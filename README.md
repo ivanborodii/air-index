@@ -1,14 +1,3 @@
-# iaq_hfis — Hierarchical Fuzzy Indoor Air Quality Index
-
-Reference implementation of the two-level Mamdani fuzzy-logic indoor air
-quality (IAQ) index described in Borodii & Osukhivska, *"Ієрархічний
-нечіткий метод формування інтегральної оцінки якості повітря у приміщенні
-на основі сенсорних вимірювань"* (ASTRJ, Ternopil Ivan Puluj National
-Technical University). It computes the index from the real sensor data
-collected by the separate [`air-monitor`](air-monitor/README.md) pipeline,
-compares it against two baseline aggregation methods, and produces
-graph-ready exports, plots, and a traceable narrative report.
-
 > **This README documents usage and interpretation. It does not replace
 > code documentation** — every public module, class, and function has its
 > own docstring; read the source for exact behavior.
