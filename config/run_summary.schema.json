@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "iaq_hfis run summary (Phase 2A: reproducibility metadata + optional evaluation)",
+  "type": "object",
+  "required": [
+    "run_id", "started_at", "finished_at", "status", "config_hash", "engine_version",
+    "window_minutes", "computed_ts_range", "n_timestamps_processed", "n_snapshot_retries",
+    "completeness_summary", "provisional_parameters_used", "environment", "errors", "warnings"
+  ],
+  "properties": {
+    "run_id": {"type": "string"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "status": {"type": "string", "enum": ["success", "partial", "failed"]},
+    "config_hash": {"type": "string"},
+    "engine_version": {"type": "string"},
+    "window_minutes": {"type": "integer"},
+    "computed_ts_range": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2},
+    "n_timestamps_processed": {"type": "integer", "minimum": 0},
+    "n_snapshot_retries": {"type": "integer", "minimum": 0},
+    "completeness_summary": {
+      "type": "object",
+      "required": ["OK", "PARTIAL", "FAILED"],
+      "properties": {
+        "OK": {"type": "integer", "minimum": 0},
+        "PARTIAL": {"type": "integer", "minimum": 0},
+        "FAILED": {"type": "integer", "minimum": 0}
+      }
+    },
+    "provisional_parameters_used": {"type": "array", "items": {"type": "string"}},
+    "environment": {
+      "type": "object",
+      "required": ["iaq_hfis_version", "python_version", "duckdb_version", "platform", "processor", "cpu_count", "git_commit", "rule_generation_version"],
+      "properties": {
+        "iaq_hfis_version": {"type": "string"},
+        "python_version": {"type": "string"},
+        "duckdb_version": {"type": "string"},
+        "platform": {"type": "string"},
+        "processor": {"type": "string"},
+        "cpu_count": {"type": ["integer", "null"]},
+        "git_commit": {"type": ["string", "null"]},
+        "rule_generation_version": {"type": "string"}
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "description": "Present only after 'iaq_hfis evaluate' has been run against this run_id; Phase 2A baselines/agreement/masking/ground-truth/stability/sensitivity/fault results.",
+      "properties": {
+        "n_computed_ts_evaluated": {"type": "integer", "minimum": 0},
+        "agreement": {"type": "array"},
+        "masking": {"type": "array"},
+        "ground_truth": {"type": "object"},
+        "stability": {"type": ["object", "null"]},
+        "sensitivity": {"type": "array"},
+        "status_proportions": {"type": "object"},
+        "reason_code_frequency": {"type": "object"}
+      }
+    },
+    "errors": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

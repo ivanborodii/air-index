@@ -1,0 +1,12 @@
+# iaq_hfis generated run artifacts -- never source, always reproducible from config + raw data
+data/iaq_hfis/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+
+# air-monitor secrets (mirrors air-monitor/.gitignore)
+air-monitor/config/email_credentials.env

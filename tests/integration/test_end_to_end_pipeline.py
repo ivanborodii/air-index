@@ -1,0 +1,148 @@
+import json
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import duckdb
+import jsonschema
+import pytest
+from fixtures.build_synthetic_db import DEFAULT_ROW, create_air_monitor_db, create_weather_db, default_weather_row
+
+from iaq_hfis.pipeline import run_pipeline
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+RUN_SUMMARY_SCHEMA = json.loads((REPO_ROOT / "config" / "run_summary.schema.json").read_text())
+
+# A January instant so the manuscript's kitchen/cold_period profile (the
+# only kitchen profile documented) applies without an override.
+COMPUTED_TS = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+WINDOW_START = COMPUTED_TS - timedelta(minutes=15)
+
+
+def _oscillate(base: float, amplitude: float, i: int) -> float:
+    """Small non-repeating, non-spiky variation -- avoids both the stuck-value
+    detector (never 5+ identical consecutive values) and the Hampel outlier
+    detector (amplitude stays well inside a normal MAD-based threshold)."""
+    return base + amplitude * (((i % 7) - 3) / 3.0)
+
+
+def _clean_rows(n: int = 30, computed_ts: datetime = COMPUTED_TS, **nullify) -> list[dict]:
+    """``n`` rows of otherwise-favorable, non-flat data ending at ``computed_ts``.
+    Pass e.g. ``mass_pm2_5=True`` to null out a field across every row
+    (simulating a fully unavailable channel)."""
+    window_start = computed_ts - timedelta(minutes=15)
+    rows = []
+    for i in range(n):
+        ts = window_start + timedelta(seconds=30 * (i + 1))
+        row = dict(DEFAULT_ROW)
+        row.update(
+            {
+                "co2_ppm": _oscillate(700.0, 5.0, i),
+                "scd_temp_c": _oscillate(19.5, 0.1, i),
+                "scd_humidity_pct": _oscillate(40.0, 0.5, i),
+                "bme_temp_c": _oscillate(19.5, 0.1, i),
+                "bme_humidity_pct": _oscillate(40.0, 0.5, i),
+                "mass_pm1_0": _oscillate(3.0, 0.1, i),
+                "mass_pm2_5": _oscillate(4.0, 0.1, i),
+                "mass_pm4_0": _oscillate(4.5, 0.1, i),
+                "mass_pm10": _oscillate(5.0, 0.1, i),
+            }
+        )
+        for field in nullify:
+            row[field] = None
+        row["ts"] = ts
+        row["measured_at"] = ts
+        row["loaded_at"] = ts
+        row["batch_id"] = f"batch-{i // 10}"
+        row["row_in_batch"] = i % 10
+        rows.append(row)
+    return rows
+
+
+@pytest.fixture
+def run_and_inspect(base_settings, sensor_specs, room_profiles):
+    def _run(rows, computed_ts: datetime = COMPUTED_TS):
+        create_air_monitor_db(Path(base_settings.paths.air_monitor_db_path), rows)
+        create_weather_db(Path(base_settings.paths.weather_db_path), [default_weather_row(computed_ts - timedelta(hours=1))])
+        summary = run_pipeline(
+            base_settings, sensor_specs, room_profiles, computed_ts - timedelta(minutes=1), computed_ts + timedelta(minutes=1), window_minutes=15
+        )
+        con = duckdb.connect(base_settings.paths.derived_db_path, read_only=True)
+        result_row = con.execute(
+            "SELECT completeness_status, index_value, index_class, missing_components FROM iaq_index_results WHERE computed_ts = ?", [computed_ts]
+        ).fetchone()
+        con.close()
+        return summary, result_row
+
+    return _run
+
+
+def test_all_components_available_gives_ok(run_and_inspect):
+    summary, (status, index_value, index_class, missing) = run_and_inspect(_clean_rows())
+    assert status == "OK"
+    assert missing == []
+    assert index_value is not None
+    assert index_class is not None
+    assert summary["completeness_summary"]["OK"] >= 1
+
+
+def test_one_missing_component_gives_partial(run_and_inspect):
+    # Temperature AND humidity both null -> M unavailable, A and V still available -> PARTIAL
+    summary, (status, index_value, index_class, missing) = run_and_inspect(_clean_rows(bme_temp_c=True, scd_temp_c=True, bme_humidity_pct=True, scd_humidity_pct=True))
+    assert status == "PARTIAL"
+    assert missing == ["M"]
+    assert index_value is not None  # still computed from the remaining components
+    assert index_class is not None
+
+
+def test_two_missing_components_gives_failed(run_and_inspect):
+    # PM (A) and temperature/humidity (M) both null -> only V (CO2) available -> FAILED
+    summary, (status, index_value, index_class, missing) = run_and_inspect(
+        _clean_rows(mass_pm2_5=True, mass_pm10=True, bme_temp_c=True, scd_temp_c=True, bme_humidity_pct=True, scd_humidity_pct=True)
+    )
+    assert status == "FAILED"
+    assert set(missing) == {"A", "M"}
+    assert index_value is None  # never a placeholder number
+    assert index_class is None
+
+
+def test_default_config_works_in_both_seasons(run_and_inspect):
+    winter_ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+
+    winter_summary, winter_row = run_and_inspect(_clean_rows(computed_ts=winter_ts), computed_ts=winter_ts)
+    assert winter_row[0] == "OK"
+    assert winter_summary["provisional_parameters_used"] == []  # kitchen/cold_period is the real manuscript/DBN profile
+
+    summer_summary, summer_row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
+    assert summer_row[0] == "OK"
+    # Author decision (2026-07-24): kitchen/warm_period deliberately reuses
+    # general_residential/warm_period's numbers, not a placeholder -- so no
+    # provisional-profile flag is expected here anymore either.
+    assert summer_summary["provisional_parameters_used"] == []
+
+
+def test_provisional_room_profile_usage_is_tracked_in_run_summary(run_and_inspect, room_profiles):
+    # Exercises the tracking mechanism itself (pipeline.py:
+    # RuntimeContext.provisional_profiles_used) independent of which real
+    # profiles happen to be provisional today.
+    summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+    profile = room_profiles.find("kitchen", "warm_period")
+    profile.provisional = True
+
+    summary, row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
+    assert row[0] == "OK"
+    assert "room_profile:kitchen/warm_period" in summary["provisional_parameters_used"]
+
+
+def test_run_summary_json_validates_against_schema(run_and_inspect):
+    summary, _ = run_and_inspect(_clean_rows())
+    jsonschema.validate(instance=summary, schema=RUN_SUMMARY_SCHEMA)
+
+
+def test_run_summary_file_is_written_and_matches_returned_summary(run_and_inspect, base_settings):
+    summary, _ = run_and_inspect(_clean_rows())
+    summary_dir = Path(base_settings.paths.run_summary_dir)
+    files = list(summary_dir.glob("run_summary_*.json"))
+    assert len(files) == 1
+    on_disk = json.loads(files[0].read_text())
+    assert on_disk == summary

@@ -1,0 +1,78 @@
+# config/room_profiles.yaml
+# Room/season temperature control regions.
+# Source, verified directly against the standard (not secondhand): ДБН
+# В.2.5-67:2013, Додаток Д (mandatory), Таблиця Д.4 "Діапазони результуючої
+# температури приміщення для опалення та охолодження", p.100.
+# Table Д.4 gives four category levels per row (Підвищені оптимальні /
+# Оптимальні / Допустимі, plus everything outside Допустимі = Critical) and
+# two period columns (опалювальний/холодний = heating/cold_period,
+# охолодження/теплий = cooling/warm_period). Only two of its residential
+# rows are used here -- see per-profile notes below for the row and exact
+# figures each profile maps to.
+#
+# Any additional room/season combination beyond what's cited to a specific
+# Table Д.4 row MUST be marked provisional: true until confirmed.
+# profiles.select_room_season() fails loudly (lists available profiles)
+# rather than silently falling back when a requested combination is missing.
+profiles:
+  - room: kitchen
+    season: cold_period
+    # CONFIRMED: Table Д.4 row "Житлові будівлі: інші об'єми (кухня,
+    # гардеробна, комора тощо)" (standing/walking, ~1.5 met), heating-period
+    # column: Підвищені оптимальні 19.5+/-1.5degC, Оптимальні 19.5+/-3.0degC,
+    # Допустимі 19.5+/-4.0degC. Mapped: Favorable=enhanced-optimal band,
+    # Acceptable=out to optimal band edge, Degraded=out to permissible band
+    # edge, Critical=beyond permissible.
+    provisional: false
+    ranges:
+      favorable: [18.0, 21.0]        # 19.5 +/- 1.5 (Підвищені оптимальні)
+      acceptable_low: [16.5, 18.0]
+      acceptable_high: [21.0, 22.5]  # outer edge = 19.5 +/- 3.0 (Оптимальні)
+      degraded_low: [15.5, 16.5]
+      degraded_high: [22.5, 23.5]    # outer edge = 19.5 +/- 4.0 (Допустимі)
+      critical_low_max: 15.5
+      critical_high_min: 23.5
+      transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
+  - room: general_residential
+    season: warm_period
+    # CONFIRMED: Table Д.4 row "Житлові будівлі: житлові об'єми (спальна
+    # кімната, вітальня, кабінет, кухня-їдальня тощо)" (sitting, ~1.2 met),
+    # cooling/warm-period column: Підвищені оптимальні 24.5+/-1.0degC,
+    # Оптимальні 24.5+/-1.5degC, Допустимі 24.5+/-2.5degC. NOTE this row is
+    # "кухня-їдальня" -- an open-plan kitchen combined with dining/living
+    # space -- not a standalone enclosed kitchen (see kitchen/warm_period
+    # below for that distinction).
+    provisional: false
+    ranges:
+      favorable: [23.5, 25.5]        # 24.5 +/- 1.0 (Підвищені оптимальні)
+      acceptable_low: [23.0, 23.5]
+      acceptable_high: [25.5, 26.0]  # outer edge = 24.5 +/- 1.5 (Оптимальні)
+      degraded_low: [22.0, 23.0]
+      degraded_high: [26.0, 27.0]    # outer edge = 24.5 +/- 2.5 (Допустимі)
+      critical_low_max: 22.0
+      critical_high_min: 27.0
+      transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
+  - room: kitchen
+    season: warm_period
+    # AUTHOR DECISION (2026-07-24): Table Д.4's standalone-kitchen row
+    # ("інші об'єми: кухня, гардеробна, комора тощо") has a literal dash
+    # ("--") in the cooling/warm-period column -- DBN B.2.5-67:2013 gives no
+    # room-specific value for a kitchen in the warm period (verified
+    # directly in the table). Per the author's explicit decision, the
+    # kitchen is treated as falling under the general residential-building
+    # temperature requirements for the warm period rather than needing a
+    # distinct kitchen-specific figure -- i.e. this profile deliberately
+    # reuses the "житлові об'єми (..., кухня-їдальня, тощо)" row's numbers
+    # (same source as general_residential/warm_period above), not as a
+    # placeholder guess but as the author's chosen interpretation of how
+    # DBN B.2.5-67:2013 applies to this room in this season.
+    provisional: false
+    ranges:
+      favorable: [23.5, 25.5]
+      acceptable_low: [23.0, 23.5]
+      acceptable_high: [25.5, 26.0]
+      degraded_low: [22.0, 23.0]
+      degraded_high: [26.0, 27.0]
+      critical_low_max: 22.0
+      critical_high_min: 27.0
+      transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
