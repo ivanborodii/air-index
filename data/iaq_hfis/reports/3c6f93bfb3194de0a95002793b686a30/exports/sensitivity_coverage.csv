@@ -1,0 +1,7 @@
+value,completeness_status,index_value,index_class
+0.7,OK,53.50284483379519,Degraded
+0.7,OK,37.50000000000001,Acceptable
+0.8,OK,53.50284483379519,Degraded
+0.8,OK,37.50000000000001,Acceptable
+0.9,OK,53.50284483379519,Degraded
+0.9,PARTIAL,37.5,Acceptable

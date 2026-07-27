@@ -1,0 +1,122 @@
+[
+  {
+    "id": "index_timeseries",
+    "title": "IAQ Index Over Time",
+    "source_csv": "index_timeseries.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "index_value"
+    ],
+    "group_by": null,
+    "description": "PROPOSED-HFIS index value over the computed range. Shade/annotate the 25/50/75 class boundaries."
+  },
+  {
+    "id": "method_comparison",
+    "title": "PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN",
+    "source_csv": "method_comparison.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "proposed_index_value",
+      "crisp_max_index_value",
+      "weighted_mean_index_value"
+    ],
+    "group_by": null,
+    "description": "Three index series over the same computed_ts range -- shows where methods diverge."
+  },
+  {
+    "id": "component_scores",
+    "title": "Component Crisp Scores Over Time",
+    "source_csv": "component_scores_timeseries.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "crisp_score"
+    ],
+    "group_by": "component",
+    "description": "One line per component (A/V/M), grouped by the 'component' column."
+  },
+  {
+    "id": "coverage_over_time",
+    "title": "Channel Coverage Ratio Over Time",
+    "source_csv": "data_quality_summary.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "coverage_ratio"
+    ],
+    "group_by": "channel",
+    "description": "Coverage ratio per direct-input channel, grouped by 'channel'; overlay the configured min_ratio threshold."
+  },
+  {
+    "id": "reason_code_frequency",
+    "title": "Data-Quality Reason Code Frequency",
+    "source_csv": "reason_code_frequency.csv",
+    "plot_type": "bar",
+    "x": "reason_code",
+    "y": [
+      "count"
+    ],
+    "group_by": null,
+    "description": "Which fault categories (stuck value, single spike, ...) drove data unavailability."
+  },
+  {
+    "id": "stability_trials",
+    "title": "Stability: Class Outcomes Under Perturbation",
+    "source_csv": "stability_trials.csv",
+    "plot_type": "histogram",
+    "x": "trial_class",
+    "y": [],
+    "group_by": null,
+    "description": "Count of perturbation trials landing in each class; compare against the baseline_class from run_summary.json."
+  },
+  {
+    "id": "sensitivity_window",
+    "title": "Sensitivity to Window Duration",
+    "source_csv": "sensitivity_window.csv",
+    "plot_type": "line",
+    "x": "value",
+    "y": [
+      "index_value"
+    ],
+    "group_by": null,
+    "description": "Index value at each manuscript-specified window size (5/15/30/60 min)."
+  },
+  {
+    "id": "sensitivity_coverage",
+    "title": "Sensitivity to Coverage Threshold",
+    "source_csv": "sensitivity_coverage.csv",
+    "plot_type": "line",
+    "x": "value",
+    "y": [
+      "index_value"
+    ],
+    "group_by": null,
+    "description": "Index value at each manuscript-specified coverage threshold (0.70/0.80/0.90)."
+  },
+  {
+    "id": "masking_rate",
+    "title": "Masking Rate: CRISP-MAX vs WEIGHTED-MEAN",
+    "source_csv": "masking_summary.csv",
+    "plot_type": "bar",
+    "x": "method",
+    "y": [
+      "masking_rate"
+    ],
+    "group_by": null,
+    "description": "Fraction of critical-component events hidden by each baseline's aggregation."
+  },
+  {
+    "id": "ground_truth_scores",
+    "title": "Ground-Truth Macro-F1 by Method",
+    "source_csv": "ground_truth_summary.csv",
+    "plot_type": "bar",
+    "x": "method",
+    "y": [
+      "macro_f1"
+    ],
+    "group_by": null,
+    "description": "Macro-F1 against the synthetic boundary-adjacent ground truth, one bar per method."
+  }
+]

@@ -1,0 +1,174 @@
+{
+  "run_id": "3c6f93bfb3194de0a95002793b686a30",
+  "started_at": "2026-07-25T11:05:05.044893+00:00",
+  "finished_at": "2026-07-25T12:06:47.018935+00:00",
+  "status": "success",
+  "config_hash": "4edee11f418f0114d4856ac2cf43c8b43e893093d0bd83abe9c246c956fbe356",
+  "engine_version": "0.1.0",
+  "window_minutes": 15,
+  "computed_ts_range": [
+    "2026-06-18T21:00:00+00:00",
+    "2026-07-27T20:29:16+00:00"
+  ],
+  "n_timestamps_processed": 11231,
+  "n_snapshot_retries": 0,
+  "completeness_summary": {
+    "OK": 10242,
+    "PARTIAL": 442,
+    "FAILED": 547
+  },
+  "provisional_parameters_used": [],
+  "environment": {
+    "iaq_hfis_version": "0.1.0",
+    "python_version": "3.13.5",
+    "duckdb_version": "1.5.2",
+    "platform": "Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41",
+    "processor": "aarch64",
+    "cpu_count": 4,
+    "git_commit": null,
+    "rule_generation_version": "worst-of-max-severity-v1"
+  },
+  "errors": [],
+  "warnings": [],
+  "evaluation": {
+    "n_computed_ts_evaluated": 11225,
+    "agreement": [
+      {
+        "method_a": "CRISP-MAX",
+        "method_b": "PROPOSED-HFIS",
+        "n": 10678,
+        "n_excluded": 547,
+        "percent_agreement": 1.0,
+        "cohens_kappa": 1.0
+      },
+      {
+        "method_a": "CRISP-MAX",
+        "method_b": "WEIGHTED-MEAN",
+        "n": 10696,
+        "n_excluded": 529,
+        "percent_agreement": 0.24336200448765893,
+        "cohens_kappa": 0.07776220425956025
+      },
+      {
+        "method_a": "PROPOSED-HFIS",
+        "method_b": "WEIGHTED-MEAN",
+        "n": 10678,
+        "n_excluded": 547,
+        "percent_agreement": 0.2420865330586252,
+        "cohens_kappa": 0.07662089597582114
+      }
+    ],
+    "masking": [
+      {
+        "method": "CRISP-MAX",
+        "severity_threshold": "Critical",
+        "n_critical_events": 4231,
+        "n_masked": 0,
+        "masking_rate": 0.0
+      },
+      {
+        "method": "WEIGHTED-MEAN",
+        "severity_threshold": "Critical",
+        "n_critical_events": 4231,
+        "n_masked": 4206,
+        "masking_rate": 0.9940912313873789
+      }
+    ],
+    "ground_truth": {
+      "PROPOSED-HFIS": {
+        "n": 42,
+        "n_excluded": 0,
+        "macro_f1": 0.8688644688644689,
+        "cohens_kappa": 0.8073394495412844
+      },
+      "CRISP-MAX": {
+        "n": 42,
+        "n_excluded": 0,
+        "macro_f1": 0.8688644688644689,
+        "cohens_kappa": 0.8073394495412844
+      },
+      "WEIGHTED-MEAN": {
+        "n": 42,
+        "n_excluded": 0,
+        "macro_f1": 0.1527777777777778,
+        "cohens_kappa": -0.04076738609112707
+      }
+    },
+    "stability": {
+      "computed_ts": "2026-07-27T23:25:00+03:00",
+      "seed": 42,
+      "n_trials": 30,
+      "baseline_class": "Acceptable",
+      "class_change_rate": 0.16666666666666666
+    },
+    "sensitivity": [
+      {
+        "varied_parameter": "window_minutes",
+        "value": 5,
+        "completeness_status": "OK",
+        "index_value": 37.5,
+        "index_class": "Acceptable"
+      },
+      {
+        "varied_parameter": "window_minutes",
+        "value": 15,
+        "completeness_status": "OK",
+        "index_value": 37.50000000000001,
+        "index_class": "Acceptable"
+      },
+      {
+        "varied_parameter": "window_minutes",
+        "value": 30,
+        "completeness_status": "OK",
+        "index_value": 37.5,
+        "index_class": "Acceptable"
+      },
+      {
+        "varied_parameter": "window_minutes",
+        "value": 60,
+        "completeness_status": "OK",
+        "index_value": 37.5,
+        "index_class": "Acceptable"
+      },
+      {
+        "varied_parameter": "coverage_threshold",
+        "value": 0.7,
+        "completeness_status": "OK",
+        "index_value": 37.50000000000001,
+        "index_class": "Acceptable"
+      },
+      {
+        "varied_parameter": "coverage_threshold",
+        "value": 0.8,
+        "completeness_status": "OK",
+        "index_value": 37.50000000000001,
+        "index_class": "Acceptable"
+      },
+      {
+        "varied_parameter": "coverage_threshold",
+        "value": 0.9,
+        "completeness_status": "PARTIAL",
+        "index_value": 37.5,
+        "index_class": "Acceptable"
+      }
+    ],
+    "status_proportions": {
+      "n_total": 11225,
+      "OK": 0.9119821826280624,
+      "PARTIAL": 0.03928730512249443,
+      "FAILED": 0.048730512249443206
+    },
+    "reason_code_frequency": {
+      "n_total_quality_rows": 561250,
+      "counts": {
+        "data_loss": 2686,
+        "out_of_range": 24920,
+        "single_spike": 57106,
+        "stuck_value": 11773,
+        "gradual_drift": 1371
+      }
+    },
+    "started_at": "2026-07-27T21:03:50.396162+00:00",
+    "finished_at": "2026-07-27T21:06:06.370924+00:00"
+  }
+}

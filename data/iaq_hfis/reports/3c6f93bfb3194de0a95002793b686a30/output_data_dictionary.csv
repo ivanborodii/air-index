@@ -1,0 +1,65 @@
+file,column,dtype,unit,description
+index_timeseries.csv,computed_ts,datetime,UTC timestamp,Instant the index was computed for (end of the rolling window).
+index_timeseries.csv,window_minutes,int,minutes,Aggregation window size used for this row.
+index_timeseries.csv,completeness_status,str,-,OK | PARTIAL | FAILED.
+index_timeseries.csv,index_value,float,0-100,Defuzzified PROPOSED-HFIS index value; null if FAILED.
+index_timeseries.csv,index_class,str,-,Favorable | Acceptable | Degraded | Critical; null if FAILED.
+index_timeseries.csv,dominant_component,str,-,Semicolon-joined component(s) most responsible for the activated rules (A/V/M); ties preserved.
+index_timeseries.csv,n_rules_fired,int,count,Number of Mamdani rules with nonzero firing strength.
+component_scores_timeseries.csv,computed_ts,datetime,UTC timestamp,Instant the component was computed for.
+component_scores_timeseries.csv,window_minutes,int,minutes,Aggregation window size used.
+component_scores_timeseries.csv,component,str,-,A (aerosol) | V (ventilation) | M (microclimate).
+component_scores_timeseries.csv,available,bool,-,Whether this component had sufficient coverage to be computed.
+component_scores_timeseries.csv,crisp_score,float,0-100,Centroid crisp score on the same scale as the final index; null if unavailable.
+component_scores_timeseries.csv,membership_favorable,float,0-1,Degree of membership in Favorable.
+component_scores_timeseries.csv,membership_acceptable,float,0-1,Degree of membership in Acceptable.
+component_scores_timeseries.csv,membership_degraded,float,0-1,Degree of membership in Degraded.
+component_scores_timeseries.csv,membership_critical,float,0-1,Degree of membership in Critical.
+component_scores_timeseries.csv,room,str,-,Room profile used for the microclimate component (temperature range selection).
+component_scores_timeseries.csv,season,str,-,Season profile used (cold_period | warm_period).
+method_comparison.csv,computed_ts,datetime,UTC timestamp,Instant compared across all three methods.
+method_comparison.csv,proposed_status,str,-,PROPOSED-HFIS completeness status.
+method_comparison.csv,proposed_index_value,float,0-100,PROPOSED-HFIS index value.
+method_comparison.csv,proposed_index_class,str,-,PROPOSED-HFIS index class.
+method_comparison.csv,crisp_max_index_value,float,0-100,CRISP-MAX baseline index value.
+method_comparison.csv,crisp_max_index_class,str,-,CRISP-MAX baseline index class.
+method_comparison.csv,weighted_mean_index_value,float,0-100,WEIGHTED-MEAN baseline index value.
+method_comparison.csv,weighted_mean_index_class,str,-,WEIGHTED-MEAN baseline index class.
+data_quality_summary.csv,computed_ts,datetime,UTC timestamp,Window this coverage figure applies to.
+data_quality_summary.csv,window_minutes,int,minutes,Aggregation window size.
+data_quality_summary.csv,channel,str,-,pm2_5 | pm10 | co2 | temperature | humidity.
+data_quality_summary.csv,n_expected,int,count,Expected samples in the window at the configured cadence.
+data_quality_summary.csv,n_usable,int,count,VALID + confirmed-SUSPECT samples.
+data_quality_summary.csv,coverage_ratio,float,0-1,n_usable / n_expected.
+data_quality_summary.csv,coverage_ok,bool,-,coverage_ratio >= configured min_ratio.
+data_quality_summary.csv,weighted_mean,float,channel units,Time-weighted mean; null if coverage_ok is false.
+reason_code_frequency.csv,reason_code,str,-,single_spike | stuck_value | data_loss | gradual_drift | out_of_range.
+reason_code_frequency.csv,count,int,count,Number of observation_quality rows carrying this reason code.
+stability_trials.csv,trial_index,int,-,0-based perturbation trial number.
+stability_trials.csv,trial_class,str,-,Index class recomputed after perturbing every available channel within its declared uncertainty.
+stability_trials.csv,changed_from_baseline,bool,-,Whether this trial's class differs from the unperturbed baseline class.
+sensitivity_window.csv,value,int,minutes,"Window size tested (manuscript-specified: 5, 15, 30, 60)."
+sensitivity_window.csv,completeness_status,str,-,OK | PARTIAL | FAILED at this window size.
+sensitivity_window.csv,index_value,float,0-100,Index value at this window size; null if FAILED.
+sensitivity_window.csv,index_class,str,-,Index class at this window size; null if FAILED.
+sensitivity_coverage.csv,value,float,0-1,"Coverage threshold tested (manuscript-specified: 0.70, 0.80, 0.90)."
+sensitivity_coverage.csv,completeness_status,str,-,OK | PARTIAL | FAILED at this threshold.
+sensitivity_coverage.csv,index_value,float,0-100,Index value at this threshold; null if FAILED.
+sensitivity_coverage.csv,index_class,str,-,Index class at this threshold; null if FAILED.
+masking_summary.csv,method,str,-,CRISP-MAX | WEIGHTED-MEAN.
+masking_summary.csv,severity_threshold,str,-,Severity a component must reach to count as 'hidden' if the baseline doesn't also reach it.
+masking_summary.csv,n_critical_events,int,count,Computed_ts where at least one component reached severity_threshold.
+masking_summary.csv,n_masked,int,count,"Of those, how many the baseline's aggregated class did not also reach."
+masking_summary.csv,masking_rate,float,0-1,"n_masked / n_critical_events; null if n_critical_events is 0 (nothing to mask, not a fabricated 0)."
+ground_truth_summary.csv,method,str,-,PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN.
+ground_truth_summary.csv,n,int,count,Synthetic boundary-adjacent vectors scored.
+ground_truth_summary.csv,n_excluded,int,count,Vectors excluded for lack of a predicted class (e.g. FAILED).
+ground_truth_summary.csv,macro_f1,float,0-1,Unweighted mean per-class F1 against the synthetic ground truth.
+ground_truth_summary.csv,cohens_kappa,float,-1 to 1,Cohen's kappa against the synthetic ground truth.
+outdoor_context_timeseries.csv,computed_ts,datetime,UTC timestamp,Instant the outdoor context was fetched for.
+outdoor_context_timeseries.csv,outdoor_forecast_time,datetime,UTC timestamp,"Timestamp of the outdoor observation actually used (as-of, never future)."
+outdoor_context_timeseries.csv,age_minutes,float,minutes,computed_ts minus outdoor_forecast_time.
+outdoor_context_timeseries.csv,is_stale,bool,-,age_minutes exceeds the configured staleness threshold.
+outdoor_context_timeseries.csv,pm2_5,float,ug/m3,"Outdoor PM2.5 (context only, never a direct index input)."
+outdoor_context_timeseries.csv,pm10,float,ug/m3,Outdoor PM10 (context only).
+outdoor_context_timeseries.csv,temperature_2m,float,degC,Outdoor temperature at 2m (context only).
