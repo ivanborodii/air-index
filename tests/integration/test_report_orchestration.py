@@ -52,9 +52,9 @@ def reported_run(base_settings, sensor_specs, room_profiles):
     create_weather_db(Path(base_settings.paths.weather_db_path), [default_weather_row(COMPUTED_TS - timedelta(hours=1))])
 
     run_summary = run_pipeline(base_settings, sensor_specs, room_profiles, COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15)
-    run_evaluation(base_settings, sensor_specs, room_profiles, COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15, run_id=run_summary["run_id"])
-    report_result = generate_report(base_settings, run_summary["run_id"])
-    return base_settings, run_summary["run_id"], report_result
+    run_evaluation(base_settings, sensor_specs, room_profiles, run_summary["pipeline_run_id"], COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15)
+    report_result = generate_report(base_settings, run_summary["pipeline_run_id"])
+    return base_settings, run_summary["pipeline_run_id"], report_result
 
 
 def test_report_raises_clear_error_for_unknown_run_id(base_settings, sensor_specs, room_profiles):
@@ -89,17 +89,17 @@ def test_plot_manifest_is_valid_json_list(reported_run):
 
 
 def test_narrative_traceable_to_actual_run_summary_json(reported_run, base_settings):
-    _, run_id, _ = reported_run
-    summary_path = Path(base_settings.paths.run_summary_dir) / f"run_summary_{run_id}.json"
+    _, pipeline_run_id, _ = reported_run
+    summary_path = Path(base_settings.paths.run_summary_dir) / f"run_summary_{pipeline_run_id}.json"
     summary = json.loads(summary_path.read_text())
-    narrative_path = Path(base_settings.paths.run_summary_dir).parent / "reports" / run_id / "run_narrative.md"
+    narrative_path = Path(base_settings.paths.run_summary_dir).parent / "reports" / pipeline_run_id / "run_narrative.md"
     narrative = narrative_path.read_text()
 
-    assert run_id in narrative
+    assert pipeline_run_id in narrative
     cs = summary["completeness_summary"]
     assert str(cs["OK"]) in narrative
     ev = summary["evaluation"]
-    for method, score in ev["ground_truth"].items():
+    for method, score in ev["reference_cases"].items():
         assert f"{score['macro_f1']:.3f}" in narrative
 
 
@@ -108,14 +108,27 @@ def test_plot_raises_clear_error_before_report(base_settings, sensor_specs, room
     create_weather_db(Path(base_settings.paths.weather_db_path), [default_weather_row(COMPUTED_TS - timedelta(hours=1))])
     run_summary = run_pipeline(base_settings, sensor_specs, room_profiles, COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15)
     with pytest.raises(FileNotFoundError, match="run 'iaq_hfis report"):
-        generate_plots(base_settings, run_summary["run_id"])
+        generate_plots(base_settings, run_summary["pipeline_run_id"])
 
 
 def test_plot_renders_pngs_after_report(reported_run):
-    settings, run_id, _ = reported_run
-    plot_result = generate_plots(settings, run_id)
+    settings, pipeline_run_id, _ = reported_run
+    plot_result = generate_plots(settings, pipeline_run_id)
     rendered_paths = [p for p in plot_result["rendered"].values() if p is not None]
     assert len(rendered_paths) > 0
     for path in rendered_paths:
         assert Path(path).is_file()
         assert Path(path).suffix == ".png"
+
+
+def test_report_is_deterministic_when_regenerated(reported_run):
+    """Mandatory regression test: repeated report generation for the same
+    pipeline_run_id (no underlying data change) must be byte-for-byte
+    deterministic."""
+    settings, pipeline_run_id, first_result = reported_run
+    second_result = generate_report(settings, pipeline_run_id)
+
+    first_md = Path(first_result["run_summary_md"]).read_text()
+    generate_report(settings, pipeline_run_id)  # regenerate again, overwriting in place
+    second_md = Path(second_result["run_summary_md"]).read_text()
+    assert first_md == second_md

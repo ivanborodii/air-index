@@ -143,16 +143,29 @@ def infer_from_values(
     index_result = None
     if available_components:
         component_degrees = {c: r.class_degrees for c, r in component_results.items()}
-        index_result = ctx.engine.infer_index(component_degrees, available_components)
+        component_crisp_scores = {c: r.crisp_score for c, r in component_results.items()}
+        index_result = ctx.engine.infer_index(
+            component_degrees, available_components, component_crisp_scores, ctx.settings.membership.dominant_component_tie_tolerance
+        )
     return component_results, index_result
 
 
-def compute_index_at(ctx: RuntimeContext, source: AirMonitorSource, computed_ts: datetime, window_minutes: int, writer: DerivedResultsWriter | None) -> dict:
+def compute_index_at(
+    ctx: RuntimeContext,
+    source: AirMonitorSource,
+    computed_ts: datetime,
+    window_minutes: int,
+    writer: DerivedResultsWriter | None,
+    pipeline_run_id: str | None = None,
+) -> dict:
     """Full pipeline for one (computed_ts, window_minutes) pair: validate,
     aggregate, infer, classify completeness, and (if ``writer`` given)
-    persist every derived row. Returns a small summary dict for run-level
-    logging/metadata.
+    persist every derived row tagged with ``pipeline_run_id`` (required
+    whenever ``writer`` is given -- every persisted row must be run-isolated).
+    Returns a small summary dict for run-level logging/metadata.
     """
+    if writer is not None and pipeline_run_id is None:
+        raise ValueError("pipeline_run_id is required when writer is given (every persisted row must be run-isolated)")
     settings = ctx.settings
     window_start = computed_ts - _minutes(window_minutes)
     now = datetime.now(timezone.utc)
@@ -185,12 +198,12 @@ def compute_index_at(ctx: RuntimeContext, source: AirMonitorSource, computed_ts:
         weighted_means[channel] = aggregate.weighted_mean
 
         if writer is not None:
-            _persist_quality(writer, stage2_df, now)
+            _persist_quality(writer, stage2_df, now, pipeline_run_id)
             writer.connection.execute(
                 """INSERT OR REPLACE INTO window_aggregates
-                   (computed_ts, window_minutes, channel, n_expected, n_usable, coverage_ratio, coverage_ok, weighted_mean)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                [computed_ts, window_minutes, channel, aggregate.coverage.n_expected, aggregate.coverage.n_usable, aggregate.coverage.ratio, aggregate.coverage.ok, aggregate.weighted_mean],
+                   (pipeline_run_id, computed_ts, window_minutes, channel, n_expected, n_usable, coverage_ratio, coverage_ok, weighted_mean)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                [pipeline_run_id, computed_ts, window_minutes, channel, aggregate.coverage.n_expected, aggregate.coverage.n_usable, aggregate.coverage.ratio, aggregate.coverage.ok, aggregate.weighted_mean],
             )
 
     completeness = completeness_status(coverage)
@@ -213,42 +226,43 @@ def compute_index_at(ctx: RuntimeContext, source: AirMonitorSource, computed_ts:
             cd = result.class_degrees
             writer.connection.execute(
                 """INSERT OR REPLACE INTO component_scores
-                   (computed_ts, window_minutes, component, available, missing_inputs,
+                   (pipeline_run_id, computed_ts, window_minutes, component, available, missing_inputs,
                     membership_favorable, membership_acceptable, membership_degraded, membership_critical,
                     crisp_score, room, season)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                [computed_ts, window_minutes, component, True, [], cd.get("Favorable"), cd.get("Acceptable"), cd.get("Degraded"), cd.get("Critical"), result.crisp_score, profile.room, profile.season],
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                [pipeline_run_id, computed_ts, window_minutes, component, True, [], cd.get("Favorable"), cd.get("Acceptable"), cd.get("Degraded"), cd.get("Critical"), result.crisp_score, profile.room, profile.season],
             )
         for component in COMPONENT_INPUTS:
             if not availability[component]:
                 missing = [ch for ch in COMPONENT_INPUTS[component] if ch in completeness.missing_inputs]
                 writer.connection.execute(
                     """INSERT OR REPLACE INTO component_scores
-                       (computed_ts, window_minutes, component, available, missing_inputs,
+                       (pipeline_run_id, computed_ts, window_minutes, component, available, missing_inputs,
                         membership_favorable, membership_acceptable, membership_degraded, membership_critical,
                         crisp_score, room, season)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    [computed_ts, window_minutes, component, False, missing, None, None, None, None, None, profile.room, profile.season],
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    [pipeline_run_id, computed_ts, window_minutes, component, False, missing, None, None, None, None, None, profile.room, profile.season],
                 )
 
     if writer is not None:
         index_value = index_result.index_value if index_result else None
         index_class = index_result.index_class if index_result else None
         dominant = index_result.dominant_components if index_result else []
+        contributors = index_result.rule_level_contributors if index_result else []
         n_fired = index_result.n_rules_fired if index_result else None
         writer.connection.execute(
             """INSERT OR REPLACE INTO iaq_index_results
-               (computed_ts, window_minutes, completeness_status, missing_components, missing_inputs,
-                index_value, index_class, dominant_component, n_rules_fired, engine_version, config_hash, computed_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            [computed_ts, window_minutes, completeness.status, completeness.missing_components, completeness.missing_inputs,
-             index_value, index_class, dominant, n_fired, settings.engine_version, ctx.config_hash, now],
+               (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs,
+                index_value, index_class, dominant_component, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            [pipeline_run_id, computed_ts, window_minutes, completeness.status, completeness.missing_components, completeness.missing_inputs,
+             index_value, index_class, dominant, contributors, n_fired, settings.engine_version, ctx.config_hash, now],
         )
         writer.connection.execute(
             """INSERT OR REPLACE INTO outdoor_context
-               (computed_ts, outdoor_forecast_time, age_minutes, is_stale, pm2_5, pm10, temperature_2m, relative_humidity_2m)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            [computed_ts, outdoor_ctx["forecast_time"], outdoor_ctx["age_minutes"], outdoor_ctx["is_stale"], outdoor_ctx["pm2_5"], outdoor_ctx["pm10"], outdoor_ctx["temperature_2m"], outdoor_ctx["relative_humidity_2m"]],
+               (pipeline_run_id, computed_ts, outdoor_forecast_time, age_minutes, is_stale, pm2_5, pm10, temperature_2m, relative_humidity_2m)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            [pipeline_run_id, computed_ts, outdoor_ctx["forecast_time"], outdoor_ctx["age_minutes"], outdoor_ctx["is_stale"], outdoor_ctx["pm2_5"], outdoor_ctx["pm10"], outdoor_ctx["temperature_2m"], outdoor_ctx["relative_humidity_2m"]],
         )
 
     return {
@@ -259,14 +273,14 @@ def compute_index_at(ctx: RuntimeContext, source: AirMonitorSource, computed_ts:
     }
 
 
-def _persist_quality(writer: DerivedResultsWriter, stage2_df, computed_at: datetime) -> None:
+def _persist_quality(writer: DerivedResultsWriter, stage2_df, computed_at: datetime, pipeline_run_id: str) -> None:
     for _, row in stage2_df.iterrows():
         writer.connection.execute(
             """INSERT OR REPLACE INTO observation_quality
-               (ts, channel, raw_value, stage1_state, stage2_state, usable, confirmed, reason_codes,
+               (pipeline_run_id, ts, channel, raw_value, stage1_state, stage2_state, usable, confirmed, reason_codes,
                 hampel_median, hampel_mad, computed_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            [row["ts"], row["channel"], row["raw_value"], row["stage1_state"], row["stage2_state"], bool(row["usable"]), row["confirmed"], row["reason_codes"], row["hampel_median"], row["hampel_mad"], computed_at],
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            [pipeline_run_id, row["ts"], row["channel"], row["raw_value"], row["stage1_state"], row["stage2_state"], bool(row["usable"]), row["confirmed"], row["reason_codes"], row["hampel_median"], row["hampel_mad"], computed_at],
         )
 
 
@@ -281,9 +295,15 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
     ``(from_ts, to_ts]`` and writes a minimal reproducibility-metadata
     run_summary.json. Opens exactly one snapshot of air_monitor.duckdb for
     the whole range (see :mod:`iaq_hfis.db`).
+
+    Every persisted row is tagged with a freshly generated
+    ``pipeline_run_id``: a second call over an overlapping or identical
+    range writes rows under its own distinct pipeline_run_id and never
+    overwrites or reads the first call's rows (see :mod:`iaq_hfis.db`'s
+    run-isolated schema).
     """
     window_minutes = window_minutes or settings.cadence.aggregation_window_minutes
-    run_id = uuid.uuid4().hex
+    pipeline_run_id = uuid.uuid4().hex
     started_at = datetime.now(timezone.utc)
 
     with AirMonitorSource(settings) as source:
@@ -295,26 +315,28 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
         status_counts = {"OK": 0, "PARTIAL": 0, "FAILED": 0}
         try:
             for computed_ts in computed_timestamps:
-                result = compute_index_at(ctx, source, computed_ts, window_minutes, writer)
+                result = compute_index_at(ctx, source, computed_ts, window_minutes, writer, pipeline_run_id)
                 status_counts[result["completeness_status"]] += 1
 
             finished_at = datetime.now(timezone.utc)
             run_status = "success" if status_counts["FAILED"] < len(computed_timestamps) else "failed"
+            environment = collect_environment_metadata(REPO_ROOT)
             writer.connection.execute(
                 """INSERT OR REPLACE INTO pipeline_runs
-                   (run_id, started_at, finished_at, status, computed_ts_min, computed_ts_max,
-                    n_timestamps_processed, n_snapshot_retries, config_hash, run_summary_path)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                [run_id, started_at, finished_at, run_status,
+                   (pipeline_run_id, started_at, finished_at, status, computed_ts_min, computed_ts_max,
+                    window_minutes, n_timestamps_processed, n_snapshot_retries, config_hash, engine_version, source_git_commit)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                [pipeline_run_id, started_at, finished_at, run_status,
                  computed_timestamps[0] if computed_timestamps else None,
                  computed_timestamps[-1] if computed_timestamps else None,
-                 len(computed_timestamps), source.snapshot_retry_count, ctx.config_hash, None],
+                 window_minutes, len(computed_timestamps), source.snapshot_retry_count, ctx.config_hash,
+                 settings.engine_version, environment.get("git_commit")],
             )
         finally:
             writer.close()
 
     summary = {
-        "run_id": run_id,
+        "pipeline_run_id": pipeline_run_id,
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "status": run_status,
@@ -326,14 +348,15 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
         "n_snapshot_retries": source.snapshot_retry_count,
         "completeness_summary": status_counts,
         "provisional_parameters_used": ctx.provisional_parameters_used + sorted(ctx.provisional_profiles_used),
-        "environment": collect_environment_metadata(REPO_ROOT),
+        "environment": environment,
+        "selected_evaluation_run_id": None,
         "errors": [],
         "warnings": [],
     }
 
     summary_dir = Path(settings.paths.run_summary_dir)
     summary_dir.mkdir(parents=True, exist_ok=True)
-    summary_path = summary_dir / f"run_summary_{run_id}.json"
+    summary_path = summary_dir / f"run_summary_{pipeline_run_id}.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     return summary

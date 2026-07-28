@@ -20,14 +20,35 @@ from iaq_hfis.models import ComponentInferenceResult, FiredRule, IndexInferenceR
 from iaq_hfis.rules import RuleBase, generate_component_rules
 
 
-def dominant_components(fired_rules: list[FiredRule]) -> list[str]:
-    """The component(s) most responsible for the activated rules.
+def dominant_adverse_component(component_crisp_scores: dict[str, float], tie_tolerance: float) -> list[str]:
+    """The manuscript's dominant adverse component: the available
+    component with the highest adverse crisp score (0-100 scale, higher =
+    worse, the same scale and centroid the final index itself uses).
 
-    For every rule with firing_strength > 0, its "binding" component(s) are
-    whichever antecedent(s) attained the rule's minimum degree (the one(s)
-    that actually constrained the min). Each binding component accumulates
-    the rule's firing strength; the result is every component tied for the
-    highest accumulated score — ties are preserved, never arbitrarily broken.
+    Multiple components are returned only when their crisp scores are
+    within ``tie_tolerance`` of the maximum (an exact tie, or a near-tie
+    within the configured tolerance); a component outside tolerance is
+    excluded even if nominally high. Empty input (e.g. a FAILED result, or
+    no components with a defined crisp score) returns an empty list --
+    never a placeholder.
+    """
+    scored = {c: s for c, s in component_crisp_scores.items() if s is not None}
+    if not scored:
+        return []
+    max_score = max(scored.values())
+    return sorted(c for c, s in scored.items() if (max_score - s) <= tie_tolerance)
+
+
+def rule_level_contributors(fired_rules: list[FiredRule]) -> list[str]:
+    """Diagnostic only -- NOT the manuscript's dominant adverse component
+    (see :func:`dominant_adverse_component`). The component(s) most
+    responsible for the activated rules: for every rule with
+    firing_strength > 0, its "binding" component(s) are whichever
+    antecedent(s) attained the rule's minimum degree (the one(s) that
+    actually constrained the min). Each binding component accumulates the
+    rule's firing strength; the result is every component tied for the
+    highest accumulated score -- ties are preserved, never arbitrarily
+    broken.
     """
     scores: dict[str, float] = {}
     for fr in fired_rules:
@@ -99,7 +120,13 @@ class MamdaniEngine:
         crisp = self._centroid(class_activation)
         return ComponentInferenceResult(component=component, class_degrees=class_activation, crisp_score=crisp if crisp is not None else 0.0, fired_rules=fired)
 
-    def infer_index(self, component_degrees: dict[str, dict[str, float]], available_components: set[str]) -> IndexInferenceResult:
+    def infer_index(
+        self,
+        component_degrees: dict[str, dict[str, float]],
+        available_components: set[str],
+        component_crisp_scores: dict[str, float],
+        dominant_component_tie_tolerance: float,
+    ) -> IndexInferenceResult:
         """Second-level inference. When ``available_components`` is a proper
         subset of {A, V, M} (completeness status PARTIAL), a fresh worst-of
         rule set is generated over just the available components, rather
@@ -125,11 +152,17 @@ class MamdaniEngine:
 
         index_value = self._centroid(class_activation)
         index_class = classify_output(index_value) if index_value is not None else None
-        dominant = dominant_components(fired)
+        # Dominant adverse component is computed from available components'
+        # crisp scores only -- PARTIAL naturally considers only those,
+        # since unavailable components have no crisp score.
+        available_crisp_scores = {c: s for c, s in component_crisp_scores.items() if c in available_components}
+        dominant = dominant_adverse_component(available_crisp_scores, dominant_component_tie_tolerance)
+        contributors = rule_level_contributors(fired)
         return IndexInferenceResult(
             output_class_degrees=class_activation,
             index_value=index_value,
             index_class=index_class,
             dominant_components=dominant,
+            rule_level_contributors=contributors,
             fired_rules=fired,
         )

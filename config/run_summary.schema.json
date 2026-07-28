@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "iaq_hfis run summary (Phase 2A: reproducibility metadata + optional evaluation)",
+  "title": "iaq_hfis run summary (reproducibility metadata + optional evaluation, run-isolated)",
   "type": "object",
   "required": [
-    "run_id", "started_at", "finished_at", "status", "config_hash", "engine_version",
+    "pipeline_run_id", "started_at", "finished_at", "status", "config_hash", "engine_version",
     "window_minutes", "computed_ts_range", "n_timestamps_processed", "n_snapshot_retries",
-    "completeness_summary", "provisional_parameters_used", "environment", "errors", "warnings"
+    "completeness_summary", "provisional_parameters_used", "environment",
+    "selected_evaluation_run_id", "errors", "warnings"
   ],
   "properties": {
-    "run_id": {"type": "string"},
+    "pipeline_run_id": {"type": "string"},
     "started_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
-    "status": {"type": "string", "enum": ["success", "partial", "failed"]},
+    "status": {"type": "string", "enum": ["success", "failed"]},
     "config_hash": {"type": "string"},
     "engine_version": {"type": "string"},
     "window_minutes": {"type": "integer"},
@@ -42,18 +43,59 @@
         "rule_generation_version": {"type": "string"}
       }
     },
+    "selected_evaluation_run_id": {
+      "type": ["string", "null"],
+      "description": "The single evaluation_run_id whose results are reported below, if evaluation has been run."
+    },
     "evaluation": {
       "type": "object",
-      "description": "Present only after 'iaq_hfis evaluate' has been run against this run_id; Phase 2A baselines/agreement/masking/ground-truth/stability/sensitivity/fault results.",
+      "description": "Present only after 'iaq_hfis evaluate' has been run for this pipeline_run_id; baselines/agreement/masking/reference-case/stability/sensitivity/fault results for exactly the evaluation run named by selected_evaluation_run_id.",
       "properties": {
+        "evaluation_run_id": {"type": "string"},
+        "pipeline_run_id": {"type": "string"},
         "n_computed_ts_evaluated": {"type": "integer", "minimum": 0},
         "agreement": {"type": "array"},
         "masking": {"type": "array"},
-        "ground_truth": {"type": "object"},
-        "stability": {"type": ["object", "null"]},
-        "sensitivity": {"type": "array"},
+        "reference_cases": {
+          "type": "object",
+          "description": "Consistency with predefined synthetic boundary-adjacent labels -- NOT an empirical accuracy estimate."
+        },
+        "stability": {
+          "type": ["object", "null"],
+          "description": "Multi-point stability: deterministic boundary-adjacent + random-comparison sample, all 3 methods.",
+          "properties": {
+            "n_samples": {"type": "integer"},
+            "n_trials_per_sample": {"type": "integer"},
+            "seed": {"type": "integer"},
+            "by_method": {"type": "object"}
+          }
+        },
+        "sensitivity": {
+          "type": "object",
+          "description": "Multi-point sensitivity: deterministic stratified sample across the evaluated range.",
+          "properties": {
+            "n_sample_points": {"type": "integer"},
+            "strata": {"type": "array", "items": {"type": "string"}},
+            "by_parameter_value": {"type": "array"}
+          }
+        },
         "status_proportions": {"type": "object"},
-        "reason_code_frequency": {"type": "object"}
+        "reason_code_frequency": {"type": "object"},
+        "errors": {"type": "array", "items": {"type": "string"}},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "publication_readiness": {
+      "type": "object",
+      "description": "Structured readiness assessment -- see iaq_hfis.provenance.",
+      "properties": {
+        "ready": {"type": "boolean"},
+        "blocking_issues": {"type": "array", "items": {"type": "string"}},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "provisional_parameters_used": {"type": "array", "items": {"type": "string"}},
+        "parameters_covered_by_sensitivity_analysis": {"type": "array", "items": {"type": "string"}},
+        "tests_executed": {"type": "object"},
+        "artifact_validation": {"type": "object"}
       }
     },
     "errors": {"type": "array", "items": {"type": "string"}},

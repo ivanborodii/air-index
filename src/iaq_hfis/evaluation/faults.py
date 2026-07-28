@@ -31,10 +31,11 @@ class ReasonCodeFrequency:
     counts: dict[str, int] = field(default_factory=dict)
 
 
-def compute_status_proportions(con: duckdb.DuckDBPyConnection, window_minutes: int, from_ts: datetime, to_ts: datetime) -> StatusProportions:
+def compute_status_proportions(con: duckdb.DuckDBPyConnection, pipeline_run_id: str, window_minutes: int, from_ts: datetime, to_ts: datetime) -> StatusProportions:
     rows = con.execute(
-        "SELECT completeness_status, COUNT(*) FROM iaq_index_results WHERE window_minutes = ? AND computed_ts > ? AND computed_ts <= ? GROUP BY 1",
-        [window_minutes, from_ts, to_ts],
+        "SELECT completeness_status, COUNT(*) FROM iaq_index_results "
+        "WHERE pipeline_run_id = ? AND window_minutes = ? AND computed_ts > ? AND computed_ts <= ? GROUP BY 1",
+        [pipeline_run_id, window_minutes, from_ts, to_ts],
     ).fetchall()
     counts = dict(rows)
     n_total = sum(counts.values())
@@ -48,9 +49,9 @@ def compute_status_proportions(con: duckdb.DuckDBPyConnection, window_minutes: i
     )
 
 
-def compute_reason_code_frequency(con: duckdb.DuckDBPyConnection, from_ts: datetime, to_ts: datetime, channel: str | None = None) -> ReasonCodeFrequency:
-    clauses = ["ts > ?", "ts <= ?"]
-    params: list = [from_ts, to_ts]
+def compute_reason_code_frequency(con: duckdb.DuckDBPyConnection, pipeline_run_id: str, from_ts: datetime, to_ts: datetime, channel: str | None = None) -> ReasonCodeFrequency:
+    clauses = ["pipeline_run_id = ?", "ts > ?", "ts <= ?"]
+    params: list = [pipeline_run_id, from_ts, to_ts]
     if channel:
         clauses.append("channel = ?")
         params.append(channel)

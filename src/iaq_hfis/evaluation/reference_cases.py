@@ -1,18 +1,21 @@
-"""Synthetic ground-truth vectors near each control-region boundary, and
-scoring against them.
+"""Synthetic, deterministic, pre-labeled reference cases near each control-
+region boundary, and consistency scoring against them.
 
-Per the manuscript: macro-F1 and Cohen's kappa are only ever computed
-against manually-labeled or synthetic observations with a pre-defined
-reference class — never against unlabeled real data (see
-:mod:`iaq_hfis.evaluation.agreement` for the unlabeled-data comparison,
-which reports agreement only, not these metrics).
+These are rule-consistency checks against a KNOWN, PRE-DEFINED label
+constructed directly from the manuscript's own control-region breakpoints --
+they are NOT an empirical ground truth and must never be described or
+reported as measuring real-world classification accuracy. Macro-F1 and
+Cohen's kappa computed here describe agreement with these predefined
+synthetic labels only (see :mod:`iaq_hfis.evaluation.agreement` for the
+separate, unlabeled real-data comparison, which reports agreement only, not
+these metrics).
 
-Each synthetic vector perturbs exactly one direct-input channel to a point
+Each reference case perturbs exactly one direct-input channel to a point
 just below/above one of its configured breakpoints, holding every other
 channel at a deeply-favorable baseline. Because the fuzzy rule base is
 worst-of (Phase 1, ``rules.py``), the expected final index class in this
-single-channel-perturbed construction is exactly the perturbed channel's
-own crisp class — no combinatorial multi-channel ground truth is needed.
+single-channel-perturbed construction is exactly the perturbed channel's own
+crisp class -- no combinatorial multi-channel case construction is needed.
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ _FAVORABLE_BASELINE = {"pm2_5": 5.0, "pm10": 10.0, "co2": 600.0}
 
 
 @dataclass(frozen=True)
-class GroundTruthVector:
+class ReferenceCase:
     name: str
     perturbed_channel: str
     values: dict[str, float]
@@ -38,7 +41,7 @@ class GroundTruthVector:
 def crisp_class_monotonic(value: float, boundaries: ClassBoundaries) -> str:
     """Table 2's own literal <=/> convention for a monotonic channel
     (higher is never better) -- e.g. PM2.5 "<=15" Favorable, ">15-25"
-    Acceptable. Used only for ground-truth labeling; the pipeline itself
+    Acceptable. Used only for reference-case labeling; the pipeline itself
     never hard-classifies a direct input (only the continuous membership
     functions built from the same breakpoints)."""
     b0, b1, b2 = boundaries.breakpoints
@@ -96,21 +99,21 @@ def _baseline_values(control_regions, room_profile: RoomTemperatureProfile) -> d
     return values
 
 
-def generate_boundary_vectors(control_regions, room_profile: RoomTemperatureProfile, offset: float = 0.5) -> list[GroundTruthVector]:
-    """One vector per boundary-adjacent test point for every direct-input
+def generate_reference_cases(control_regions, room_profile: RoomTemperatureProfile, offset: float = 0.5) -> list[ReferenceCase]:
+    """One case per boundary-adjacent test point for every direct-input
     channel. ``offset`` is a small crisp-classification margin (distinct
     from the membership transition width) chosen to land unambiguously on
     one side of the boundary for labeling purposes.
     """
-    vectors: list[GroundTruthVector] = []
+    cases: list[ReferenceCase] = []
 
     monotonic = {"pm2_5": control_regions.pm2_5, "pm10": control_regions.pm10, "co2": control_regions.co2}
     for channel, boundaries in monotonic.items():
         for label, value in _monotonic_test_points(boundaries, offset):
             values = _baseline_values(control_regions, room_profile)
             values[channel] = value
-            vectors.append(
-                GroundTruthVector(
+            cases.append(
+                ReferenceCase(
                     name=f"{channel}_{label}", perturbed_channel=channel, values=values, expected_class=crisp_class_monotonic(value, boundaries)
                 )
             )
@@ -120,25 +123,24 @@ def generate_boundary_vectors(control_regions, room_profile: RoomTemperatureProf
         for label, value in _two_sided_test_points(ranges, offset):
             values = _baseline_values(control_regions, room_profile)
             values[channel] = value
-            vectors.append(
-                GroundTruthVector(name=f"{channel}_{label}", perturbed_channel=channel, values=values, expected_class=crisp_class_two_sided(value, ranges))
-            )
+            cases.append(ReferenceCase(name=f"{channel}_{label}", perturbed_channel=channel, values=values, expected_class=crisp_class_two_sided(value, ranges)))
 
-    return vectors
+    return cases
 
 
-def score_against_ground_truth(vectors: list[GroundTruthVector], predicted_classes: list[str | None]) -> dict:
+def score_against_reference_cases(cases: list[ReferenceCase], predicted_classes: list[str | None]) -> dict:
     """macro-F1 and Cohen's kappa of ``predicted_classes`` against each
-    vector's ``expected_class``. Entries with a None prediction (e.g. a
-    FAILED completeness status) are excluded, and their count is reported
-    separately rather than silently dropped."""
+    case's predefined ``expected_class``. This is consistency with a known
+    synthetic label, NOT an empirical accuracy estimate. Entries with a
+    None prediction (e.g. a FAILED completeness status) are excluded, and
+    their count is reported separately rather than silently dropped."""
     from iaq_hfis.evaluation._metrics import cohens_kappa, macro_f1
 
-    if len(vectors) != len(predicted_classes):
-        raise ValueError("vectors and predicted_classes must be the same length")
+    if len(cases) != len(predicted_classes):
+        raise ValueError("cases and predicted_classes must be the same length")
 
-    paired = [(v.expected_class, p) for v, p in zip(vectors, predicted_classes) if p is not None]
-    n_excluded = len(vectors) - len(paired)
+    paired = [(c.expected_class, p) for c, p in zip(cases, predicted_classes) if p is not None]
+    n_excluded = len(cases) - len(paired)
     if not paired:
         return {"n": 0, "n_excluded": n_excluded, "macro_f1": None, "cohens_kappa": None}
 

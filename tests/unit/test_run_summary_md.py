@@ -1,7 +1,7 @@
 from iaq_hfis.reporting.summary import SECTIONS, build_run_summary_markdown
 
 MINIMAL_SUMMARY = {
-    "run_id": "abc123",
+    "pipeline_run_id": "abc123",
     "status": "success",
     "started_at": "2026-07-23T00:00:00+00:00",
     "finished_at": "2026-07-23T00:01:00+00:00",
@@ -14,15 +14,34 @@ MINIMAL_SUMMARY = {
     "environment": {"iaq_hfis_version": "0.1.0", "python_version": "3.13.5"},
     "completeness_summary": {"OK": 2, "PARTIAL": 1, "FAILED": 0},
     "provisional_parameters_used": ["room_profile:kitchen/warm_period"],
+    "selected_evaluation_run_id": None,
 }
 
 FULL_EVALUATION = {
+    "evaluation_run_id": "eval123",
+    "pipeline_run_id": "abc123",
     "n_computed_ts_evaluated": 3,
     "agreement": [{"method_a": "CRISP-MAX", "method_b": "PROPOSED-HFIS", "n": 3, "n_excluded": 0, "percent_agreement": 1.0, "cohens_kappa": 1.0}],
     "masking": [{"method": "WEIGHTED-MEAN", "severity_threshold": "Critical", "n_critical_events": 2, "n_masked": 1, "masking_rate": 0.5}],
-    "ground_truth": {"PROPOSED-HFIS": {"n": 42, "n_excluded": 0, "macro_f1": 0.9, "cohens_kappa": 0.87}},
-    "stability": {"computed_ts": "2026-07-23T00:15:00", "seed": 42, "n_trials": 30, "baseline_class": "Favorable", "class_change_rate": 0.1},
-    "sensitivity": [{"varied_parameter": "window_minutes", "value": 15, "completeness_status": "OK", "index_value": 20.0, "index_class": "Favorable"}],
+    "reference_cases": {"PROPOSED-HFIS": {"n": 42, "n_excluded": 0, "macro_f1": 0.9, "cohens_kappa": 0.87}},
+    "stability": {
+        "n_samples": 5,
+        "n_trials_per_sample": 30,
+        "seed": 42,
+        "by_method": {
+            "PROPOSED-HFIS": {
+                "n_trials_total": 150, "n_class_changes": 15, "class_change_rate": 0.1, "class_change_rate_ci95": [0.05, 0.15],
+                "mean_abs_index_change": 1.2, "median_abs_index_change": 1.0, "p95_abs_index_change": 2.5, "max_abs_index_change": 3.0,
+            }
+        },
+    },
+    "sensitivity": {
+        "n_sample_points": 10,
+        "strata": ["class_Favorable", "ordinary"],
+        "by_parameter_value": [
+            {"varied_parameter": "window_minutes", "value": 15, "n_samples": 10, "n_status_transitions": 0, "n_class_transitions": 0, "class_agreement_with_reference": 1.0, "mean_abs_index_diff": 0.0, "median_abs_index_diff": 0.0, "p95_abs_index_diff": 0.0, "max_abs_index_diff": 0.0}
+        ],
+    },
     "status_proportions": {"n_total": 3, "OK": 0.667, "PARTIAL": 0.333, "FAILED": 0.0},
     "reason_code_frequency": {"n_total_quality_rows": 10, "counts": {"stuck_value": 3}},
 }

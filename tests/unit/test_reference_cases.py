@@ -1,10 +1,10 @@
 import pytest
 
-from iaq_hfis.evaluation.ground_truth import (
+from iaq_hfis.evaluation.reference_cases import (
     crisp_class_monotonic,
     crisp_class_two_sided,
-    generate_boundary_vectors,
-    score_against_ground_truth,
+    generate_reference_cases,
+    score_against_reference_cases,
 )
 
 
@@ -29,34 +29,34 @@ def test_crisp_class_two_sided_matches_table_2_convention(room_profiles):
     assert crisp_class_two_sided(23.51, ranges) == "Critical"
 
 
-def test_generate_boundary_vectors_expected_classes_are_derivable(base_settings, room_profiles):
+def test_generate_reference_cases_expected_classes_are_derivable(base_settings, room_profiles):
     profile = room_profiles.find("kitchen", "cold_period")
-    vectors = generate_boundary_vectors(base_settings.control_regions, profile)
-    assert len(vectors) > 0
-    for v in vectors:
-        assert v.expected_class in ("Favorable", "Acceptable", "Degraded", "Critical")
+    cases = generate_reference_cases(base_settings.control_regions, profile)
+    assert len(cases) > 0
+    for c in cases:
+        assert c.expected_class in ("Favorable", "Acceptable", "Degraded", "Critical")
         # every other channel stays at the deeply-favorable baseline
-        for channel, value in v.values.items():
-            if channel != v.perturbed_channel:
-                assert channel in v.values
+        for channel, value in c.values.items():
+            if channel != c.perturbed_channel:
+                assert channel in c.values
 
 
-def test_score_against_ground_truth_perfect_prediction(base_settings, room_profiles):
+def test_score_against_reference_cases_perfect_prediction(base_settings, room_profiles):
     profile = room_profiles.find("kitchen", "cold_period")
-    vectors = generate_boundary_vectors(base_settings.control_regions, profile)
-    predictions = [v.expected_class for v in vectors]
-    score = score_against_ground_truth(vectors, predictions)
+    cases = generate_reference_cases(base_settings.control_regions, profile)
+    predictions = [c.expected_class for c in cases]
+    score = score_against_reference_cases(cases, predictions)
     assert score["macro_f1"] == pytest.approx(1.0)
     assert score["cohens_kappa"] == pytest.approx(1.0)
-    assert score["n"] == len(vectors)
+    assert score["n"] == len(cases)
     assert score["n_excluded"] == 0
 
 
-def test_score_against_ground_truth_excludes_none_predictions(base_settings, room_profiles):
+def test_score_against_reference_cases_excludes_none_predictions(base_settings, room_profiles):
     profile = room_profiles.find("kitchen", "cold_period")
-    vectors = generate_boundary_vectors(base_settings.control_regions, profile)
-    predictions = [None] * len(vectors)
-    score = score_against_ground_truth(vectors, predictions)
+    cases = generate_reference_cases(base_settings.control_regions, profile)
+    predictions = [None] * len(cases)
+    score = score_against_reference_cases(cases, predictions)
     assert score["n"] == 0
-    assert score["n_excluded"] == len(vectors)
+    assert score["n_excluded"] == len(cases)
     assert score["macro_f1"] is None

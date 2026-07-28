@@ -23,31 +23,34 @@ from iaq_hfis.reporting import data_dictionary, exports, narrative, plot_manifes
 from iaq_hfis.reporting import summary as summary_module
 
 
-def _report_dir(settings: Settings, run_id: str) -> Path:
-    return Path(settings.paths.run_summary_dir).parent / "reports" / run_id
+def _report_dir(settings: Settings, pipeline_run_id: str) -> Path:
+    return Path(settings.paths.run_summary_dir).parent / "reports" / pipeline_run_id
 
 
-def load_run_summary(settings: Settings, run_id: str) -> dict:
-    summary_path = Path(settings.paths.run_summary_dir) / f"run_summary_{run_id}.json"
+def load_run_summary(settings: Settings, pipeline_run_id: str) -> dict:
+    summary_path = Path(settings.paths.run_summary_dir) / f"run_summary_{pipeline_run_id}.json"
     if not summary_path.is_file():
-        raise FileNotFoundError(f"no run_summary found for run_id={run_id} at {summary_path} -- run 'iaq_hfis run' first")
+        raise FileNotFoundError(f"no run_summary found for pipeline_run_id={pipeline_run_id} at {summary_path} -- run 'iaq_hfis run' first")
     return json.loads(summary_path.read_text(encoding="utf-8"))
 
 
-def generate_report(settings: Settings, run_id: str, window_minutes: int | None = None) -> dict:
-    """Writes every Phase 2B artifact for ``run_id`` into
-    ``data/iaq_hfis/reports/{run_id}/``. Returns the paths written."""
-    summary = load_run_summary(settings, run_id)
+def generate_report(settings: Settings, pipeline_run_id: str, window_minutes: int | None = None) -> dict:
+    """Writes every reporting artifact for ``pipeline_run_id`` into
+    ``data/iaq_hfis/reports/{pipeline_run_id}/``, scoped to exactly this
+    pipeline run and its one ``selected_evaluation_run_id`` (if evaluation
+    has been run). Returns the paths written."""
+    summary = load_run_summary(settings, pipeline_run_id)
     window_minutes = window_minutes or summary.get("window_minutes") or settings.cadence.aggregation_window_minutes
     from_ts = datetime.fromisoformat(summary["computed_ts_range"][0])
     to_ts = datetime.fromisoformat(summary["computed_ts_range"][1])
+    evaluation_run_id = summary.get("selected_evaluation_run_id")
 
-    report_dir = _report_dir(settings, run_id)
+    report_dir = _report_dir(settings, pipeline_run_id)
     csv_dir = report_dir / "exports"
 
     con = duckdb.connect(settings.paths.derived_db_path, read_only=True)
     try:
-        csv_paths = exports.export_all(con, csv_dir, window_minutes, run_id, from_ts, to_ts)
+        csv_paths = exports.export_all(con, csv_dir, window_minutes, pipeline_run_id, evaluation_run_id, from_ts, to_ts)
     finally:
         con.close()
 
@@ -66,13 +69,13 @@ def generate_report(settings: Settings, run_id: str, window_minutes: int | None 
     }
 
 
-def generate_plots(settings: Settings, run_id: str) -> dict:
+def generate_plots(settings: Settings, pipeline_run_id: str) -> dict:
     """Renders PNGs from an already-generated ``plot_manifest.json`` (run
     ``generate_report`` first)."""
-    report_dir = _report_dir(settings, run_id)
+    report_dir = _report_dir(settings, pipeline_run_id)
     manifest_path = report_dir / plot_manifest.MANIFEST_FILENAME
     if not manifest_path.is_file():
-        raise FileNotFoundError(f"no plot_manifest.json for run_id={run_id} at {manifest_path} -- run 'iaq_hfis report --run-id {run_id}' first")
+        raise FileNotFoundError(f"no plot_manifest.json for pipeline_run_id={pipeline_run_id} at {manifest_path} -- run 'iaq_hfis report --pipeline-run-id {pipeline_run_id}' first")
 
     csv_dir = report_dir / "exports"
     plots_dir = report_dir / "plots"

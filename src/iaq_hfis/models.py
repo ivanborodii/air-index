@@ -71,12 +71,23 @@ class ComponentInferenceResult:
 
 @dataclass
 class IndexInferenceResult:
-    """Output of the second-level (index) Mamdani inference."""
+    """Output of the second-level (index) Mamdani inference.
+
+    ``dominant_components`` is the manuscript's dominant adverse
+    component(s): the available component(s) with the highest adverse crisp
+    score, ties preserved only within a configurable tolerance (see
+    :func:`iaq_hfis.fuzzy_engine.dominant_adverse_component`).
+    ``rule_level_contributors`` is a separate diagnostic: which
+    component(s) "bound" the min() in the fired Mamdani rules -- useful for
+    debugging rule activation, but NOT the manuscript's dominant adverse
+    component and must never be confused with it.
+    """
 
     output_class_degrees: dict[str, float]
     index_value: float | None
     index_class: str | None
     dominant_components: list[str]
+    rule_level_contributors: list[str] = field(default_factory=list)
     fired_rules: list[FiredRule] = field(default_factory=list)
 
     @property

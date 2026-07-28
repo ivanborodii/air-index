@@ -16,10 +16,11 @@ WINDOW_START = COMPUTED_TS - timedelta(minutes=15)
 EVALUATION_TABLES = [
     "baseline_results",
     "evaluation_agreement",
-    "evaluation_stability",
+    "evaluation_stability_samples",
+    "evaluation_stability_trials",
     "evaluation_sensitivity",
     "evaluation_masking",
-    "evaluation_ground_truth",
+    "evaluation_reference_cases",
 ]
 
 
@@ -66,23 +67,24 @@ def evaluated_run(base_settings, sensor_specs, room_profiles):
         base_settings,
         sensor_specs,
         room_profiles,
+        run_summary["pipeline_run_id"],
         COMPUTED_TS - timedelta(minutes=1),
         COMPUTED_TS + timedelta(minutes=1),
         window_minutes=15,
-        run_id=run_summary["run_id"],
     )
     return run_summary, eval_summary
 
 
 def test_evaluation_merges_into_existing_run_summary(evaluated_run, base_settings):
     run_summary, eval_summary = evaluated_run
-    assert eval_summary["run_id"] == run_summary["run_id"]
+    assert eval_summary["pipeline_run_id"] == run_summary["pipeline_run_id"]
     assert "evaluation" in eval_summary
+    assert eval_summary["selected_evaluation_run_id"] == eval_summary["evaluation"]["evaluation_run_id"]
 
-    summary_path = Path(base_settings.paths.run_summary_dir) / f"run_summary_{run_summary['run_id']}.json"
+    summary_path = Path(base_settings.paths.run_summary_dir) / f"run_summary_{run_summary['pipeline_run_id']}.json"
     on_disk = json.loads(summary_path.read_text())
     assert "evaluation" in on_disk
-    assert on_disk["run_id"] == run_summary["run_id"]  # core fields preserved, not overwritten
+    assert on_disk["pipeline_run_id"] == run_summary["pipeline_run_id"]  # core fields preserved, not overwritten
 
 
 def test_evaluation_tables_created_and_populated(evaluated_run, base_settings):
@@ -112,11 +114,11 @@ def test_agreement_results_present_for_every_method_pair(evaluated_run):
     assert pairs == {("CRISP-MAX", "PROPOSED-HFIS"), ("CRISP-MAX", "WEIGHTED-MEAN"), ("PROPOSED-HFIS", "WEIGHTED-MEAN")}
 
 
-def test_ground_truth_scored_for_all_three_methods(evaluated_run):
+def test_reference_cases_scored_for_all_three_methods(evaluated_run):
     _, eval_summary = evaluated_run
-    gt = eval_summary["evaluation"]["ground_truth"]
-    assert set(gt.keys()) == {"PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"}
-    for method, score in gt.items():
+    rc = eval_summary["evaluation"]["reference_cases"]
+    assert set(rc.keys()) == {"PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"}
+    for method, score in rc.items():
         assert score["n"] > 0
         assert score["macro_f1"] is not None
 
@@ -124,10 +126,12 @@ def test_ground_truth_scored_for_all_three_methods(evaluated_run):
 def test_sensitivity_sweep_covers_configured_windows_and_thresholds(evaluated_run, base_settings):
     _, eval_summary = evaluated_run
     sens = eval_summary["evaluation"]["sensitivity"]
-    windows = {s["value"] for s in sens if s["varied_parameter"] == "window_minutes"}
-    thresholds = {s["value"] for s in sens if s["varied_parameter"] == "coverage_threshold"}
+    by_value = sens["by_parameter_value"]
+    windows = {row["value"] for row in by_value if row["varied_parameter"] == "window_minutes"}
+    thresholds = {row["value"] for row in by_value if row["varied_parameter"] == "coverage_threshold"}
     assert windows == set(base_settings.evaluation.sensitivity_window_minutes)
     assert thresholds == set(base_settings.evaluation.sensitivity_coverage_thresholds)
+    assert sens["n_sample_points"] >= 1
 
 
 def test_status_proportions_match_run_completeness_summary(evaluated_run):
@@ -137,3 +141,42 @@ def test_status_proportions_match_run_completeness_summary(evaluated_run):
     assert props["n_total"] == n_total
     if n_total > 0:
         assert abs((props["OK"] or 0) + (props["PARTIAL"] or 0) + (props["FAILED"] or 0) - 1.0) < 1e-9
+
+
+def test_two_evaluation_runs_do_not_mix_rows(base_settings, sensor_specs, room_profiles):
+    """Mandatory regression test: two evaluation executions for the same
+    pipeline run must each get their own evaluation_run_id and never mix
+    rows, even when run back to back over the identical range."""
+    create_air_monitor_db(Path(base_settings.paths.air_monitor_db_path), _clean_rows())
+    create_weather_db(Path(base_settings.paths.weather_db_path), [default_weather_row(COMPUTED_TS - timedelta(hours=1))])
+
+    run_summary = run_pipeline(
+        base_settings, sensor_specs, room_profiles, COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15
+    )
+    first = run_evaluation(
+        base_settings, sensor_specs, room_profiles, run_summary["pipeline_run_id"],
+        COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15,
+    )
+    second = run_evaluation(
+        base_settings, sensor_specs, room_profiles, run_summary["pipeline_run_id"],
+        COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15,
+    )
+
+    first_id = first["evaluation"]["evaluation_run_id"]
+    second_id = second["evaluation"]["evaluation_run_id"]
+    assert first_id != second_id
+
+    con = duckdb.connect(base_settings.paths.derived_db_path, read_only=True)
+    try:
+        first_rows = con.execute("SELECT COUNT(*) FROM baseline_results WHERE evaluation_run_id = ?", [first_id]).fetchone()[0]
+        second_rows = con.execute("SELECT COUNT(*) FROM baseline_results WHERE evaluation_run_id = ?", [second_id]).fetchone()[0]
+        assert first_rows > 0
+        assert second_rows > 0
+        assert first_rows == second_rows  # same underlying data, independently (re)computed, not merged
+
+        # The run_summary.json now points at only the most recent (second) evaluation run.
+        summary_path = Path(base_settings.paths.run_summary_dir) / f"run_summary_{run_summary['pipeline_run_id']}.json"
+        on_disk = json.loads(summary_path.read_text())
+        assert on_disk["selected_evaluation_run_id"] == second_id
+    finally:
+        con.close()

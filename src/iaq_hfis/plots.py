@@ -52,8 +52,19 @@ def _plot_bar(ax, df: pd.DataFrame, spec: dict) -> None:
 
 
 def _plot_histogram(ax, df: pd.DataFrame, spec: dict) -> None:
-    counts = df[spec["x"]].value_counts().sort_index()
-    ax.bar(counts.index.astype(str), counts.values)
+    if spec.get("group_by"):
+        categories = sorted(df[spec["x"]].dropna().unique().tolist(), key=str)
+        width = 0.8 / max(df[spec["group_by"]].nunique(), 1)
+        for i, (key, group) in enumerate(df.groupby(spec["group_by"])):
+            counts = group[spec["x"]].value_counts().reindex(categories, fill_value=0)
+            offsets = [xi + i * width for xi in range(len(categories))]
+            ax.bar(offsets, counts.values, width=width, label=str(key))
+        ax.set_xticks(range(len(categories)))
+        ax.set_xticklabels([str(c) for c in categories], rotation=30, ha="right")
+        ax.legend()
+    else:
+        counts = df[spec["x"]].value_counts().sort_index()
+        ax.bar(counts.index.astype(str), counts.values)
 
 
 def render_plot(spec: dict, csv_dir: Path, out_dir: Path) -> Path | None:

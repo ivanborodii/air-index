@@ -173,6 +173,12 @@ class MembershipConfig(BaseModel):
 
     output_transition_width: float = Field(gt=0, default=2.0)
     overlap_width_policy: Literal["reject", "auto_expand"] = "reject"
+    # AUTHOR_DEFINED: the manuscript does not specify a numeric tie
+    # tolerance for dominant-adverse-component attribution. Two available
+    # components are both reported as dominant only when their crisp scores
+    # (0-100 scale) differ by no more than this amount; otherwise only the
+    # strictly higher one is reported. See fuzzy_engine.dominant_adverse_component.
+    dominant_component_tie_tolerance: float = Field(ge=0, default=1.0)
 
 
 class ProfileSelectionConfig(BaseModel):
@@ -274,8 +280,14 @@ class EvaluationConfig(BaseModel):
 
     stability_seed: int = 42  # PROVISIONAL: manuscript requires a fixed seed but gives no value
     stability_n_trials: int = Field(ge=1, default=30)  # PROVISIONAL
+    # AUTHOR_DEFINED: multi-point stability sample sizes -- bounded so evaluation runtime
+    # stays predictable on Raspberry Pi 5. See evaluation/multi_point_stability.py.
+    stability_max_boundary_samples: int = Field(ge=0, default=20)
+    stability_max_random_samples: int = Field(ge=0, default=10)
     sensitivity_window_minutes: list[int] = Field(default_factory=lambda: [5, 15, 30, 60])
     sensitivity_coverage_thresholds: list[float] = Field(default_factory=lambda: [0.70, 0.80, 0.90])
+    # AUTHOR_DEFINED: multi-point sensitivity stratified sample size -- bounded for the same reason.
+    sensitivity_max_samples_per_stratum: int = Field(ge=1, default=5)
     masking_severity_threshold: Literal["Acceptable", "Degraded", "Critical"] = "Critical"  # PROVISIONAL
 
 

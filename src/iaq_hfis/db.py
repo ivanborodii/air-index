@@ -20,7 +20,7 @@ import logging
 import shutil
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
 
@@ -31,11 +31,38 @@ from iaq_hfis.config import Settings
 
 logger = logging.getLogger(__name__)
 
+#: Run-isolated schema: every run-dependent table carries pipeline_run_id
+#: (and, for evaluation tables, evaluation_run_id). Version 1 (pre-isolation)
+#: rows must never be silently reinterpreted as version 2 rows -- see
+#: LegacySchemaError below and iaq_hfis.cli's rebuild-db command.
+SCHEMA_VERSION = 2
+
+#: Tables whose presence with a pre-isolation column set indicates a legacy
+#: (schema version 1) derived database.
+_RUN_ISOLATED_TABLES = (
+    "observation_quality",
+    "window_aggregates",
+    "outdoor_context",
+    "component_scores",
+    "iaq_index_results",
+    "baseline_results",
+)
+
 
 class SnapshotError(Exception):
     """Raised when a consistent point-in-time snapshot could not be taken
     after exhausting retries. Callers should treat this as a skip-this-cycle
     condition, not a fatal error."""
+
+
+class LegacySchemaError(Exception):
+    """Raised when the derived database file already exists with a
+    pre-run-isolation schema (no pipeline_run_id column on the
+    run-dependent tables). Legacy rows are never silently reinterpreted as
+    run-isolated rows -- the derived database is fully reproducible from
+    config + raw source data, so the safe fix is always to rebuild it, never
+    to guess at a migration.
+    """
 
 
 def make_snapshot(source_db_path: Path, snapshot_dir: Path, max_retries: int = 3, retry_delay_s: float = 2.0) -> tuple[Path, int]:
@@ -167,18 +194,78 @@ class AirMonitorSource:
         return row.iloc[0].to_dict()
 
 
+def _existing_table_columns(con: duckdb.DuckDBPyConnection, table: str) -> set[str] | None:
+    """Returns the column names of ``table`` if it already exists in
+    ``con``'s database, or ``None`` if it does not exist yet."""
+    rows = con.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = ?", [table]
+    ).fetchall()
+    if not rows:
+        return None
+    return {r[0] for r in rows}
+
+
+def _detect_legacy_schema(con: duckdb.DuckDBPyConnection, db_path: Path) -> None:
+    """Raises :class:`LegacySchemaError` if any run-isolated table already
+    exists in ``con`` without a ``pipeline_run_id`` column -- i.e. this
+    derived database predates run isolation (schema version 1)."""
+    for table in _RUN_ISOLATED_TABLES:
+        columns = _existing_table_columns(con, table)
+        if columns is not None and "pipeline_run_id" not in columns:
+            raise LegacySchemaError(
+                f"'{db_path}' contains table '{table}' without a pipeline_run_id column -- "
+                f"this is a pre-run-isolation (schema version 1) derived database. "
+                f"The derived database is fully reproducible from config + raw source data, "
+                f"so the safe fix is to rebuild it: "
+                f"`python -m iaq_hfis.cli rebuild-db --config <path> --confirm`. "
+                f"This only deletes the derived database file (never the raw air-monitor/weather source databases)."
+            )
+
+
+def rebuild_derived_database(db_path: str) -> None:
+    """Deletes the derived database file (+ its .wal, if present) and
+    recreates it fresh with the current (run-isolated) schema. Only ever
+    touches ``paths.derived_db_path`` -- never air_monitor.duckdb or
+    weather.duckdb, which this module only ever opens read-only.
+    """
+    path = Path(db_path)
+    wal = Path(str(path) + ".wal")
+    path.unlink(missing_ok=True)
+    wal.unlink(missing_ok=True)
+    writer = DerivedResultsWriter(db_path)
+    writer.close()
+
+
 class DerivedResultsWriter:
     """Single persistent read-write connection to iaq_hfis's own derived
     database (never air_monitor.duckdb / weather.duckdb), mirroring the
     connection-lifetime pattern of ``air-monitor/storage/duckdb_client.py``.
+
+    Detects a legacy (pre-run-isolation) schema on an existing database file
+    and fails loudly with :class:`LegacySchemaError` rather than silently
+    reinterpreting old rows as run-isolated. On a fresh or already
+    up-to-date database, stamps/verifies ``schema_version``.
     """
 
     def __init__(self, db_path: str) -> None:
         path = Path(db_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         self._con = duckdb.connect(str(path), read_only=False)
+        _detect_legacy_schema(self._con, path)
         schema_sql = (Path(__file__).parent / "sql" / "create_tables.sql").read_text(encoding="utf-8")
         self._con.execute(schema_sql)
+        self._ensure_schema_version(path)
+
+    def _ensure_schema_version(self, path: Path) -> None:
+        row = self._con.execute("SELECT max(version) FROM schema_version").fetchone()
+        current = row[0] if row else None
+        if current is None:
+            self._con.execute("INSERT INTO schema_version (version, applied_at) VALUES (?, ?)", [SCHEMA_VERSION, datetime.now(timezone.utc)])
+        elif current != SCHEMA_VERSION:
+            raise LegacySchemaError(
+                f"'{path}' has schema_version={current}, but this code expects schema_version={SCHEMA_VERSION}. "
+                f"Rebuild the derived database: `python -m iaq_hfis.cli rebuild-db --config <path> --confirm`."
+            )
 
     @property
     def connection(self) -> duckdb.DuckDBPyConnection:

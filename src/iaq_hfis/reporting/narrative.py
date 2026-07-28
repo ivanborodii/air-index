@@ -1,5 +1,5 @@
 """``run_narrative.md``: a deterministic English narrative generated only
-from fields already present in ``run_summary_{run_id}.json``.
+from fields already present in ``run_summary_{pipeline_run_id}.json``.
 
 Every sentence with a number formats a value read directly from ``summary``
 or ``summary["evaluation"]`` -- no new metric is computed here. This is
@@ -28,7 +28,7 @@ CAUTIONS: list[str] = [
     "The CO2 thresholds represent an operational ventilation scale, not a universal toxicity limit -- CO2 interpretation depends on occupancy, ventilation rate, and room type.",
     "Temperature and humidity control regions are room- and season-specific; the profile actually used for this run is recorded above, including whether it is a provisional stand-in.",
     "Several membership transition widths and confirmation/detection thresholds are provisional research configuration, not manuscript-derived values -- see 'Provisional parameters engaged' above.",
-    "No accuracy or macro-F1/kappa claim is made against unlabeled real observations; those metrics are computed only against the synthetic, pre-labeled ground-truth vectors reported under 'Method comparison'.",
+    "Method agreement computed against unlabeled real observations is agreement only, never accuracy. Macro-F1/Cohen's kappa are reported only against the synthetic, pre-labeled reference cases under 'Method comparison', and describe consistency with those predefined labels, not real-world classification accuracy.",
 ]
 
 
@@ -44,7 +44,7 @@ def build_run_narrative(summary: dict) -> str:
     lines: list[str] = [WARNING_BANNER, "", "# iaq_hfis Run Narrative", ""]
 
     lines.append(
-        f"Run `{summary['run_id']}` computed the hierarchical fuzzy indoor air quality index over "
+        f"Run `{summary['pipeline_run_id']}` computed the hierarchical fuzzy indoor air quality index over "
         f"{summary['computed_ts_range'][0]} to {summary['computed_ts_range'][1]}, using a "
         f"{summary['window_minutes']}-minute rolling window, recomputed at each aligned timestamp "
         f"({summary['n_timestamps_processed']} timestamps processed)."
@@ -77,12 +77,16 @@ def build_run_narrative(summary: dict) -> str:
     ev = summary.get("evaluation")
     lines.append("## Method comparison")
     if ev is None:
-        lines.append("Evaluation (baselines, agreement, masking, ground-truth scoring, stability, sensitivity) was not run for this run_id. Run `iaq_hfis evaluate --run-id <id>` to add it.")
+        lines.append(
+            f"Evaluation (baselines, agreement, masking, reference-case consistency, stability, sensitivity) was not "
+            f"run for this pipeline_run_id. Run `iaq_hfis evaluate --pipeline-run-id {summary['pipeline_run_id']}` to add it."
+        )
         lines.append("")
     else:
+        lines.append(f"Evaluation run `{ev['evaluation_run_id']}` (the selected evaluation for this pipeline run):")
         for a in ev.get("agreement", []):
             if a["percent_agreement"] is not None:
-                lines.append(f"- {a['method_a']} and {a['method_b']} agreed on {_pct(a['percent_agreement'])} of {a['n']} compared timestamps (Cohen's kappa={_num(a['cohens_kappa'])}).")
+                lines.append(f"- {a['method_a']} and {a['method_b']} agreed on {_pct(a['percent_agreement'])} of {a['n']} compared timestamps (unlabeled agreement, Cohen's kappa={_num(a['cohens_kappa'])}).")
             else:
                 lines.append(f"- {a['method_a']} and {a['method_b']}: no comparable timestamps this run.")
         for m in ev.get("masking", []):
@@ -90,26 +94,38 @@ def build_run_narrative(summary: dict) -> str:
                 lines.append(f"- {m['method']} hid a component that individually reached {m['severity_threshold']} in {_pct(m['masking_rate'])} of {m['n_critical_events']} such events.")
             else:
                 lines.append(f"- {m['method']}: no component reached {m['severity_threshold']} this run, so a masking rate could not be computed.")
-        for method, score in (ev.get("ground_truth") or {}).items():
+        for method, score in (ev.get("reference_cases") or {}).items():
             if score["macro_f1"] is not None:
-                lines.append(f"- Against the synthetic boundary-adjacent ground truth (n={score['n']}), {method} scored macro-F1={_num(score['macro_f1'])}, Cohen's kappa={_num(score['cohens_kappa'])}.")
+                lines.append(f"- Against the synthetic, pre-labeled boundary-adjacent reference cases (n={score['n']}), {method} scored macro-F1={_num(score['macro_f1'])}, Cohen's kappa={_num(score['cohens_kappa'])} (consistency, not empirical accuracy).")
         lines.append("")
 
         lines.append("## Stability and sensitivity")
         stability = ev.get("stability")
         if stability is not None:
             lines.append(
-                f"Under {stability['n_trials']} perturbation trials (fixed seed={stability['seed']}, each channel "
-                f"perturbed within its declared sensor uncertainty) sampled at {stability['computed_ts']}, the index "
-                f"class changed from the baseline ({stability['baseline_class']}) in {_pct(stability['class_change_rate'])} of trials."
+                f"Multi-point stability: {stability['n_samples']} deterministically-sampled computed_ts "
+                f"(boundary-adjacent + random-comparison, seed={stability['seed']}), {stability['n_trials_per_sample']} "
+                f"perturbation trials each (every available channel perturbed within its declared sensor uncertainty)."
+            )
+            for method, s in (stability.get("by_method") or {}).items():
+                ci = s.get("class_change_rate_ci95")
+                ci_text = f", 95% CI [{_pct(ci[0])}, {_pct(ci[1])}]" if ci else ""
+                lines.append(
+                    f"- {method}: class changed in {_pct(s['class_change_rate'])} of {s['n_trials_total']} trials{ci_text}; "
+                    f"mean absolute index change {_num(s['mean_abs_index_change'], 2)}, p95 {_num(s['p95_abs_index_change'], 2)}."
+                )
+        else:
+            lines.append("Stability was not sampled this run (no eligible computed_ts with available components).")
+        sensitivity = ev.get("sensitivity")
+        if sensitivity and sensitivity.get("n_sample_points"):
+            strata = ", ".join(sensitivity.get("strata") or [])
+            lines.append(
+                f"Multi-point sensitivity: {sensitivity['n_sample_points']} stratified sample points "
+                f"(strata: {strata}), swept across window durations and coverage thresholds "
+                f"(see sensitivity_window_summary.csv / sensitivity_coverage_summary.csv for per-value statistics)."
             )
         else:
-            lines.append("Stability was not sampled this run (no computed_ts had available components).")
-        if ev.get("sensitivity"):
-            lines.append(
-                "Sensitivity to window duration and coverage threshold was swept at the manuscript-specified values "
-                "(see the Sensitivity section of run_summary.md and sensitivity_window.csv / sensitivity_coverage.csv)."
-            )
+            lines.append("Sensitivity was not swept this run (no computed_ts available to sample).")
         lines.append("")
 
     lines.append("## Scientific cautions")

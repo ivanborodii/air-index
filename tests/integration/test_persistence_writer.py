@@ -11,7 +11,18 @@ EXPECTED_TABLES = {
     "component_scores",
     "iaq_index_results",
     "pipeline_runs",
+    "evaluation_runs",
+    "schema_version",
 }
+
+_INSERT_SQL = """INSERT OR REPLACE INTO iaq_index_results
+         (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs,
+          index_value, index_class, dominant_component, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+
+
+def _row(pipeline_run_id: str, index_value: float) -> list:
+    return [pipeline_run_id, NOW, 15, "OK", [], [], index_value, "Acceptable", ["A"], ["A"], 30, "0.1.0", "abc123", NOW]
 
 
 def test_schema_creates_all_derived_tables(base_settings):
@@ -38,17 +49,40 @@ def test_writer_never_touches_air_monitor_tables(base_settings):
 def test_upsert_is_idempotent(base_settings):
     writer = DerivedResultsWriter(base_settings.paths.derived_db_path)
     try:
-        row = [NOW, 15, "OK", [], [], 42.5, "Acceptable", ["A"], 30, "0.1.0", "abc123", NOW]
-        sql = """INSERT OR REPLACE INTO iaq_index_results
-                 (computed_ts, window_minutes, completeness_status, missing_components, missing_inputs,
-                  index_value, index_class, dominant_component, n_rules_fired, engine_version, config_hash, computed_at)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"""
-        writer.connection.execute(sql, row)
-        row[5] = 43.0  # re-insert with a different value at the same primary key
-        writer.connection.execute(sql, row)
-        result = writer.connection.execute("SELECT index_value FROM iaq_index_results WHERE computed_ts=? AND window_minutes=?", [NOW, 15]).fetchall()
+        writer.connection.execute(_INSERT_SQL, _row("run-a", 42.5))
+        writer.connection.execute(_INSERT_SQL, _row("run-a", 43.0))  # re-insert, same key, different value
+        result = writer.connection.execute(
+            "SELECT index_value FROM iaq_index_results WHERE pipeline_run_id=? AND computed_ts=? AND window_minutes=?", ["run-a", NOW, 15]
+        ).fetchall()
         assert len(result) == 1
         assert result[0][0] == 43.0
+    finally:
+        writer.close()
+
+
+def test_two_pipeline_runs_over_same_timestamp_do_not_overwrite_each_other(base_settings):
+    """Mandatory regression test: two pipeline runs over the same
+    computed_ts/window_minutes must be isolated by pipeline_run_id, never
+    overwrite or read each other's rows -- the core guarantee of the
+    run-isolated schema."""
+    writer = DerivedResultsWriter(base_settings.paths.derived_db_path)
+    try:
+        writer.connection.execute(_INSERT_SQL, _row("run-a", 10.0))
+        writer.connection.execute(_INSERT_SQL, _row("run-b", 90.0))
+
+        a = writer.connection.execute(
+            "SELECT index_value FROM iaq_index_results WHERE pipeline_run_id=? AND computed_ts=? AND window_minutes=?", ["run-a", NOW, 15]
+        ).fetchone()
+        b = writer.connection.execute(
+            "SELECT index_value FROM iaq_index_results WHERE pipeline_run_id=? AND computed_ts=? AND window_minutes=?", ["run-b", NOW, 15]
+        ).fetchone()
+        both = writer.connection.execute(
+            "SELECT COUNT(*) FROM iaq_index_results WHERE computed_ts=? AND window_minutes=?", [NOW, 15]
+        ).fetchone()
+
+        assert a[0] == 10.0
+        assert b[0] == 90.0
+        assert both[0] == 2  # both rows coexist, neither overwrote the other
     finally:
         writer.close()
 

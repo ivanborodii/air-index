@@ -3,10 +3,8 @@ into ``run_summary.json``: package version, interpreter/library versions,
 platform/CPU info, git commit (when available), and the rule-generation
 algorithm version.
 
-This repository has no ``.git`` directory (verified: `git status` reports
-"not a git repository") — ``git_commit`` is reported as ``None`` rather
-than raising, matching the task spec's "record ... Git commit when
-available".
+``git_commit`` is ``None`` when ``repo_root`` is not inside a git working
+tree (e.g. `git rev-parse` fails) rather than raising.
 """
 
 from __future__ import annotations

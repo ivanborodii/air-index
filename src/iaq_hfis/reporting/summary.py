@@ -1,6 +1,6 @@
 """``run_summary.md``: a human-readable Markdown rendering of
-``run_summary_{run_id}.json``. Pure formatting -- every number here already
-exists in the JSON; this module invents nothing.
+``run_summary_{pipeline_run_id}.json``. Pure formatting -- every number here
+already exists in the JSON; this module invents nothing.
 """
 
 from __future__ import annotations
@@ -17,9 +17,10 @@ SECTIONS = [
     "Environment",
     "Completeness Summary",
     "Provisional Parameters Used",
+    "Publication Readiness",
     "Baseline Comparison",
     "Masking",
-    "Ground-Truth Scoring",
+    "Reference-Case Consistency",
     "Stability",
     "Sensitivity",
     "Fault / Reason-Code Frequency",
@@ -35,7 +36,7 @@ def _fmt(value) -> str:
 
 
 def build_run_summary_markdown(summary: dict) -> str:
-    lines: list[str] = [f"# iaq_hfis Run Summary", "", f"Run ID: `{summary['run_id']}`", ""]
+    lines: list[str] = ["# iaq_hfis Run Summary", "", f"Pipeline run ID: `{summary['pipeline_run_id']}`", ""]
 
     lines += [f"## {SECTIONS[0]}", ""]
     lines += [
@@ -48,6 +49,7 @@ def build_run_summary_markdown(summary: dict) -> str:
         f"- Snapshot retries: {summary['n_snapshot_retries']}",
         f"- Config hash: `{summary['config_hash']}`",
         f"- Engine version: {summary['engine_version']}",
+        f"- Selected evaluation run ID: {_fmt(summary.get('selected_evaluation_run_id'))}",
         "",
     ]
 
@@ -69,13 +71,25 @@ def build_run_summary_markdown(summary: dict) -> str:
         lines.append("None engaged this run.")
     lines.append("")
 
+    lines += [f"## {SECTIONS[4]}", ""]
+    pr = summary.get("publication_readiness")
+    if pr is None:
+        lines.append("Not assessed for this run -- run `iaq_hfis validate-artifacts` and regenerate the report.")
+    else:
+        lines.append(f"- Ready: **{pr.get('ready')}**")
+        for issue in pr.get("blocking_issues") or []:
+            lines.append(f"- Blocking: {issue}")
+        for warning in pr.get("warnings") or []:
+            lines.append(f"- Warning: {warning}")
+    lines.append("")
+
     ev = summary.get("evaluation")
     if ev is None:
-        for section in SECTIONS[4:]:
-            lines += [f"## {section}", "", "Not computed for this run_id -- run `iaq_hfis evaluate --run-id <id>` first.", ""]
+        for section in SECTIONS[5:]:
+            lines += [f"## {section}", "", "Not computed for this pipeline_run_id -- run `iaq_hfis evaluate --pipeline-run-id <id>` first.", ""]
         return "\n".join(lines)
 
-    lines += [f"## {SECTIONS[4]} (agreement, unlabeled real data)", ""]
+    lines += [f"## {SECTIONS[5]} (agreement, unlabeled real data)", ""]
     for a in ev.get("agreement", []):
         lines.append(
             f"- {a['method_a']} vs {a['method_b']}: {_fmt(a['percent_agreement'])} agreement, "
@@ -85,40 +99,54 @@ def build_run_summary_markdown(summary: dict) -> str:
         lines.append("No agreement results (no computed_ts evaluated).")
     lines.append("")
 
-    lines += [f"## {SECTIONS[5]}", ""]
+    lines += [f"## {SECTIONS[6]}", ""]
     for m in ev.get("masking", []):
         lines.append(f"- {m['method']} (>= {m['severity_threshold']}): rate={_fmt(m['masking_rate'])} ({m['n_masked']}/{m['n_critical_events']} events)")
     if not ev.get("masking"):
         lines.append("No masking results.")
     lines.append("")
 
-    lines += [f"## {SECTIONS[6]}", ""]
-    for method, score in (ev.get("ground_truth") or {}).items():
+    lines += [f"## {SECTIONS[7]}", ""]
+    lines.append("Consistency with predefined synthetic boundary-adjacent labels -- NOT an empirical accuracy estimate.")
+    for method, score in (ev.get("reference_cases") or {}).items():
         lines.append(f"- {method}: macro-F1={_fmt(score['macro_f1'])}, Cohen's kappa={_fmt(score['cohens_kappa'])} (n={score['n']}, excluded={score['n_excluded']})")
     lines.append("")
 
-    lines += [f"## {SECTIONS[7]}", ""]
+    lines += [f"## {SECTIONS[8]}", ""]
     stability = ev.get("stability")
     if stability is None:
-        lines.append("Not sampled this run (no computed_ts with available components).")
+        lines.append("Not sampled this run (no eligible computed_ts with available components).")
     else:
         lines += [
-            f"- Sampled at: {stability['computed_ts']}",
+            f"- Sample points: {stability['n_samples']} (boundary-adjacent + random-comparison)",
             f"- Seed: {stability['seed']} (fixed, reproducible)",
-            f"- Trials: {stability['n_trials']}",
-            f"- Baseline class: {stability['baseline_class']}",
-            f"- Class-change rate: {_fmt(stability['class_change_rate'])}",
+            f"- Trials per sample: {stability['n_trials_per_sample']}",
         ]
-    lines.append("")
-
-    lines += [f"## {SECTIONS[8]}", ""]
-    for s in ev.get("sensitivity", []):
-        lines.append(f"- {s['varied_parameter']}={s['value']}: status={s['completeness_status']}, index={_fmt(s['index_value'])} ({s['index_class']})")
-    if not ev.get("sensitivity"):
-        lines.append("No sensitivity results.")
+        for method, s in (stability.get("by_method") or {}).items():
+            ci = s.get("class_change_rate_ci95")
+            ci_text = f" (95% CI [{_fmt(ci[0])}, {_fmt(ci[1])}])" if ci else ""
+            lines.append(
+                f"- {method}: class_change_rate={_fmt(s['class_change_rate'])}{ci_text}, "
+                f"mean|Δindex|={_fmt(s['mean_abs_index_change'])}, p95|Δindex|={_fmt(s['p95_abs_index_change'])}, "
+                f"max|Δindex|={_fmt(s['max_abs_index_change'])}"
+            )
     lines.append("")
 
     lines += [f"## {SECTIONS[9]}", ""]
+    sensitivity = ev.get("sensitivity")
+    if not sensitivity or not sensitivity.get("n_sample_points"):
+        lines.append("No sensitivity results.")
+    else:
+        lines.append(f"- Sample points: {sensitivity['n_sample_points']}")
+        lines.append(f"- Strata: {', '.join(sensitivity.get('strata') or [])}")
+        for row in sensitivity.get("by_parameter_value") or []:
+            lines.append(
+                f"  - {row['varied_parameter']}={row['value']}: class_agreement={_fmt(row['class_agreement_with_reference'])}, "
+                f"mean|Δindex|={_fmt(row['mean_abs_index_diff'])}, n={row['n_samples']}"
+            )
+    lines.append("")
+
+    lines += [f"## {SECTIONS[10]}", ""]
     props = ev.get("status_proportions") or {}
     lines.append(f"- Status proportions (n={props.get('n_total')}): OK={_fmt(props.get('OK'))}, PARTIAL={_fmt(props.get('PARTIAL'))}, FAILED={_fmt(props.get('FAILED'))}")
     freq = ev.get("reason_code_frequency") or {}
