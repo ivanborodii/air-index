@@ -6,6 +6,7 @@
     python -m iaq_hfis.cli plot --pipeline-run-id <id>
     python -m iaq_hfis.cli validate-artifacts --pipeline-run-id <id>
     python -m iaq_hfis.cli rebuild-db --confirm
+    python -m iaq_hfis.cli finalize --pipeline-run-id <id>
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from datetime import datetime
 from iaq_hfis.config import ConfigError, RoomProfilesConfig, SensorSpecs, Settings, load_room_profiles, load_sensor_specs, load_settings
 from iaq_hfis.db import LegacySchemaError, rebuild_derived_database
 from iaq_hfis.evaluate import run_evaluation
+from iaq_hfis.final_snapshot import build_final_snapshot
 from iaq_hfis.pipeline import run_pipeline
 from iaq_hfis.report import generate_plots, generate_report
 from iaq_hfis.validation import ArtifactValidationError, validate_artifacts
@@ -77,6 +79,10 @@ def main(argv: list[str] | None = None) -> int:
     rebuild_p = sub.add_parser("rebuild-db", help="Delete and recreate the derived database with the current schema (never touches raw/weather source databases)")
     _add_config_args(rebuild_p)
     rebuild_p.add_argument("--confirm", action="store_true", help="Required: acknowledges this deletes the derived database file")
+
+    finalize_p = sub.add_parser("finalize", help="Build the tracked research_results/final/ publication snapshot from a validated pipeline run")
+    _add_config_args(finalize_p)
+    finalize_p.add_argument("--pipeline-run-id", required=True)
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -141,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "report":
         try:
-            result = generate_report(settings, args.pipeline_run_id, args.window_minutes)
+            result = generate_report(settings, args.pipeline_run_id, sensor_specs, room_profiles, args.window_minutes)
         except FileNotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 2
@@ -152,6 +158,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  run_narrative.md: {result['run_narrative_md']}")
         print(f"  data dictionary: {result['data_dictionary']}")
         print(f"  plot manifest: {result['plot_manifest']}")
+        print(f"  parameter provenance: {result['parameter_provenance']}")
+        print(f"  article results summary: {result['article_results_summary']}")
+        print(f"  article metrics: {result['article_metrics']}")
+        print(f"  generated in {result['generation_seconds']:.1f}s")
         return 0
 
     if args.command == "plot":
@@ -163,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Plots written to {result['plots_dir']}")
         for name, path in result["rendered"].items():
             print(f"  {name}: {'written' if path else 'skipped (no data)'}")
+        print(f"  rendered in {result['generation_seconds']:.1f}s")
         return 0
 
     if args.command == "validate-artifacts":
@@ -174,6 +185,17 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(f"validate-artifacts: FAILED ({len(report.violations)} violation(s), {len(report.checks_passed)} passed)", file=sys.stderr)
         return 1
+
+    if args.command == "finalize":
+        try:
+            result = build_final_snapshot(settings, args.pipeline_run_id)
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(f"Final snapshot written to {result['final_dir']}")
+        vr = result["validation_report"]
+        print(f"  artifact validation: {'OK' if vr.ok else 'FAILED'} ({len(vr.checks_passed)} passed, {len(vr.violations)} violations)")
+        return 0 if vr.ok else 1
 
     return 1
 

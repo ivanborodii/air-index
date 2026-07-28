@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
+import resource
+import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -313,9 +315,12 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
 
         writer = DerivedResultsWriter(settings.paths.derived_db_path)
         status_counts = {"OK": 0, "PARTIAL": 0, "FAILED": 0}
+        per_timestamp_seconds: list[float] = []
         try:
             for computed_ts in computed_timestamps:
+                t0 = time.perf_counter()
                 result = compute_index_at(ctx, source, computed_ts, window_minutes, writer, pipeline_run_id)
+                per_timestamp_seconds.append(time.perf_counter() - t0)
                 status_counts[result["completeness_status"]] += 1
 
             finished_at = datetime.now(timezone.utc)
@@ -332,8 +337,31 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
                  window_minutes, len(computed_timestamps), source.snapshot_retry_count, ctx.config_hash,
                  settings.engine_version, environment.get("git_commit")],
             )
+            derived_row_counts = {
+                table: writer.connection.execute(f"SELECT COUNT(*) FROM {table} WHERE pipeline_run_id = ?", [pipeline_run_id]).fetchone()[0]
+                for table in ("observation_quality", "window_aggregates", "component_scores", "iaq_index_results")
+            }
         finally:
             writer.close()
+
+        source_raw_row_count = source.connection.execute("SELECT COUNT(*) FROM raw_observations WHERE ts > ? AND ts <= ?", [from_ts, to_ts]).fetchone()[0]
+
+    per_ts_ms = sorted(s * 1000.0 for s in per_timestamp_seconds)
+    performance = {
+        "platform": environment["platform"],
+        "processor": environment["processor"],
+        "cpu_count": environment["cpu_count"],
+        "total_runtime_seconds": (finished_at - started_at).total_seconds(),
+        "peak_memory_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0,  # ru_maxrss is KB on Linux
+        "per_timestamp_latency_ms": {
+            "mean": (sum(per_ts_ms) / len(per_ts_ms)) if per_ts_ms else None,
+            "median": float(np.median(per_ts_ms)) if per_ts_ms else None,
+            "p95": float(np.percentile(per_ts_ms, 95)) if per_ts_ms else None,
+            "max": max(per_ts_ms) if per_ts_ms else None,
+        },
+        "source_raw_row_count": source_raw_row_count,
+        "derived_row_counts": derived_row_counts,
+    }
 
     summary = {
         "pipeline_run_id": pipeline_run_id,
@@ -349,6 +377,7 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
         "completeness_summary": status_counts,
         "provisional_parameters_used": ctx.provisional_parameters_used + sorted(ctx.provisional_profiles_used),
         "environment": environment,
+        "performance": performance,
         "selected_evaluation_run_id": None,
         "errors": [],
         "warnings": [],

@@ -128,6 +128,49 @@ def build_run_narrative(summary: dict) -> str:
             lines.append("Sensitivity was not swept this run (no computed_ts available to sample).")
         lines.append("")
 
+        lines.append("## Boundary continuity")
+        continuity = ev.get("continuity")
+        by_bm = (continuity or {}).get("by_boundary_method") or []
+        if by_bm:
+            lines.append(
+                f"Deterministic input grids ({continuity['grid_points_per_boundary']} points each) around "
+                f"{continuity['n_boundaries']} control-region boundaries, comparing PROPOSED-HFIS, CRISP-MAX, "
+                f"and WEIGHTED-MEAN numerically (see continuity_grid.csv / continuity_summary.csv)."
+            )
+            for method in ("PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"):
+                rows = [r for r in by_bm if r["method"] == method and r["max_adjacent_jump"] is not None]
+                if not rows:
+                    continue
+                mean_max_jump = sum(r["max_adjacent_jump"] for r in rows) / len(rows)
+                total_transitions = sum(r["n_class_transitions"] for r in rows)
+                lines.append(f"- {method}: mean largest adjacent-point jump {_num(mean_max_jump, 2)} index points across {len(rows)} boundaries, {total_transitions} class transitions total.")
+        else:
+            lines.append("Boundary continuity was not computed this run.")
+        lines.append("")
+
+        lines.append("## Fault-injection benchmark")
+        fi = ev.get("fault_injection")
+        if fi and fi.get("metrics_by_reason_code"):
+            lines.append(
+                f"Deterministic, pre-labeled synthetic scenarios ({fi['n_scenarios']}), fully separate from the "
+                f"unlabeled real-data reason-code frequency below (see fault_detection_metrics.csv)."
+            )
+            for m in fi["metrics_by_reason_code"]:
+                lines.append(f"- {m['reason_code']}: precision={_num(m['precision'], 3)}, recall={_num(m['recall'], 3)}, F1={_num(m['f1'], 3)} (tp={m['tp']}, fp={m['fp']}, fn={m['fn']}).")
+            if fi.get("false_rejection_rate_for_genuine_events") is not None:
+                lines.append(f"- Genuine sustained events falsely rejected: {_pct(fi['false_rejection_rate_for_genuine_events'])}.")
+            hc = fi.get("hampel_calibration") or {}
+            if hc:
+                lines.append(
+                    f"- Hampel calibration grid (window_size x mad_multiplier) evaluated on development and holdout "
+                    f"scenario splits; current configuration (window_size={hc.get('current_window_size')}, "
+                    f"mad_multiplier={hc.get('current_mad_multiplier')}) is retained regardless of this synthetic grid's "
+                    f"outcome -- see hampel_calibration.csv and 'Provisional parameters engaged' above."
+                )
+        else:
+            lines.append("Fault-injection benchmark was not computed this run.")
+        lines.append("")
+
     lines.append("## Scientific cautions")
     lines.append("")
     for caution in CAUTIONS:

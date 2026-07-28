@@ -53,13 +53,13 @@ def reported_run(base_settings, sensor_specs, room_profiles):
 
     run_summary = run_pipeline(base_settings, sensor_specs, room_profiles, COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15)
     run_evaluation(base_settings, sensor_specs, room_profiles, run_summary["pipeline_run_id"], COMPUTED_TS - timedelta(minutes=1), COMPUTED_TS + timedelta(minutes=1), window_minutes=15)
-    report_result = generate_report(base_settings, run_summary["pipeline_run_id"])
+    report_result = generate_report(base_settings, run_summary["pipeline_run_id"], sensor_specs, room_profiles)
     return base_settings, run_summary["pipeline_run_id"], report_result
 
 
 def test_report_raises_clear_error_for_unknown_run_id(base_settings, sensor_specs, room_profiles):
     with pytest.raises(FileNotFoundError, match="run 'iaq_hfis run' first"):
-        generate_report(base_settings, "does-not-exist")
+        generate_report(base_settings, "does-not-exist", sensor_specs, room_profiles)
 
 
 def test_report_writes_every_csv(reported_run):
@@ -121,14 +121,14 @@ def test_plot_renders_pngs_after_report(reported_run):
         assert Path(path).suffix == ".png"
 
 
-def test_report_is_deterministic_when_regenerated(reported_run):
+def test_report_is_deterministic_when_regenerated(reported_run, sensor_specs, room_profiles):
     """Mandatory regression test: repeated report generation for the same
     pipeline_run_id (no underlying data change) must be byte-for-byte
     deterministic."""
     settings, pipeline_run_id, first_result = reported_run
-    second_result = generate_report(settings, pipeline_run_id)
+    second_result = generate_report(settings, pipeline_run_id, sensor_specs, room_profiles)
 
     first_md = Path(first_result["run_summary_md"]).read_text()
-    generate_report(settings, pipeline_run_id)  # regenerate again, overwriting in place
+    generate_report(settings, pipeline_run_id, sensor_specs, room_profiles)  # regenerate again, overwriting in place
     second_md = Path(second_result["run_summary_md"]).read_text()
     assert first_md == second_md

@@ -99,7 +99,7 @@ flowchart TD
         comp --> engine
         engine --> write[(iaq_hfis.duckdb<br/>derived tables)]
         write --> base[baselines.py<br/>CRISP-MAX / WEIGHTED-MEAN]
-        write --> eval[evaluation/*<br/>agreement, masking, stability,<br/>sensitivity, ground truth]
+        write --> eval[evaluation/*<br/>agreement, masking, multi-point stability/sensitivity,<br/>continuity, fault injection, reference cases]
         base --> eval
         eval --> write
         write --> report[reporting/*<br/>summary.md, narrative.md,<br/>CSV exports, data dictionary]
@@ -150,12 +150,14 @@ air_ml/
 │   ├── evaluate.py                 # orchestrates the Phase 2A evaluation suite
 │   ├── evaluation/
 │   │   ├── _metrics.py             # percent_agreement, cohens_kappa, macro_f1
-│   │   ├── ground_truth.py         # synthetic boundary-adjacent vectors + scoring
+│   │   ├── reference_cases.py      # synthetic boundary-adjacent vectors + consistency scoring (NOT ground truth)
 │   │   ├── agreement.py            # inter-method agreement (unlabeled real data)
-│   │   ├── stability.py            # seeded perturbation within declared sensor uncertainty
-│   │   ├── sensitivity.py          # window / coverage-threshold sweeps
+│   │   ├── multi_point_stability.py    # deterministic boundary-adjacent + random-comparison perturbation sampling
+│   │   ├── multi_point_sensitivity.py  # deterministic stratified window/coverage-threshold sweeps
+│   │   ├── continuity.py           # HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment
+│   │   ├── fault_injection.py      # labeled synthetic fault-injection benchmark + Hampel calibration
 │   │   ├── masking.py              # masking-rate detection
-│   │   └── faults.py               # status proportions, reason-code frequency
+│   │   └── faults.py               # status proportions, reason-code frequency (unlabeled real data)
 │   ├── reproducibility.py          # environment/version metadata
 │   ├── report.py                   # orchestrates Phase 2B reporting
 │   ├── reporting/
@@ -317,23 +319,33 @@ typo'd key fails loudly rather than being silently ignored.
 | `coverage` | `min_ratio` (0.80) | Minimum ρ for a channel to be usable | manuscript |
 | `hampel` | `window_size` (11), `mad_multiplier` (1.0) | Outlier-candidate detection | **yes** — but grounded in the manuscript's own cited paper's worked example (Pearson et al. 2016, K=5→11-point window, t=1), not an unsourced guess; see §31 |
 | `confirmation` | `pm_cross_channel_tolerance_pct` (20.0) | PM ordering/cross-check tolerance | **yes** |
-| | `dual_channel_temp_tolerance_c` (1.0), `dual_channel_rh_tolerance_pct` (8.0) | SCD41 vs BME688 agreement tolerance | **yes** |
+| | *(dual-channel T/RH tolerance)* | NOT a config key — derived at runtime as `declared_uncertainty(primary) + declared_uncertainty(secondary)` from `sensor_specs.yaml` (`schema.dual_channel_tolerance`), so it can't drift out of sync | sensor_specification |
 | | `persistence_min_consecutive_samples` (2) | Min run length for confirmation | **yes** |
 | | `stuck_value_min_repeats` (5) | Min identical-value run length | **yes** |
 | | `gradual_drift_min_consecutive_steps` (5) | Min same-direction run length | **yes** |
 | | `gradual_drift_magnitude_multiplier` (3.0) | Run must also move ≥ this × declared_uncertainty | **yes** — added to fix a real false-positive rate against live data, see §29 |
-| | `outdoor_context_max_age_minutes` (90.0) | Staleness threshold for outdoor data | **yes** |
+| | `outdoor_context_max_age_minutes` (120.0) | Staleness threshold for outdoor data | author_defined — 2x the real hourly `fetch_weather.py` cron cadence |
 | `schema_mapping` | `required_raw_columns`, `channels` | See §7 | — |
 | `device_status_state_map` | `ok`→VALID, `partial`→VALID, `failed`→INVALID, `disabled`→MISSING, `data_not_ready`→MISSING | Maps `air-monitor` status flags to quality states | — |
 | `membership` | `output_transition_width` (2.0) | Overlap width for the output scale | **yes** |
 | | `overlap_width_policy` (`reject`\|`auto_expand`) | What to do if a width < declared uncertainty | — (policy choice) |
+| | `dominant_component_tie_tolerance` (1.0) | Crisp-score margin within which multiple components are jointly reported as dominant adverse | author_defined |
 | `profile_selection` | `room` (`kitchen`) | Which room profile to use | — (matches real deployment) |
 | | `season_month_ranges` | Calendar cutover months | **yes** |
-| `control_regions` | `pm2_5`, `pm10`, `co2`, `relative_humidity`, `output` | See §14 | breakpoints = manuscript; transition_widths = **yes** |
+| `control_regions` | `pm2_5`, `pm10`, `co2`, `relative_humidity`, `output` | See §14 | breakpoints = manuscript/standard; transition_widths = **yes** (mostly sensor_specification-matched) |
 | `evaluation` | `stability_seed` (42), `stability_n_trials` (30) | Perturbation analysis | **yes** |
+| | `stability_max_boundary_samples` (20), `stability_max_random_samples` (10) | Multi-point stability sample-size bounds | author_defined |
 | | `sensitivity_window_minutes`, `sensitivity_coverage_thresholds` | Sweep values | manuscript |
+| | `sensitivity_max_samples_per_stratum` (5) | Multi-point sensitivity sample-size bound | author_defined |
 | | `masking_severity_threshold` (`Critical`) | Which severity counts as "hidden" | **yes** |
+| | `continuity_grid_points` (21) | Boundary continuity experiment grid density | author_defined |
 | `engine_version` | `"0.1.0"` | Recorded in every derived row and run summary | — |
+
+Full per-parameter machine-readable provenance (path, effective value,
+unit, status, source, engaged-this-run) is generated every `report` call
+into `parameter_provenance.csv` — see `src/iaq_hfis/provenance.py` and
+`docs/manuscript_method_mapping.md`. The table above is a human-readable
+summary; the CSV is the authoritative, testable version.
 
 ### `config/sensor_specs.yaml`
 
@@ -533,26 +545,38 @@ value for a missing one).
 
 All commands run from the `air_ml/` repo root, module form
 `python -m iaq_hfis.cli <command>` (or use `scripts/run_iaq_hfis.sh` for
-the whole pipeline at once).
+the whole pipeline at once). Every derived-DB row is isolated by
+`pipeline_run_id` (and, for evaluation tables, `evaluation_run_id`) — see
+`docs/result_reproducibility.md`.
 
 ```bash
-# 1. Compute the index over a time range and persist results
+# 1. Compute the index over a time range and persist results (creates a fresh pipeline_run_id)
 python -m iaq_hfis.cli run --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00
 
-# -> prints: Run <run_id>: success
+# -> prints: Run <pipeline_run_id>: success
 #    processed N timestamps over window=15min
 #    completeness: {'OK': .., 'PARTIAL': .., 'FAILED': ..}
 
-# 2. Run baselines + evaluation over the same range, merging into the same run_summary
-python -m iaq_hfis.cli evaluate --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00 --run-id <run_id>
+# 2. Run the full evaluation suite (agreement, masking, reference cases, multi-point
+#    stability/sensitivity, boundary continuity, fault-injection benchmark) -- always
+#    creates a NEW evaluation_run_id, never mixes rows with a prior evaluation
+python -m iaq_hfis.cli evaluate --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00 --pipeline-run-id <id>
 
-# 3. Generate run_summary.md, run_narrative.md, CSVs, data dictionary, plot manifest
-python -m iaq_hfis.cli report --run-id <run_id>
+# 3. Generate run_summary.md, run_narrative.md, CSVs, data dictionary, plot manifest,
+#    parameter_provenance.csv, and publication_readiness (persisted back into run_summary.json)
+python -m iaq_hfis.cli report --pipeline-run-id <id>
 
 # 4. Render PNGs from the plot manifest
-python -m iaq_hfis.cli plot --run-id <run_id>
+python -m iaq_hfis.cli plot --pipeline-run-id <id>
 
-# All four at once, over the last 24 hours:
+# 5. Cross-check every artifact against the derived DB and each other; exits non-zero on any mismatch
+python -m iaq_hfis.cli validate-artifacts --pipeline-run-id <id>
+
+# 6. Rebuild the derived database (never touches raw air-monitor/weather source DBs) --
+#    required if it predates the run-isolated schema (LegacySchemaError)
+python -m iaq_hfis.cli rebuild-db --confirm
+
+# All of 1-4 at once, over the last 24 hours:
 scripts/run_iaq_hfis.sh 1440
 
 # Custom window size:
@@ -563,44 +587,56 @@ python -m iaq_hfis.cli run --config /path/to/iaq_hfis.yaml --from ... --to ...
 ```
 
 Configuration errors (missing settings, unknown room/season combination
-encountered mid-run) print a clear message and exit with code 2, never a
-raw traceback.
+encountered mid-run) and legacy-schema errors print a clear message and
+exit with code 2, never a raw traceback.
 
 ## 22. Database outputs
 
-All in a **new**, dedicated file (`data/iaq_hfis/iaq_hfis.duckdb`) — never
-`air_monitor.duckdb`. Schema: `src/iaq_hfis/sql/create_tables.sql`
-(idempotent `CREATE TABLE IF NOT EXISTS`).
+All in a **new**, dedicated, run-isolated file (`data/iaq_hfis/iaq_hfis.duckdb`)
+— never `air_monitor.duckdb`. Schema: `src/iaq_hfis/sql/create_tables.sql`
+(idempotent `CREATE TABLE IF NOT EXISTS`; schema_version tracked, legacy
+pre-isolation databases are detected and rejected -- see §33 and
+`docs/result_reproducibility.md`).
 
 | Table | One row per | Key columns |
 |---|---|---|
-| `observation_quality` | (expected slot, channel) | stage1_state, stage2_state, usable, confirmed, reason_codes |
-| `window_aggregates` | (computed_ts, window_minutes, channel) | n_expected, n_usable, coverage_ratio, weighted_mean |
-| `outdoor_context` | computed_ts | forecast_time, age_minutes, is_stale, pm2_5, pm10, temperature_2m |
-| `component_scores` | (computed_ts, window_minutes, component) | available, membership_*, crisp_score, room, season |
-| `iaq_index_results` | (computed_ts, window_minutes) | completeness_status, index_value, index_class, dominant_component |
-| `pipeline_runs` | run_id | status, computed_ts_min/max, config_hash |
-| `baseline_results` | (computed_ts, window_minutes, method) | index_value, index_class, n_components |
-| `evaluation_agreement` | (run_id, method_a, method_b) | percent_agreement, cohens_kappa |
-| `evaluation_stability` | (run_id, computed_ts) | seed, n_trials, class_change_rate, trial_classes |
-| `evaluation_sensitivity` | (run_id, computed_ts, varied_parameter, value) | completeness_status, index_value |
-| `evaluation_masking` | (run_id, method, severity_threshold) | n_critical_events, n_masked, masking_rate |
-| `evaluation_ground_truth` | (run_id, method) | n, macro_f1, cohens_kappa |
+| `observation_quality` | (pipeline_run_id, expected slot, channel) | stage1_state, stage2_state, usable, confirmed, reason_codes |
+| `window_aggregates` | (pipeline_run_id, computed_ts, window_minutes, channel) | n_expected, n_usable, coverage_ratio, weighted_mean |
+| `outdoor_context` | (pipeline_run_id, computed_ts) | forecast_time, age_minutes, is_stale, pm2_5, pm10, temperature_2m |
+| `component_scores` | (pipeline_run_id, computed_ts, window_minutes, component) | available, membership_*, crisp_score, room, season |
+| `iaq_index_results` | (pipeline_run_id, computed_ts, window_minutes) | completeness_status, index_value, index_class, dominant_component, rule_level_contributors |
+| `pipeline_runs` | pipeline_run_id | status, computed_ts_min/max, config_hash, source_git_commit |
+| `evaluation_runs` | evaluation_run_id | pipeline_run_id, status, evaluated_range, config_hash, stability_seed |
+| `baseline_results` | (pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, method) | index_value, index_class, n_components |
+| `evaluation_agreement` | (evaluation_run_id, method_a, method_b) | percent_agreement, cohens_kappa |
+| `evaluation_stability_samples` / `evaluation_stability_trials` | sample / (sample, method, trial) | selection_reason, baseline_class_*, trial_class, changed_from_baseline |
+| `evaluation_sensitivity` | (evaluation_run_id, sample_id, varied_parameter, value) | stratum, reference_*, completeness_status, index_value |
+| `evaluation_masking` | (evaluation_run_id, method, severity_threshold) | n_critical_events, n_masked, masking_rate |
+| `evaluation_reference_cases` | (evaluation_run_id, method) | n, macro_f1, cohens_kappa (consistency, not accuracy) |
+| `evaluation_continuity_grid` / `evaluation_continuity_summary` | grid point / (boundary, method) | index_value; max/mean_adjacent_jump, monotonicity_violations |
+| `fault_injection_events` / `fault_detection_predictions` / `fault_detection_metrics` | event / sample / reason_code | fault_type; predicted_reason_codes; tp/fp/fn, precision, recall, f1 |
+| `hampel_calibration` | (evaluation_run_id, split, window_size, mad_multiplier) | fault_recall, genuine_event_preservation_rate, objective_score, selected |
+| `parameter_provenance` | (pipeline_run_id, parameter_path) | effective_value, status, source, engaged |
 
 ## 23. File outputs
 
 Per run, under `data/iaq_hfis/`:
 
 ```
-run_summaries/run_summary_{run_id}.json    # written by `run`, extended by `evaluate`
-reports/{run_id}/
+run_summaries/run_summary_{pipeline_run_id}.json   # written by `run`, extended by `evaluate`/`report`
+reports/{pipeline_run_id}/
   run_summary.md                            # written by `report`
   run_narrative.md
   output_data_dictionary.csv
+  parameter_provenance.csv
   plot_manifest.json
   exports/*.csv                             # see §24
   plots/*.png                               # written by `plot`
 ```
+
+Plus the tracked, static publication snapshot `research_results/final/`
+(committed to git, replaced atomically by the final-run procedure) — see
+`research_results/final/README.md`.
 
 ## 24. Every graph-ready CSV, explained
 
@@ -612,28 +648,34 @@ written empty as if it were real data.
 
 | File | Grain | What it's for |
 |---|---|---|
-| `index_timeseries.csv` | one row per computed_ts | The final index value/class over time |
+| `index_timeseries.csv` | one row per computed_ts | The final index value/class over time, plus dominant_component and the rule_level_contributors diagnostic |
 | `component_scores_timeseries.csv` | one row per (computed_ts, component) | A/V/M crisp scores and membership degrees over time |
 | `method_comparison.csv` | one row per computed_ts | PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN side by side |
 | `data_quality_summary.csv` | one row per (computed_ts, channel) | Coverage ratio per channel over time |
-| `reason_code_frequency.csv` | one row per reason code | Which fault categories occurred, and how often |
-| `stability_trials.csv` | one row per perturbation trial | Class outcome of each seeded perturbation trial |
-| `sensitivity_window.csv` | one row per window size tested | Index value/status at each of 5/15/30/60 min |
-| `sensitivity_coverage.csv` | one row per threshold tested | Index value/status at each of 0.70/0.80/0.90 |
+| `reason_code_frequency.csv` | one row per reason code | Which fault categories occurred on real data, and how often (unlabeled) |
+| `stability_samples.csv` | one row per sampled point | Which computed_ts were sampled (boundary_adjacent/random_comparison) and their baselines |
+| `stability_trials.csv` | one row per (sample, method, trial) | Class/index outcome of each seeded perturbation trial, tidy across every sample |
+| `stability_by_point.csv` / `stability_summary.csv` | per (sample, method) / per method | Per-point and aggregate class-change rate + index-change stats |
+| `sensitivity_window_by_point.csv` / `sensitivity_window_summary.csv` | per sampled point / per window size | Index value/status at each of 5/15/30/60 min, per-point and aggregated |
+| `sensitivity_coverage_by_point.csv` / `sensitivity_coverage_summary.csv` | per sampled point / per threshold | Index value/status at each of 0.70/0.80/0.90, per-point and aggregated |
 | `masking_summary.csv` | one row per baseline method | Masking rate for CRISP-MAX and WEIGHTED-MEAN |
-| `ground_truth_summary.csv` | one row per method | macro-F1/kappa against the synthetic ground truth |
+| `reference_case_consistency.csv` | one row per method | macro-F1/kappa against the synthetic reference cases — consistency, NOT accuracy |
 | `outdoor_context_timeseries.csv` | one row per computed_ts | Outdoor PM/temperature context (never a direct index input) |
+| `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, method) | HFIS vs CRISP-MAX vs WEIGHTED-MEAN numerical behavior across each control-region boundary |
+| `fault_injection_events.csv` / `fault_detection_predictions.csv` / `fault_detection_metrics.csv` | event / sample / reason_code | The labeled synthetic fault-injection benchmark (separate from real, unlabeled data) |
+| `hampel_calibration.csv` | one row per (split, window_size, mad_multiplier) | Diagnostic Hampel parameter grid; configured value always retained regardless |
+| `parameter_provenance.csv` | one row per parameter | Machine-readable status/source/engaged for every scientific/operational parameter |
 
 ## 25. Plotting instructions
 
 ```bash
-python -m iaq_hfis.cli plot --run-id <run_id>
-# or: python scripts/plot_iaq_hfis_results.py --run-id <run_id>
+python -m iaq_hfis.cli plot --pipeline-run-id <id>
+# or: python scripts/plot_iaq_hfis_results.py --pipeline-run-id <id>
 ```
 
-Requires `report --run-id <run_id>` to have run first (needs
+Requires `report --pipeline-run-id <id>` to have run first (needs
 `plot_manifest.json` + the exported CSVs). Renders one PNG per
-`plot_manifest.json` entry into `data/iaq_hfis/reports/{run_id}/plots/`,
+`plot_manifest.json` entry into `data/iaq_hfis/reports/{pipeline_run_id}/plots/`,
 using matplotlib's headless `Agg` backend. A plot is **skipped** (logged,
 not rendered) if its source CSV is missing, empty, or every requested
 y-column is null for every row — this specifically prevents a
@@ -642,8 +684,8 @@ misleading all-zero chart.
 
 ## 26. Reproducibility metadata
 
-Every `run_summary_{run_id}.json` includes an `"environment"` block
-(`reproducibility.py:collect_environment_metadata`):
+Every `run_summary_{pipeline_run_id}.json` includes an `"environment"`
+block (`reproducibility.py:collect_environment_metadata`):
 
 ```json
 {
@@ -653,13 +695,17 @@ Every `run_summary_{run_id}.json` includes an `"environment"` block
   "platform": "Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41",
   "processor": "aarch64",
   "cpu_count": 4,
-  "git_commit": null,
+  "git_commit": "5fa210d...",
   "rule_generation_version": "worst-of-max-severity-v1"
 }
 ```
 
-`git_commit` is `null` because this repository has no `.git` directory —
-reported honestly as unavailable rather than erroring or guessing.
+`git_commit` is `null` only when `repo_root` is not inside a git working
+tree (e.g. `git rev-parse HEAD` fails) — reported honestly as unavailable
+rather than erroring or guessing. It is also recorded directly on
+`pipeline_runs.source_git_commit` in the derived DB. See
+`docs/result_reproducibility.md` for the full identity chain
+(`pipeline_run_id` / `evaluation_run_id` / `config_hash` / git commit).
 Also recorded per run: `config_hash` (SHA-256 over all three config
 files' canonical JSON), the exact `computed_ts_range` and `window_minutes`,
 and `provisional_parameters_used` (which non-manuscript-sourced values
@@ -668,9 +714,13 @@ were actually engaged, e.g. a provisional room profile).
 ## 27. Running the tests
 
 ```bash
-pytest tests/            # all 237 tests (unit + integration)
-pytest tests/unit/        # fast, no real I/O beyond tmp_path-scoped synthetic DuckDB files
-pytest tests/integration/  # snapshot+ASOF join, persistence, full run/evaluate/report/plot pipelines
+pytest tests/               # everything (unit + integration) -- takes several minutes:
+                             # evaluate()-calling integration tests each also run the fixed-cost
+                             # boundary-continuity experiment and fault-injection/Hampel-calibration
+                             # benchmark, not just data-dependent checks
+pytest tests/unit/           # fast, no real I/O beyond tmp_path-scoped synthetic DuckDB files
+pytest tests/integration/    # snapshot+ASOF join, persistence, full run/evaluate/report/plot pipelines,
+                              # run/evaluation isolation, artifact-validation, legacy-schema regressions
 ```
 
 `tests/fixtures/build_synthetic_db.py` builds small synthetic
@@ -678,22 +728,42 @@ pytest tests/integration/  # snapshot+ASOF join, persistence, full run/evaluate/
 for integration tests, so the suite never depends on live data. Several
 tests (documented in each file) were additionally run against the actual
 live `air-monitor` database during development to catch bugs synthetic
-data alone would have missed (§29).
+data alone would have missed (§29). Mandatory regression coverage (run
+isolation, evaluation isolation, deterministic multi-point stability, no
+duplicate sensitivity keys, continuity detects a planted discontinuity,
+fault-injection recovers known outcomes, legacy-schema detection,
+publication-snapshot forbidden-file check, etc.) lives mainly in
+`tests/integration/test_mandatory_regressions.py` and
+`tests/unit/test_legacy_schema.py`.
 
 ## 28. Performance on Raspberry Pi 5
 
 Measured on this exact device (Broadcom BCM2712, 4 cores, 8 GB LPDDR4X,
-kernel `6.12.62+rpt-rpi-2712`) during a real `run` against live data: **~5
-seconds per computed timestamp** (validation + aggregation + inference),
-plus a roughly constant per-run snapshot cost (copying `air_monitor.duckdb`,
-typically well under a second at the database sizes seen so far). The
-Hampel filter, stuck/drift detectors, and confirmation logic are plain
-Python loops over ~30-sample windows — adequate at this data volume;
-would need vectorizing before scaling to much larger windows or higher
-channel counts. `evaluate`'s stability/sensitivity steps are the most
-expensive per invocation (30 re-inference trials plus a full
-window/coverage sweep), sampled at only the latest `computed_ts` in a
-range specifically to bound this cost.
+kernel `6.12.62+rpt-rpi-2712`). Every `run` now records real per-run
+performance directly into `run_summary.json:performance` (platform, peak
+memory, per-timestamp latency mean/median/p95/max, source/derived row
+counts) and `evaluate` records its own total runtime and peak memory --
+see `article_results_summary.md` §12 in any report directory for the
+actual numbers from that specific run, and
+`research_results/final/latest_run.json` for the published study's
+numbers.
+
+Per-timestamp `run` latency is dominated by plain Python loops (Hampel
+filter, stuck/drift detectors, confirmation logic) over ~30-sample
+windows — adequate at this data volume; would need vectorizing before
+scaling to much larger windows or higher channel counts. `evaluate` is
+now considerably heavier than `run` per invocation, because it always
+executes several fixed-cost synthetic experiments regardless of how much
+real data is being evaluated: the boundary continuity experiment
+(`continuity_grid_points` x 13 boundaries x 3 methods) and the
+fault-injection benchmark's Hampel calibration grid (`HAMPEL_WINDOW_GRID`
+x `HAMPEL_MULTIPLIER_GRID` x 2 splits, each re-running the quality layer
+on several synthetic scenarios). Both grids are deliberately kept small
+for this reason (§9's `continuity_grid_points` and
+`evaluation.hampel_calibration_grid` provenance entries explain the
+tradeoff) -- the real, data-dependent multi-point stability/sensitivity
+sampling is bounded separately by `stability_max_*`/
+`sensitivity_max_samples_per_stratum`.
 
 ## 29. Limitations
 
@@ -714,11 +784,23 @@ range specifically to bound this cost.
   from ordinary CO2 dynamics) by adding a magnitude gate tied to declared
   sensor uncertainty — but this remains a provisional design, not a
   validated fault-detection algorithm.
-- **Stability/sensitivity are sampled, not exhaustive** — only the latest
-  `computed_ts` in an `evaluate` range, to bound runtime (§28).
-- **No accuracy claim exists or is possible** without real ground truth
-  (§30) — macro-F1/kappa are reported only against synthetic
-  boundary-adjacent vectors.
+- **Stability/sensitivity are sampled, not exhaustive** — a deterministic,
+  bounded multi-point sample (boundary-adjacent + random-comparison for
+  stability; stratified for sensitivity) across the evaluated range, not
+  every computed_ts, to bound runtime (§28).
+- **No accuracy claim exists or is possible** without real empirical ground
+  truth (§30) — macro-F1/kappa are reported only as *consistency* against
+  synthetic, pre-labeled boundary-adjacent reference cases, never as an
+  accuracy estimate.
+- **The fault-injection benchmark and boundary continuity experiment are
+  synthetic, not real-data validation** — they show the detection layer and
+  the inference method behave as designed on known, deterministic inputs;
+  they don't measure performance on the actual live sensor deployment's
+  full range of conditions.
+- **Hampel calibration is diagnostic, not adopted automatically** — the
+  configured `window_size`/`mad_multiplier` are retained regardless of the
+  synthetic calibration grid's outcome; a change requires separate
+  verification against real live data (§9, `hampel_calibration.csv`).
 - **Single-device validation.** Everything above was developed and tested
   against one Raspberry Pi 5 with one set of SPS30/SCD41/BME688 units —
   generalization to other sensor batches/models is untested.
@@ -743,9 +825,14 @@ range specifically to bound this cost.
    provisional stand-in (§10).
 7. **Membership widths and several validation thresholds are research
    configuration** — provisional, not manuscript-derived (§9 marks each one).
-8. **No accuracy claim is made without ground truth** — macro-F1/kappa
-   only against synthetic labeled vectors; real unlabeled data gets
-   inter-method *agreement* only, never "accuracy."
+8. **No accuracy claim is made without real empirical ground truth** —
+   macro-F1/kappa are reported only as *consistency* with predefined
+   synthetic reference cases (`reference_case_consistency.csv`), which is
+   NOT the same as accuracy; real unlabeled data gets inter-method
+   *agreement* only, never "accuracy."
+9. **The fault-injection benchmark uses synthetic, labeled data**,
+   deliberately kept separate from the unlabeled real-data reason-code
+   frequency — the two must never be conflated in generated text.
 
 ## 31. Source and provenance mapping
 
@@ -859,11 +946,14 @@ manuscript styling.
 | "Component contributions" | `component_scores_timeseries.csv` | x=`computed_ts`, y=`crisp_score`, series split by `component` |
 | "Data coverage over time" | `data_quality_summary.csv` | x=`computed_ts`, y=`coverage_ratio`, series split by `channel`; horizontal line at the configured `min_ratio` |
 | "Data-quality fault breakdown" | `reason_code_frequency.csv` | x=`reason_code`, y=`count` |
-| "Stability near the operating point" | `stability_trials.csv` | histogram of `trial_class`; annotate `changed_from_baseline` fraction |
-| "Sensitivity to window duration" | `sensitivity_window.csv` | x=`value`, y=`index_value` |
-| "Sensitivity to coverage threshold" | `sensitivity_coverage.csv` | x=`value`, y=`index_value` |
+| "Stability near the operating point" | `stability_trials.csv` | histogram of `trial_class`, grouped by `method`; annotate `changed_from_baseline` fraction |
+| "Stability class-change rate by method" | `stability_summary.csv` | x=`method`, y=`class_change_rate` (with its 95% CI columns) |
+| "Sensitivity to window duration" | `sensitivity_window_summary.csv` | x=`value`, y=`mean_abs_index_diff` / `p95_abs_index_diff` |
+| "Sensitivity to coverage threshold" | `sensitivity_coverage_summary.csv` | x=`value`, y=`mean_abs_index_diff` / `p95_abs_index_diff` |
 | "Masking rate comparison" | `masking_summary.csv` | x=`method`, y=`masking_rate` (omit if `null` for both — nothing to show, §25) |
-| "Ground-truth scoring by method" | `ground_truth_summary.csv` | x=`method`, y=`macro_f1` and/or `cohens_kappa` |
+| "Reference-case consistency by method" | `reference_case_consistency.csv` | x=`method`, y=`macro_f1` and/or `cohens_kappa` (consistency, not accuracy) |
+| "Boundary continuity curves" | `continuity_grid.csv` | x=`input_value`, y=`index_value`, one line per `method`, one figure per `boundary_id` |
+| "Fault-detection performance" | `fault_detection_metrics.csv` | x=`reason_code`, y=`precision`/`recall`/`f1` |
 
 Every column above is documented (type, unit, description) in
 `output_data_dictionary.csv` in the same report directory.

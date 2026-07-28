@@ -43,6 +43,20 @@
         "rule_generation_version": {"type": "string"}
       }
     },
+    "performance": {
+      "type": "object",
+      "description": "Runtime/resource measurements for this pipeline run, taken on the actual execution host.",
+      "properties": {
+        "platform": {"type": "string"},
+        "processor": {"type": "string"},
+        "cpu_count": {"type": ["integer", "null"]},
+        "total_runtime_seconds": {"type": "number"},
+        "peak_memory_mb": {"type": "number"},
+        "per_timestamp_latency_ms": {"type": "object"},
+        "source_raw_row_count": {"type": "integer"},
+        "derived_row_counts": {"type": "object"}
+      }
+    },
     "selected_evaluation_run_id": {
       "type": ["string", "null"],
       "description": "The single evaluation_run_id whose results are reported below, if evaluation has been run."
@@ -54,6 +68,7 @@
         "evaluation_run_id": {"type": "string"},
         "pipeline_run_id": {"type": "string"},
         "n_computed_ts_evaluated": {"type": "integer", "minimum": 0},
+        "performance": {"type": "object"},
         "agreement": {"type": "array"},
         "masking": {"type": "array"},
         "reference_cases": {
@@ -79,6 +94,26 @@
             "by_parameter_value": {"type": "array"}
           }
         },
+        "continuity": {
+          "type": "object",
+          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids).",
+          "properties": {
+            "n_boundaries": {"type": "integer"},
+            "grid_points_per_boundary": {"type": "integer"},
+            "by_boundary_method": {"type": "array"}
+          }
+        },
+        "fault_injection": {
+          "type": "object",
+          "description": "Deterministic, labeled synthetic fault-injection benchmark -- separate from unlabeled real-data reason_code_frequency.",
+          "properties": {
+            "n_scenarios": {"type": "integer"},
+            "metrics_by_reason_code": {"type": "array"},
+            "false_rejection_rate_for_genuine_events": {"type": ["number", "null"]},
+            "confirmation_recovery_rate": {"type": ["number", "null"]},
+            "hampel_calibration": {"type": "object"}
+          }
+        },
         "status_proportions": {"type": "object"},
         "reason_code_frequency": {"type": "object"},
         "errors": {"type": "array", "items": {"type": "string"}},
@@ -94,8 +129,8 @@
         "warnings": {"type": "array", "items": {"type": "string"}},
         "provisional_parameters_used": {"type": "array", "items": {"type": "string"}},
         "parameters_covered_by_sensitivity_analysis": {"type": "array", "items": {"type": "string"}},
-        "tests_executed": {"type": "object"},
-        "artifact_validation": {"type": "object"}
+        "tests_executed": {"type": ["object", "null"]},
+        "artifact_validation": {"type": ["object", "null"]}
       }
     },
     "errors": {"type": "array", "items": {"type": "string"}},

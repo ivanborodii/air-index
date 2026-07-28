@@ -289,6 +289,10 @@ class EvaluationConfig(BaseModel):
     # AUTHOR_DEFINED: multi-point sensitivity stratified sample size -- bounded for the same reason.
     sensitivity_max_samples_per_stratum: int = Field(ge=1, default=5)
     masking_severity_threshold: Literal["Acceptable", "Degraded", "Critical"] = "Critical"  # PROVISIONAL
+    # AUTHOR_DEFINED: dense grid resolution for the boundary continuity experiment
+    # (points per +/-1 declared-uncertainty span around each control-region boundary).
+    # Kept modest: this experiment re-runs on every 'iaq_hfis evaluate' call, not just once.
+    continuity_grid_points: int = Field(ge=5, default=21)
 
 
 class Settings(BaseModel):

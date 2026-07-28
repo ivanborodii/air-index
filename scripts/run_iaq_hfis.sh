@@ -41,15 +41,19 @@ fi
 
 echo
 echo "iaq_hfis: evaluating run ${RUN_ID}"
-.venv/bin/python -m iaq_hfis.cli evaluate --from "$FROM_TS" --to "$TO_TS" "${WINDOW_MINUTES_ARG[@]}" --run-id "$RUN_ID"
+.venv/bin/python -m iaq_hfis.cli evaluate --from "$FROM_TS" --to "$TO_TS" "${WINDOW_MINUTES_ARG[@]}" --pipeline-run-id "$RUN_ID"
 
 echo
 echo "iaq_hfis: generating report for run ${RUN_ID}"
-.venv/bin/python -m iaq_hfis.cli report --run-id "$RUN_ID"
+.venv/bin/python -m iaq_hfis.cli report --pipeline-run-id "$RUN_ID"
 
 echo
 echo "iaq_hfis: rendering plots for run ${RUN_ID}"
-.venv/bin/python -m iaq_hfis.cli plot --run-id "$RUN_ID"
+.venv/bin/python -m iaq_hfis.cli plot --pipeline-run-id "$RUN_ID"
+
+echo
+echo "iaq_hfis: validating artifacts for run ${RUN_ID}"
+.venv/bin/python -m iaq_hfis.cli validate-artifacts --pipeline-run-id "$RUN_ID"
 
 echo
 echo "iaq_hfis: done. Artifacts in data/iaq_hfis/reports/${RUN_ID}/"

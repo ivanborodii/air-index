@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import resource
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,6 +37,16 @@ from iaq_hfis.baselines import crisp_max, weighted_mean
 from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings, config_hash
 from iaq_hfis.db import AirMonitorSource, DerivedResultsWriter
 from iaq_hfis.evaluation.agreement import pairwise_agreement
+from iaq_hfis.evaluation.continuity import run_continuity_experiment
+from iaq_hfis.evaluation.fault_injection import (
+    HAMPEL_MULTIPLIER_GRID,
+    HAMPEL_WINDOW_GRID,
+    confirmation_recovery_rate,
+    false_rejection_rate_for_genuine_events,
+    run_benchmark,
+    run_hampel_calibration,
+    score_predictions,
+)
 from iaq_hfis.evaluation.faults import compute_reason_code_frequency, compute_status_proportions
 from iaq_hfis.evaluation.masking import evaluate_masking
 from iaq_hfis.evaluation.multi_point_sensitivity import select_sensitivity_samples, summarize_sensitivity
@@ -257,6 +268,74 @@ def run_evaluation(
                              sp.reference_index_class, sp.reference_index_value, s.varied_parameter, s.value, s.completeness_status, s.index_value, s.index_class, now],
                         )
 
+            # --- Boundary continuity experiment: PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN,
+            # dense deterministic grids around every control-region boundary. ---
+            continuity_points, continuity_summaries = run_continuity_experiment(
+                ctx, settings.control_regions, representative_profile, settings.evaluation.continuity_grid_points
+            )
+            for p in continuity_points:
+                con.execute(
+                    """INSERT OR REPLACE INTO evaluation_continuity_grid
+                       (evaluation_run_id, pipeline_run_id, boundary_id, channel, boundary_value, grid_index, input_value, method, index_value, index_class)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, p.boundary_id, p.channel, p.boundary_value, p.grid_index, p.input_value, p.method, p.index_value, p.index_class],
+                )
+            for s in continuity_summaries:
+                con.execute(
+                    """INSERT OR REPLACE INTO evaluation_continuity_summary
+                       (evaluation_run_id, pipeline_run_id, boundary_id, channel, method, max_adjacent_jump, mean_adjacent_jump,
+                        total_variation, n_class_transitions, class_transition_positions, index_range, monotonicity_violations, masked_by_favorable)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, s.boundary_id, s.channel, s.method, s.max_adjacent_jump, s.mean_adjacent_jump,
+                     s.total_variation, s.n_class_transitions, ";".join(str(v) for v in s.class_transition_positions), s.index_range,
+                     s.monotonicity_violations, s.masked_by_favorable],
+                )
+
+            # --- Fault-injection benchmark: deterministic, labeled synthetic scenarios,
+            # fully separate from the unlabeled real-data reason-code frequency below. ---
+            fault_events, fault_predictions = run_benchmark(
+                settings.schema_mapping, sensor_specs, settings.hampel, settings.confirmation,
+                settings.confirmation.pm_cross_channel_tolerance_pct, settings.cadence.sample_cadence_seconds,
+            )
+            for e in fault_events:
+                con.execute(
+                    """INSERT OR REPLACE INTO fault_injection_events
+                       (evaluation_run_id, pipeline_run_id, scenario_id, channel, fault_type, injected_at_index, duration_samples, description)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, e.scenario_id, e.channel, e.fault_type, e.injected_at_index, e.duration_samples, e.description],
+                )
+            for p in fault_predictions:
+                con.execute(
+                    """INSERT OR REPLACE INTO fault_detection_predictions
+                       (evaluation_run_id, pipeline_run_id, scenario_id, channel, sample_index, true_fault_type, predicted_reason_codes, stage2_state, usable)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, p.scenario_id, p.channel, p.sample_index, p.true_fault_type, p.predicted_reason_codes, p.stage2_state, p.usable],
+                )
+            fault_metrics = score_predictions(fault_predictions)
+            for m in fault_metrics:
+                con.execute(
+                    """INSERT OR REPLACE INTO fault_detection_metrics
+                       (evaluation_run_id, pipeline_run_id, reason_code, tp, fp, fn, precision, recall, f1, false_positive_rate, mean_detection_delay)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, m.reason_code, m.tp, m.fp, m.fn, m.precision, m.recall, m.f1, m.false_positive_rate, m.mean_detection_delay],
+                )
+            fault_false_rejection_rate = false_rejection_rate_for_genuine_events(fault_predictions)
+            fault_confirmation_recovery_rate = confirmation_recovery_rate(fault_predictions)
+
+            hampel_calibration_rows = run_hampel_calibration(
+                settings.schema_mapping, sensor_specs, settings.confirmation, settings.confirmation.pm_cross_channel_tolerance_pct,
+                settings.cadence.sample_cadence_seconds, settings.hampel.window_size, settings.hampel.mad_multiplier,
+            )
+            for c in hampel_calibration_rows:
+                con.execute(
+                    """INSERT OR REPLACE INTO hampel_calibration
+                       (evaluation_run_id, pipeline_run_id, dataset_split, window_size, mad_multiplier, fault_recall,
+                        genuine_event_preservation_rate, objective_score, selected)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, c.dataset_split, c.window_size, c.mad_multiplier, c.fault_recall,
+                     c.genuine_event_preservation_rate, c.objective_score, c.selected],
+                )
+
             # --- Status proportions + fault reason-code frequency over the whole range, this pipeline_run_id only ---
             status_proportions = compute_status_proportions(con, pipeline_run_id, window_minutes, from_ts, to_ts)
             reason_frequency = compute_reason_code_frequency(con, pipeline_run_id, from_ts, to_ts)
@@ -281,6 +360,10 @@ def run_evaluation(
         "evaluation_run_id": evaluation_run_id,
         "pipeline_run_id": pipeline_run_id,
         "n_computed_ts_evaluated": len(computed_timestamps),
+        "performance": {
+            "total_runtime_seconds": (finished_at - started_at).total_seconds(),
+            "peak_memory_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0,
+        },
         "agreement": [
             {"method_a": a.method_a, "method_b": a.method_b, "n": a.n, "n_excluded": a.n_excluded, "percent_agreement": a.percent_agreement, "cohens_kappa": a.cohens_kappa}
             for a in agreement_results
@@ -316,6 +399,44 @@ def run_evaluation(
             "n_sample_points": len(sensitivity_points),
             "strata": sorted({sp.stratum for sp, _ in sensitivity_points}),
             "by_parameter_value": summarize_sensitivity(sensitivity_points),
+        },
+        "continuity": {
+            "n_boundaries": len({s.boundary_id for s in continuity_summaries}),
+            "grid_points_per_boundary": settings.evaluation.continuity_grid_points,
+            "by_boundary_method": [
+                {
+                    "boundary_id": s.boundary_id, "channel": s.channel, "method": s.method,
+                    "max_adjacent_jump": s.max_adjacent_jump, "mean_adjacent_jump": s.mean_adjacent_jump,
+                    "total_variation": s.total_variation, "n_class_transitions": s.n_class_transitions,
+                    "index_range": s.index_range, "monotonicity_violations": s.monotonicity_violations,
+                    "masked_by_favorable": s.masked_by_favorable,
+                }
+                for s in continuity_summaries
+            ],
+        },
+        "fault_injection": {
+            "n_scenarios": len({e.scenario_id for e in fault_events}),
+            "metrics_by_reason_code": [
+                {"reason_code": m.reason_code, "tp": m.tp, "fp": m.fp, "fn": m.fn, "precision": m.precision, "recall": m.recall,
+                 "f1": m.f1, "false_positive_rate": m.false_positive_rate, "mean_detection_delay": m.mean_detection_delay}
+                for m in fault_metrics
+            ],
+            "false_rejection_rate_for_genuine_events": fault_false_rejection_rate,
+            "confirmation_recovery_rate": fault_confirmation_recovery_rate,
+            "hampel_calibration": {
+                "current_window_size": settings.hampel.window_size,
+                "current_mad_multiplier": settings.hampel.mad_multiplier,
+                "candidate_grid": {"window_size": HAMPEL_WINDOW_GRID, "mad_multiplier": HAMPEL_MULTIPLIER_GRID},
+                "holdout_objective_score_for_current_config": next(
+                    (c.objective_score for c in hampel_calibration_rows if c.selected and c.dataset_split == "holdout"), None
+                ),
+                "best_development_objective_score": max(
+                    (c.objective_score for c in hampel_calibration_rows if c.dataset_split == "development" and c.objective_score is not None), default=None
+                ),
+                "note": "Current configured (window_size, mad_multiplier) is retained regardless of this grid's outcome -- "
+                        "a change is only adopted after separate empirical verification against real live data, not from "
+                        "synthetic-benchmark evidence alone. See hampel_calibration.csv for the full grid.",
+            },
         },
         "status_proportions": {"n_total": status_proportions.n_total, "OK": status_proportions.ok, "PARTIAL": status_proportions.partial, "FAILED": status_proportions.failed},
         "reason_code_frequency": {"n_total_quality_rows": reason_frequency.n_total_quality_rows, "counts": reason_frequency.counts},
