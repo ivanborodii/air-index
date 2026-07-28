@@ -895,9 +895,11 @@ live data will differ.)
 | `SnapshotError: could not take a consistent snapshot` | `air_monitor.duckdb` changed mid-copy repeatedly (very high write rate) or disk pressure | Retry; check `data/iaq_hfis/logs/iaq_hfis.log` for the underlying exception |
 | All timestamps FAILED | Coverage below `min_ratio` for ≥2 channels, or bad `schema_mapping` | Check `window_aggregates.coverage_ratio`; verify `schema_mapping` columns exist |
 | `MembershipConfigError: ... narrower than declared sensor uncertainty` | A configured `transition_widths` entry is smaller than `sensor_specs.yaml`'s `declared_uncertainty` for that channel | Widen the transition width, or set `membership.overlap_width_policy: auto_expand` |
-| `evaluate`/`report`/`plot` says "run 'iaq_hfis run' first" | No `run_summary_{run_id}.json` (or no data in the derived DB) for that run_id/range | Run the prerequisite step; check the run_id was copied correctly |
+| `evaluate`/`report`/`plot` says "run 'iaq_hfis run' first" | No `run_summary_{pipeline_run_id}.json` (or no data in the derived DB) for that pipeline_run_id/range | Run the prerequisite step; check the pipeline_run_id was copied correctly |
 | A plot is silently missing | Its source CSV had nothing to export this run (logged at INFO level) | Check the log; this is by design (§25), not a bug |
 | Real kitchen summer run uses general_residential's numbers | `kitchen/warm_period` has no independent DBN value; author decided to reuse general_residential's (§10, §29) | Expected, by design — not flagged provisional (it's a confirmed decision, not a guess) |
+| `LegacySchemaError: ... pipeline_run_id column` or `... schema_version=N` | The derived database predates the run-isolated schema, or a code/schema version mismatch | `python -m iaq_hfis.cli rebuild-db --confirm` (only deletes the derived DB, never raw sources) |
+| `validate-artifacts` reports a violation | A generated artifact is stale, hand-edited, or a real bug in report generation | Regenerate with `iaq_hfis report` + `iaq_hfis plot`; if it recurs, treat as a real bug, not something to work around |
 
 ## 34. How to interpret the generated result summary
 
@@ -912,10 +914,12 @@ Read `run_summary.md` top to bottom:
 3. **Provisional Parameters Used** — anything listed here means part of
    this run's numbers depend on a value not yet confirmed by the author
    (§9, §29). Never quote a result depending on these as final.
-4. **Baseline Comparison / Masking / Ground-Truth Scoring** — read these
-   together: high agreement + low masking + high macro-F1 for
+4. **Baseline Comparison / Masking / Reference-Case Consistency** — read
+   these together: high agreement + low masking + high macro-F1 for
    PROPOSED-HFIS relative to WEIGHTED-MEAN is the evidence the manuscript's
-   method is doing something CRISP-MAX/WEIGHTED-MEAN don't.
+   method is doing something CRISP-MAX/WEIGHTED-MEAN don't. Remember:
+   agreement is not accuracy, and reference-case macro-F1/kappa is
+   consistency with a synthetic label, not empirical accuracy.
 5. **Stability** — a high class-change rate near a real operating point
    means results there are sensitive to sensor noise; treat class
    distinctions cautiously in that regime.
@@ -933,7 +937,7 @@ structured data.
 
 ## 35. How to build article figures from exported data
 
-Every figure below reads only from `data/iaq_hfis/reports/{run_id}/exports/*.csv`
+Every figure below reads only from `data/iaq_hfis/reports/{pipeline_run_id}/exports/*.csv`
 (never the database directly) — the same files `plots.py` already renders,
 provided here so you can rebuild them in your own plotting environment
 (e.g. matplotlib in a notebook, or R/ggplot2) with full control over

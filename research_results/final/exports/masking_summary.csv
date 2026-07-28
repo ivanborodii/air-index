@@ -1,0 +1,3 @@
+method,severity_threshold,n_critical_events,n_masked,masking_rate
+CRISP-MAX,Critical,904,0,0.0
+WEIGHTED-MEAN,Critical,904,897,0.9922566371681416

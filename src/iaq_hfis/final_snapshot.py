@@ -71,6 +71,14 @@ def build_final_snapshot(
         raise FileNotFoundError(f"no report directory for pipeline_run_id={pipeline_run_id} at {report_dir} -- run 'iaq_hfis report' first")
 
     validation_report = validate_artifacts(settings, pipeline_run_id)
+    if summary.get("publication_readiness") is not None:
+        summary["publication_readiness"]["artifact_validation"] = {
+            "ok": validation_report.ok,
+            "n_checks_passed": len(validation_report.checks_passed),
+            "n_violations": len(validation_report.violations),
+        }
+        if test_report_text is not None:
+            summary["publication_readiness"]["tests_executed"] = {"summary": test_report_text.strip().splitlines()[-1] if test_report_text.strip() else None}
 
     final_dir = final_dir or (REPO_ROOT / FINAL_SNAPSHOT_DIRNAME)
     with tempfile.TemporaryDirectory(prefix="iaq_hfis_final_snapshot_") as tmp:

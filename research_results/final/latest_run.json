@@ -1,0 +1,66 @@
+{
+  "pipeline_run_id": "47195a37fb52424cae0411555732c23f",
+  "evaluation_run_id": "fad333e03b9a4ed9ad07646ad653334e",
+  "source_time_range": [
+    "2026-07-14T21:01:29+00:00",
+    "2026-07-28T21:01:29+00:00"
+  ],
+  "window_minutes": 15,
+  "coverage_min_ratio": 0.8,
+  "config_hash": "49fa03b6c0d202b58e8a533c3bd3e5febb1934234f5fbd081e99ff7a2fea31e1",
+  "git_commit": "a15562a887dec8f334b4addb9652e82be522a152",
+  "result_generation_timestamp_utc": "2026-07-28T23:15:29.222705+00:00",
+  "publication_readiness": {
+    "ready": true,
+    "blocking_issues": [],
+    "warnings": [
+      "16 provisional parameter(s) engaged this run -- disclosed in provisional_parameters_used, not resolved",
+      "16 engaged provisional parameter(s) have no sensitivity-analysis coverage: cadence.slot_match_tolerance_seconds, confirmation.gradual_drift_magnitude_multiplier, confirmation.gradual_drift_min_consecutive_steps, confirmation.persistence_min_consecutive_samples, confirmation.pm_cross_channel_tolerance_pct, confirmation.stuck_value_min_repeats, control_regions.output.transition_widths, control_regions.relative_humidity.transition_width, evaluation.masking_severity_threshold, evaluation.stability_n_trials, evaluation.stability_seed, fuzzy_engine.partial_mode_inference_rule, hampel.mad_multiplier, hampel.window_size, membership.output_transition_width, profile_selection.season_month_ranges"
+    ],
+    "provisional_parameters_used": [
+      "cadence.slot_match_tolerance_seconds",
+      "confirmation.gradual_drift_magnitude_multiplier",
+      "confirmation.gradual_drift_min_consecutive_steps",
+      "confirmation.persistence_min_consecutive_samples",
+      "confirmation.pm_cross_channel_tolerance_pct",
+      "confirmation.stuck_value_min_repeats",
+      "control_regions.output.transition_widths",
+      "control_regions.relative_humidity.transition_width",
+      "evaluation.masking_severity_threshold",
+      "evaluation.stability_n_trials",
+      "evaluation.stability_seed",
+      "fuzzy_engine.partial_mode_inference_rule",
+      "hampel.mad_multiplier",
+      "hampel.window_size",
+      "membership.output_transition_width",
+      "profile_selection.season_month_ranges"
+    ],
+    "parameters_covered_by_sensitivity_analysis": [
+      "coverage.min_ratio",
+      "evaluation.sensitivity_coverage_thresholds",
+      "evaluation.sensitivity_window_minutes"
+    ],
+    "tests_executed": {
+      "summary": "281 passed in 409.84s (0:06:49)"
+    },
+    "artifact_validation": {
+      "ok": true,
+      "n_checks_passed": 19,
+      "n_violations": 0
+    }
+  },
+  "artifact_validation": {
+    "ok": true,
+    "n_checks_passed": 19,
+    "n_violations": 0
+  },
+  "paths": {
+    "run_summary_md": "run_summary.md",
+    "run_narrative_md": "run_narrative.md",
+    "article_results_summary": "article_results_summary.md",
+    "article_metrics": "article_metrics.json",
+    "plot_manifest": "plot_manifest.json",
+    "exports_dir": "exports/",
+    "plots_dir": "plots/"
+  }
+}

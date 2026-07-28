@@ -1,0 +1,9 @@
+scenario_id,channel,fault_type,injected_at_index,duration_samples,description
+co2_data_loss_dev,co2,data_loss,20,5,5 consecutive missing samples.
+co2_genuine_rapid_event_dev,co2,genuine_event,20,20,"Sustained step change (e.g. ventilation) -- must remain usable, not be discarded as a fault."
+co2_gradual_drift_dev,co2,gradual_drift,20,10,Steep 10-step monotonic ramp exceeding the magnitude gate.
+co2_out_of_range_dev,co2,out_of_range,20,1,One value far outside the datasheet technical range.
+co2_persistent_real_change_dev,co2,genuine_event,20,20,"Gradual but sustained real rise that plateaus and holds -- a genuine change, not a transient fault."
+co2_single_spike_dev,co2,single_spike,20,1,One isolated large deviation reverting immediately.
+co2_stuck_value_dev,co2,stuck_value,20,8,8 consecutive identical readings.
+pm2_5_order_violation,pm2_5,pm_order_violation,20,1,"PM1 mass exceeds PM2.5 mass at one sample, violating cumulative ordering."

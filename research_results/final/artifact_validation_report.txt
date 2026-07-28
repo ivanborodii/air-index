@@ -1,0 +1,22 @@
+Artifact validation for pipeline_run_id=47195a37fb52424cae0411555732c23f
+  PASS: run_summary.json validates against config/run_summary.schema.json
+  PASS: run_summary.json pipeline_run_id matches the requested pipeline_run_id
+  PASS: evaluation section's pipeline_run_id/evaluation_run_id match the summary's own identifiers
+  PASS: n_timestamps_processed (4032) == persisted iaq_index_results count (4032)
+  PASS: completeness_summary sums to n_timestamps_processed (4032)
+  PASS: every FAILED row has a null index_value, null index_class, and no dominant_component
+  PASS: index_timeseries.csv row count (4032) == persisted iaq_index_results count (4032)
+  PASS: status counts agree between run_summary.json and index_timeseries.csv
+  PASS: run_summary.md contains the OK/PARTIAL/FAILED counts from run_summary.json
+  PASS: run_narrative.md contains the OK/PARTIAL/FAILED counts from run_summary.json
+  PASS: agreement n+n_excluded reconciles with method_comparison.csv row count for every method pair
+  PASS: masking n_masked <= n_critical_events for every method
+  PASS: stability_trials.csv row count for PROPOSED-HFIS (900) == n_trials_total (900)
+  PASS: stability class_change_rate for PROPOSED-HFIS reconciles with stability_trials.csv
+  PASS: stability_trials.csv row count for CRISP-MAX (900) == n_trials_total (900)
+  PASS: stability class_change_rate for CRISP-MAX reconciles with stability_trials.csv
+  PASS: stability_trials.csv row count for WEIGHTED-MEAN (900) == n_trials_total (900)
+  PASS: stability class_change_rate for WEIGHTED-MEAN reconciles with stability_trials.csv
+  PASS: every plot_manifest.json entry references columns that exist in its source CSV
+
+RESULT: OK
