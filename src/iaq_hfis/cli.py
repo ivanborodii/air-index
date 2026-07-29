@@ -6,22 +6,26 @@
     python -m iaq_hfis.cli plot --pipeline-run-id <id>
     python -m iaq_hfis.cli validate-artifacts --pipeline-run-id <id>
     python -m iaq_hfis.cli rebuild-db --confirm
-    python -m iaq_hfis.cli finalize --pipeline-run-id <id>
+    python -m iaq_hfis.cli test-report
+    python -m iaq_hfis.cli finalize --pipeline-run-id <id> [--test-report-json test_report.json]
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from iaq_hfis.config import ConfigError, RoomProfilesConfig, SensorSpecs, Settings, load_room_profiles, load_sensor_specs, load_settings
 from iaq_hfis.db import LegacySchemaError, rebuild_derived_database
 from iaq_hfis.evaluate import run_evaluation
-from iaq_hfis.final_snapshot import build_final_snapshot
+from iaq_hfis.final_snapshot import REPO_ROOT, build_final_snapshot
 from iaq_hfis.pipeline import run_pipeline
 from iaq_hfis.report import generate_plots, generate_report
+from iaq_hfis.testing_report import run_full_test_suite, write_test_report
 from iaq_hfis.validation import ArtifactValidationError, report_dir as validation_report_dir, validate_artifacts, write_artifact_validation_report
 
 
@@ -83,6 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     finalize_p = sub.add_parser("finalize", help="Build the tracked research_results/final/ publication snapshot from a validated pipeline run")
     _add_config_args(finalize_p)
     finalize_p.add_argument("--pipeline-run-id", required=True)
+    finalize_p.add_argument("--test-report-json", help="Path to a test_report.json from 'test-report' -- embedded in the snapshot; refuses to finalize if it says ok=false")
+
+    test_report_p = sub.add_parser("test-report", help="Run the full pytest suite and record total/passed/failed/skipped/time/environment (required before finalize)")
+    test_report_p.add_argument("--verbose", action="store_true")
+    test_report_p.add_argument("--out-dir", default=".", help="Directory to write test_report.json/.md into (default: repo root)")
+    test_report_p.add_argument("--pytest-args", nargs=argparse.REMAINDER, default=[], help="Extra arguments passed through to pytest")
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -99,6 +109,14 @@ def main(argv: list[str] | None = None) -> int:
         rebuild_derived_database(settings.paths.derived_db_path)
         print(f"Rebuilt derived database at {settings.paths.derived_db_path}")
         return 0
+
+    if args.command == "test-report":
+        summary = run_full_test_suite(REPO_ROOT, pytest_args=args.pytest_args)
+        json_path, md_path = write_test_report(summary, Path(args.out_dir))
+        print(f"Test report written to {json_path}, {md_path}")
+        print(f"  total={summary.get('total')} passed={summary.get('passed')} failed={summary.get('failed')} "
+              f"errors={summary.get('errors')} skipped={summary.get('skipped')} wall={summary.get('wall_seconds'):.1f}s")
+        return 0 if summary.get("ok") else 1
 
     loaded = _load_config(args)
     if loaded is None:
@@ -190,8 +208,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.command == "finalize":
+        test_report_summary = None
+        if args.test_report_json:
+            test_report_summary = json.loads(Path(args.test_report_json).read_text(encoding="utf-8"))
+            if not test_report_summary.get("ok"):
+                print(
+                    f"finalize refused: {args.test_report_json} reports ok=false "
+                    f"({test_report_summary.get('failed')} failed, {test_report_summary.get('errors')} error(s)) -- "
+                    f"do not publish with failing tests. Fix and re-run 'iaq_hfis test-report' first.",
+                    file=sys.stderr,
+                )
+                return 1
         try:
-            result = build_final_snapshot(settings, args.pipeline_run_id)
+            result = build_final_snapshot(settings, args.pipeline_run_id, test_report_summary=test_report_summary)
         except FileNotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 2

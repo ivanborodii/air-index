@@ -20,6 +20,7 @@ from pathlib import Path
 
 from iaq_hfis.config import Settings
 from iaq_hfis.report import _report_dir, load_run_summary
+from iaq_hfis.testing_report import write_test_report
 from iaq_hfis.validation import validate_artifacts, write_artifact_validation_report
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -106,13 +107,15 @@ the final-run procedure; do not edit these files directly.
 def build_final_snapshot(
     settings: Settings,
     pipeline_run_id: str,
-    test_report_text: str | None = None,
+    test_report_summary: dict | None = None,
     final_dir: Path | None = None,
 ) -> dict:
     """Copies every validated artifact for ``pipeline_run_id`` into
     ``final_dir`` (defaults to ``<repo root>/research_results/final``),
-    plus ``latest_run.json`` and (if given) a ``test_report.txt``. Returns
-    the validate-artifacts report used.
+    plus ``latest_run.json`` and (if given) ``test_report.json``/``.md``
+    (the structured dict from :func:`iaq_hfis.testing_report.run_full_test_suite`
+    -- total/passed/failed/skipped/wall-time/environment). Returns the
+    validate-artifacts report used.
 
     ``final_dir`` is overridable specifically so tests never touch the
     real repository's tracked publication snapshot.
@@ -130,8 +133,14 @@ def build_final_snapshot(
             "n_checks_passed": len(validation_report.checks_passed),
             "n_violations": len(validation_report.violations),
         }
-        if test_report_text is not None:
-            summary["publication_readiness"]["tests_executed"] = {"summary": test_report_text.strip().splitlines()[-1] if test_report_text.strip() else None}
+        if test_report_summary is not None:
+            summary["publication_readiness"]["tests_executed"] = {
+                "ok": test_report_summary.get("ok"),
+                "total": test_report_summary.get("total"),
+                "passed": test_report_summary.get("passed"),
+                "failed": test_report_summary.get("failed"),
+                "skipped": test_report_summary.get("skipped"),
+            }
 
     final_dir = final_dir or (REPO_ROOT / FINAL_SNAPSHOT_DIRNAME)
     with tempfile.TemporaryDirectory(prefix="iaq_hfis_final_snapshot_") as tmp:
@@ -147,8 +156,8 @@ def build_final_snapshot(
         (staging / "artifact_validation_report.txt").write_text(artifact_validation_text, encoding="utf-8")
         write_artifact_validation_report(validation_report, staging)
 
-        if test_report_text is not None:
-            (staging / "test_report.txt").write_text(test_report_text, encoding="utf-8")
+        if test_report_summary is not None:
+            write_test_report(test_report_summary, staging)
 
         summary_snapshot_path = staging / f"run_summary_{pipeline_run_id}.json"
         summary_snapshot_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -179,6 +188,8 @@ def build_final_snapshot(
                 "provisional_parameter_assessment": "provisional_parameter_assessment.md",
                 "artifact_validation_json": "artifact_validation.json",
                 "artifact_validation_md": "artifact_validation.md",
+                "test_report_json": "test_report.json",
+                "test_report_md": "test_report.md",
                 "exports_dir": "exports/",
                 "plots_dir": "plots/",
             },

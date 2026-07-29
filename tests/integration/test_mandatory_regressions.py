@@ -320,3 +320,37 @@ def test_validate_artifacts_writes_json_and_md_reports(full_run, tmp_path):
     md_text = md_path.read_text()
     assert "Artifact Validation Report" in md_text
     assert pipeline_run_id in md_text
+
+
+def test_final_snapshot_embeds_test_report_when_given(full_run, tmp_path):
+    """Mandatory regression test: build_final_snapshot must write
+    test_report.json/.md into the snapshot when a test_report_summary is
+    given, and fold its pass/fail counts into publication_readiness --
+    per the "do not proceed to publishing if any required test fails"
+    requirement, the snapshot must carry visible evidence of whether tests
+    passed."""
+    settings, pipeline_run_id = full_run
+    fake_test_report = {
+        "total": 42, "passed": 42, "failed": 0, "errors": 0, "skipped": 0,
+        "wall_seconds": 12.3, "exit_code": 0, "ok": True,
+        "environment": {"python_version": "3.13.5", "duckdb_version": "1.5.2", "platform": "Linux-test", "git_commit": "deadbeef"},
+        "generated_at_utc": "2026-07-29T00:00:00+00:00",
+        "command": "pytest tests/ -q",
+        "stdout_tail": "42 passed in 12.3s",
+    }
+    result = build_final_snapshot(settings, pipeline_run_id, test_report_summary=fake_test_report, final_dir=tmp_path / "final")
+    final_dir = Path(result["final_dir"])
+
+    assert (final_dir / "test_report.json").is_file()
+    assert (final_dir / "test_report.md").is_file()
+    parsed = json.loads((final_dir / "test_report.json").read_text())
+    assert parsed["total"] == 42
+    assert parsed["ok"] is True
+
+    summary_path = final_dir / "run_summary.json"
+    summary = json.loads(summary_path.read_text())
+    tests_executed = summary["publication_readiness"]["tests_executed"]
+    assert tests_executed["ok"] is True
+    assert tests_executed["total"] == 42
+    assert tests_executed["passed"] == 42
+    assert tests_executed["failed"] == 0
