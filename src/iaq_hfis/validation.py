@@ -76,6 +76,8 @@ def validate_artifacts(settings: Settings, pipeline_run_id: str) -> ArtifactVali
         _check_agreement_and_masking(csv_dir, summary, passed, violations)
         _check_stability(csv_dir, summary, passed, violations)
         _check_plot_manifest(report_dir, csv_dir, passed, violations)
+        _check_provisional_parameters_agree(report_dir, summary, passed, violations)
+        _check_sensitivity_consistency(csv_dir, summary, passed, violations)
     finally:
         con.close()
 
@@ -247,3 +249,162 @@ def _check_plot_manifest(report_dir: Path, csv_dir: Path, passed: list[str], vio
         violations.extend(bad_refs)
     else:
         passed.append("every plot_manifest.json entry references columns that exist in its source CSV")
+
+
+def _check_provisional_parameters_agree(report_dir: Path, summary: dict, passed: list[str], violations: list[str]) -> None:
+    """Mandatory cross-artifact check: run_summary.json's top-level
+    provisional_parameters_used, publication_readiness's copy of it,
+    parameter_provenance.csv's engaged PROVISIONAL rows, run_summary.md,
+    run_narrative.md, and article_results_summary.md (if present) must all
+    report the exact same set of provisional parameters -- this is exactly
+    the class of bug where run_summary.md said "None engaged" while
+    publication_readiness said 16."""
+    authoritative = sorted(summary.get("provisional_parameters_used") or [])
+    n = len(authoritative)
+
+    pr = summary.get("publication_readiness")
+    if pr is not None:
+        pr_list = sorted(pr.get("provisional_parameters_used") or [])
+        if pr_list == authoritative:
+            passed.append("publication_readiness.provisional_parameters_used matches run_summary.json's top-level provisional_parameters_used")
+        else:
+            violations.append(
+                f"publication_readiness.provisional_parameters_used ({len(pr_list)}) != "
+                f"run_summary.json top-level provisional_parameters_used ({n}): "
+                f"only-in-publication_readiness={sorted(set(pr_list) - set(authoritative))}, "
+                f"only-in-top-level={sorted(set(authoritative) - set(pr_list))}"
+            )
+
+    provenance_csv = report_dir / "parameter_provenance.csv"
+    if provenance_csv.is_file():
+        df = pd.read_csv(provenance_csv)
+        engaged_provisional = sorted(df[(df["status"] == "PROVISIONAL") & (df["engaged"] == True)]["path"].tolist())  # noqa: E712
+        if engaged_provisional == authoritative:
+            passed.append("parameter_provenance.csv engaged PROVISIONAL rows match run_summary.json's provisional_parameters_used")
+        else:
+            violations.append(
+                f"parameter_provenance.csv engaged PROVISIONAL rows ({len(engaged_provisional)}) != "
+                f"run_summary.json provisional_parameters_used ({n}): "
+                f"only-in-csv={sorted(set(engaged_provisional) - set(authoritative))}, "
+                f"only-in-summary={sorted(set(authoritative) - set(engaged_provisional))}"
+            )
+
+    for label, filename in (("run_summary.md", "run_summary.md"), ("run_narrative.md", "run_narrative.md")):
+        path = report_dir / filename
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if n == 0:
+            if "none engaged this run" in text.lower() or "no provisional parameters were engaged" in text.lower():
+                passed.append(f"{label} correctly states no provisional parameters were engaged (authoritative count is 0)")
+            else:
+                violations.append(f"{label} does not clearly state zero provisional parameters engaged, but the authoritative count is 0")
+        else:
+            if "none engaged this run" in text.lower() or "no provisional parameters were engaged" in text.lower():
+                violations.append(f"{label} says no provisional parameters were engaged, but the authoritative count is {n}: {authoritative}")
+                continue
+            missing_from_text = [p for p in authoritative if p not in text]
+            if missing_from_text:
+                violations.append(f"{label} is missing {len(missing_from_text)} of {n} authoritative provisional parameter name(s): {missing_from_text}")
+            else:
+                passed.append(f"{label} names all {n} authoritative provisional parameters")
+
+    article_path = report_dir / "article_results_summary.md"
+    if article_path.is_file():
+        text = article_path.read_text(encoding="utf-8")
+        if n == 0:
+            if "none engaged this run" in text.lower():
+                passed.append("article_results_summary.md correctly states no provisional parameters were engaged")
+            else:
+                violations.append("article_results_summary.md does not clearly state zero provisional parameters engaged, but the authoritative count is 0")
+        else:
+            missing_from_text = [p for p in authoritative if p not in text]
+            if missing_from_text:
+                violations.append(f"article_results_summary.md is missing {len(missing_from_text)} of {n} authoritative provisional parameter name(s): {missing_from_text}")
+            else:
+                passed.append(f"article_results_summary.md names all {n} authoritative provisional parameters")
+
+
+def _recompute_sensitivity_summary_from_by_point(by_point: pd.DataFrame) -> dict[float, dict]:
+    """Independent re-implementation (deliberately not importing the
+    production aggregation function) of the sensitivity summary formula,
+    used only to cross-check that the persisted summary CSV was actually
+    computed from the detailed by-point data it claims to summarize."""
+    recomputed = {}
+    for value, g in by_point.groupby("value"):
+        n_eligible = len(g)
+        evaluated = g[g["completeness_status"].notna()]
+        n_evaluated = len(evaluated)
+        class_transitions = int((evaluated["index_class"] != evaluated["reference_index_class"]).sum())
+        valid = evaluated[evaluated["index_value"].notna() & evaluated["reference_index_value"].notna()]
+        diffs = (valid["index_value"] - valid["reference_index_value"]).abs()
+        recomputed[value] = {
+            "n_eligible": n_eligible,
+            "n_evaluated": n_evaluated,
+            "n_class_transitions": class_transitions,
+            "class_agreement_with_reference": (n_evaluated - class_transitions) / n_evaluated if n_evaluated else None,
+            "mean_abs_index_diff": float(diffs.mean()) if len(diffs) else None,
+        }
+    return recomputed
+
+
+def _check_sensitivity_consistency(csv_dir: Path, summary: dict, passed: list[str], violations: list[str]) -> None:
+    """Mandatory check: every sensitivity summary row must recompute
+    exactly (strict numeric tolerance) from its own detailed by-point CSV,
+    contain no duplicate parameter settings, and agree with run_summary.json."""
+    ev = summary.get("evaluation")
+    if ev is None:
+        return
+    tol = 1e-6
+
+    for varied_parameter, by_point_name, summary_name in (
+        ("window_minutes", "sensitivity_window_by_point.csv", "sensitivity_window_summary.csv"),
+        ("coverage_threshold", "sensitivity_coverage_by_point.csv", "sensitivity_coverage_summary.csv"),
+    ):
+        by_point_path = csv_dir / by_point_name
+        summary_path = csv_dir / summary_name
+        if not by_point_path.is_file() or not summary_path.is_file():
+            continue
+
+        by_point = pd.read_csv(by_point_path)
+        summary_df = pd.read_csv(summary_path)
+
+        dup = summary_df["value"].duplicated()
+        if dup.any():
+            violations.append(f"{summary_name} has duplicate 'value' rows: {summary_df.loc[dup, 'value'].tolist()}")
+        else:
+            passed.append(f"{summary_name} has no duplicate parameter settings")
+
+        recomputed = _recompute_sensitivity_summary_from_by_point(by_point)
+        mismatches = []
+        for _, row in summary_df.iterrows():
+            expected = recomputed.get(row["value"])
+            if expected is None:
+                mismatches.append(f"value={row['value']} present in {summary_name} but not in {by_point_name}")
+                continue
+            for key in ("n_eligible", "n_evaluated", "n_class_transitions"):
+                if key in row and int(row[key]) != expected[key]:
+                    mismatches.append(f"value={row['value']} {key}: summary={row[key]} recomputed={expected[key]}")
+            for key in ("class_agreement_with_reference", "mean_abs_index_diff"):
+                if key in row and expected[key] is not None and pd.notna(row[key]):
+                    if abs(float(row[key]) - expected[key]) > tol:
+                        mismatches.append(f"value={row['value']} {key}: summary={row[key]} recomputed={expected[key]}")
+        if mismatches:
+            violations.extend(f"{summary_name} disagrees with {by_point_name}: {m}" for m in mismatches)
+        else:
+            passed.append(f"{summary_name} recomputes exactly from {by_point_name} (tolerance {tol})")
+
+        # Cross-check against run_summary.json's own copy of the same summary.
+        json_rows = {r["value"]: r for r in (ev.get("sensitivity") or {}).get("by_parameter_value", []) if r["varied_parameter"] == varied_parameter}
+        json_mismatches = []
+        for _, row in summary_df.iterrows():
+            j = json_rows.get(row["value"])
+            if j is None:
+                json_mismatches.append(f"value={row['value']} present in {summary_name} but not in run_summary.json")
+                continue
+            if int(j["n_class_transitions"]) != int(row["n_class_transitions"]):
+                json_mismatches.append(f"value={row['value']} n_class_transitions: json={j['n_class_transitions']} csv={row['n_class_transitions']}")
+        if json_mismatches:
+            violations.extend(f"run_summary.json sensitivity disagrees with {summary_name}: {m}" for m in json_mismatches)
+        else:
+            passed.append(f"run_summary.json sensitivity ({varied_parameter}) agrees with {summary_name}")

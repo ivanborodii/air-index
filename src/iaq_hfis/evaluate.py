@@ -49,7 +49,7 @@ from iaq_hfis.evaluation.fault_injection import (
 )
 from iaq_hfis.evaluation.faults import compute_reason_code_frequency, compute_status_proportions
 from iaq_hfis.evaluation.masking import evaluate_masking
-from iaq_hfis.evaluation.multi_point_sensitivity import select_sensitivity_samples, summarize_sensitivity
+from iaq_hfis.evaluation.multi_point_sensitivity import compute_sensitivity_summary, select_sensitivity_samples
 from iaq_hfis.evaluation.multi_point_stability import select_stability_samples, run_multi_point_stability, summarize_stability
 from iaq_hfis.evaluation.reference_cases import generate_reference_cases, score_against_reference_cases
 from iaq_hfis.evaluation.sensitivity import sweep_coverage_thresholds, sweep_window_minutes
@@ -268,6 +268,11 @@ def run_evaluation(
                              sp.reference_index_class, sp.reference_index_value, s.varied_parameter, s.value, s.completeness_status, s.index_value, s.index_class, now],
                         )
 
+            # Computed from the just-persisted rows (never from the in-memory sensitivity_points
+            # objects above) -- the single deterministic aggregation function also used by
+            # reporting/exports.py's CSV export, so JSON and CSV can never numerically disagree.
+            sensitivity_summary_rows = compute_sensitivity_summary(con, evaluation_run_id) if sensitivity_points else []
+
             # --- Boundary continuity experiment: PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN,
             # dense deterministic grids around every control-region boundary. ---
             continuity_points, continuity_summaries = run_continuity_experiment(
@@ -398,7 +403,8 @@ def run_evaluation(
         "sensitivity": {
             "n_sample_points": len(sensitivity_points),
             "strata": sorted({sp.stratum for sp, _ in sensitivity_points}),
-            "by_parameter_value": summarize_sensitivity(sensitivity_points),
+            "by_parameter_value": sensitivity_summary_rows,
+            "baseline_config": {"window_minutes": settings.cadence.aggregation_window_minutes, "recompute_interval_minutes": settings.cadence.recompute_interval_minutes, "coverage_min_ratio": settings.coverage.min_ratio},
         },
         "continuity": {
             "n_boundaries": len({s.boundary_id for s in continuity_summaries}),

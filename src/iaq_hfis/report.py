@@ -22,7 +22,7 @@ import pandas as pd
 from iaq_hfis import plots
 from iaq_hfis.article_summary import write_article_summary
 from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings
-from iaq_hfis.provenance import assess_publication_readiness, collect_parameter_provenance, mark_engagement
+from iaq_hfis.provenance import apply_known_engagement, assess_publication_readiness, collect_parameter_provenance
 from iaq_hfis.reporting import data_dictionary, exports, narrative, plot_manifest
 from iaq_hfis.reporting import summary as summary_module
 
@@ -71,7 +71,11 @@ def generate_report(settings: Settings, pipeline_run_id: str, sensor_specs: Sens
     to_ts = datetime.fromisoformat(summary["computed_ts_range"][1])
     evaluation_run_id = summary.get("selected_evaluation_run_id")
 
-    provenance = mark_engagement(collect_parameter_provenance(settings, sensor_specs, room_profiles), summary.get("provisional_parameters_used") or [])
+    # provisional_parameters_used was already decided authoritatively at 'run' time (pipeline.py);
+    # here we only mark each catalog row's 'engaged' flag from that already-persisted list --
+    # never re-derive engagement independently, which is exactly how run_summary.md/run_narrative.md
+    # (reading this same top-level field) previously disagreed with publication_readiness.
+    provenance = apply_known_engagement(collect_parameter_provenance(settings, sensor_specs, room_profiles), summary.get("provisional_parameters_used") or [])
     summary["publication_readiness"] = assess_publication_readiness(summary, provenance)
     _write_run_summary(settings, pipeline_run_id, summary)
 

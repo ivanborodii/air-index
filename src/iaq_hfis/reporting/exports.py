@@ -151,18 +151,25 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("stratum", "str", "-", "Which stratification group this sample was drawn from."),
         ColumnSpec("reference_completeness_status", "str", "-", "Completeness status at the configured (15-minute) window."),
         ColumnSpec("reference_index_class", "str", "-", "Index class at the configured (15-minute) window."),
+        ColumnSpec("reference_index_value", "float", "0-100", "Index value at the configured (15-minute) window; null if not OK."),
         ColumnSpec("value", "int", "minutes", "Window size tested (manuscript-specified: 5, 15, 30, 60)."),
         ColumnSpec("completeness_status", "str", "-", "OK | PARTIAL | FAILED at this window size."),
         ColumnSpec("index_value", "float", "0-100", "Index value at this window size; null if FAILED."),
         ColumnSpec("index_class", "str", "-", "Index class at this window size; null if FAILED."),
     ],
     SENSITIVITY_WINDOW_SUMMARY: [
+        ColumnSpec("varied_parameter", "str", "-", "Always 'window_minutes' in this file."),
         ColumnSpec("value", "int", "minutes", "Window size tested."),
-        ColumnSpec("n_samples", "int", "count", "Number of sampled computed_ts evaluated at this window size."),
-        ColumnSpec("n_status_transitions", "int", "count", "Samples whose completeness status differed from the reference."),
-        ColumnSpec("n_class_transitions", "int", "count", "Samples whose index class differed from the reference."),
-        ColumnSpec("class_agreement_with_reference", "float", "0-1", "Fraction of samples whose class matched the reference."),
-        ColumnSpec("mean_abs_index_diff", "float", "index points", "Mean absolute index difference from the reference."),
+        ColumnSpec("n_eligible", "int", "count", "Sampled points selected for this window size (denominator before availability filtering)."),
+        ColumnSpec("n_evaluated", "int", "count", "Of those, how many produced a non-null completeness_status (the sweep actually ran)."),
+        ColumnSpec("n_unavailable", "int", "count", "n_eligible - n_evaluated."),
+        ColumnSpec("n_valid_comparisons", "int", "count", "Of the evaluated points, how many had both a swept and reference index_value (denominator for the index-difference statistics)."),
+        ColumnSpec("n_samples", "int", "count", "Alias of n_eligible, kept for backward-compatible column naming."),
+        ColumnSpec("n_status_transitions", "int", "count", "Evaluated samples whose completeness status differed from the reference."),
+        ColumnSpec("n_class_transitions", "int", "count", "Evaluated samples whose index class differed from the reference."),
+        ColumnSpec("n_agreement", "int", "count", "n_evaluated - n_class_transitions."),
+        ColumnSpec("class_agreement_with_reference", "float", "0-1", "n_agreement / n_evaluated; null if n_evaluated is 0."),
+        ColumnSpec("mean_abs_index_diff", "float", "index points", "Mean absolute index difference from the reference, over n_valid_comparisons."),
         ColumnSpec("median_abs_index_diff", "float", "index points", "Median absolute index difference from the reference."),
         ColumnSpec("p95_abs_index_diff", "float", "index points", "95th percentile absolute index difference from the reference."),
         ColumnSpec("max_abs_index_diff", "float", "index points", "Maximum absolute index difference from the reference."),
@@ -173,18 +180,25 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("stratum", "str", "-", "Which stratification group this sample was drawn from."),
         ColumnSpec("reference_completeness_status", "str", "-", "Completeness status at the configured coverage threshold."),
         ColumnSpec("reference_index_class", "str", "-", "Index class at the configured coverage threshold."),
+        ColumnSpec("reference_index_value", "float", "0-100", "Index value at the configured coverage threshold; null if not OK."),
         ColumnSpec("value", "float", "0-1", "Coverage threshold tested (manuscript-specified: 0.70, 0.80, 0.90)."),
         ColumnSpec("completeness_status", "str", "-", "OK | PARTIAL | FAILED at this threshold."),
         ColumnSpec("index_value", "float", "0-100", "Index value at this threshold; null if FAILED."),
         ColumnSpec("index_class", "str", "-", "Index class at this threshold; null if FAILED."),
     ],
     SENSITIVITY_COVERAGE_SUMMARY: [
+        ColumnSpec("varied_parameter", "str", "-", "Always 'coverage_threshold' in this file."),
         ColumnSpec("value", "float", "0-1", "Coverage threshold tested."),
-        ColumnSpec("n_samples", "int", "count", "Number of sampled computed_ts evaluated at this threshold."),
-        ColumnSpec("n_status_transitions", "int", "count", "Samples whose completeness status differed from the reference."),
-        ColumnSpec("n_class_transitions", "int", "count", "Samples whose index class differed from the reference."),
-        ColumnSpec("class_agreement_with_reference", "float", "0-1", "Fraction of samples whose class matched the reference."),
-        ColumnSpec("mean_abs_index_diff", "float", "index points", "Mean absolute index difference from the reference."),
+        ColumnSpec("n_eligible", "int", "count", "Sampled points selected for this threshold (denominator before availability filtering)."),
+        ColumnSpec("n_evaluated", "int", "count", "Of those, how many produced a non-null completeness_status (the sweep actually ran)."),
+        ColumnSpec("n_unavailable", "int", "count", "n_eligible - n_evaluated."),
+        ColumnSpec("n_valid_comparisons", "int", "count", "Of the evaluated points, how many had both a swept and reference index_value (denominator for the index-difference statistics)."),
+        ColumnSpec("n_samples", "int", "count", "Alias of n_eligible, kept for backward-compatible column naming."),
+        ColumnSpec("n_status_transitions", "int", "count", "Evaluated samples whose completeness status differed from the reference."),
+        ColumnSpec("n_class_transitions", "int", "count", "Evaluated samples whose index class differed from the reference."),
+        ColumnSpec("n_agreement", "int", "count", "n_evaluated - n_class_transitions."),
+        ColumnSpec("class_agreement_with_reference", "float", "0-1", "n_agreement / n_evaluated; null if n_evaluated is 0."),
+        ColumnSpec("mean_abs_index_diff", "float", "index points", "Mean absolute index difference from the reference, over n_valid_comparisons."),
         ColumnSpec("median_abs_index_diff", "float", "index points", "Median absolute index difference from the reference."),
         ColumnSpec("p95_abs_index_diff", "float", "index points", "95th percentile absolute index difference from the reference."),
         ColumnSpec("max_abs_index_diff", "float", "index points", "Maximum absolute index difference from the reference."),
@@ -441,7 +455,7 @@ def export_stability_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, eval
 
 def _export_sensitivity_by_point(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str, varied_parameter: str, filename: str) -> Path | None:
     df = con.execute(
-        "SELECT sample_id, computed_ts, stratum, reference_completeness_status, reference_index_class, "
+        "SELECT sample_id, computed_ts, stratum, reference_completeness_status, reference_index_class, reference_index_value, "
         "value, completeness_status, index_value, index_class "
         "FROM evaluation_sensitivity WHERE evaluation_run_id = ? AND varied_parameter = ? ORDER BY value, sample_id",
         [evaluation_run_id, varied_parameter],
@@ -460,34 +474,13 @@ def export_sensitivity_coverage_by_point(con: duckdb.DuckDBPyConnection, out_dir
 
 
 def _export_sensitivity_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str, varied_parameter: str, filename: str) -> Path | None:
-    df = con.execute(
-        "SELECT value, reference_completeness_status, completeness_status, reference_index_class, index_class, "
-        "reference_index_value, index_value "
-        "FROM evaluation_sensitivity WHERE evaluation_run_id = ? AND varied_parameter = ?",
-        [evaluation_run_id, varied_parameter],
-    ).df()
-    if df.empty:
+    from iaq_hfis.evaluation.multi_point_sensitivity import compute_sensitivity_summary
+
+    rows = compute_sensitivity_summary(con, evaluation_run_id, varied_parameter)
+    if not rows:
         return None
-    rows = []
-    for value, g in df.groupby("value"):
-        n = len(g)
-        status_transitions = int((g["completeness_status"] != g["reference_completeness_status"]).sum())
-        class_transitions = int((g["index_class"] != g["reference_index_class"]).sum())
-        diffs = (g["index_value"] - g["reference_index_value"]).abs().dropna()
-        rows.append(
-            {
-                "value": value,
-                "n_samples": n,
-                "n_status_transitions": status_transitions,
-                "n_class_transitions": class_transitions,
-                "class_agreement_with_reference": (n - class_transitions) / n if n else None,
-                "mean_abs_index_diff": float(diffs.mean()) if len(diffs) else None,
-                "median_abs_index_diff": float(diffs.median()) if len(diffs) else None,
-                "p95_abs_index_diff": float(diffs.quantile(0.95)) if len(diffs) else None,
-                "max_abs_index_diff": float(diffs.max()) if len(diffs) else None,
-            }
-        )
-    return _write(pd.DataFrame(rows), COLUMNS[filename], out_dir, filename)
+    df = pd.DataFrame(rows)
+    return _write(df, COLUMNS[filename], out_dir, filename)
 
 
 def export_sensitivity_window_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:

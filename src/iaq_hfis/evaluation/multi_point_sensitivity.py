@@ -145,32 +145,68 @@ def select_sensitivity_samples(
     return samples
 
 
-def summarize_sensitivity(points: list[tuple[SensitivitySamplePoint, list]]) -> list[dict]:
-    """One summary row per (varied_parameter, value): sample count, status
-    and class transition counts, index-difference statistics from each
-    sample point's own reference (15-minute window / configured coverage
-    threshold) value, and class agreement rate -- aggregated across every
-    sampled point, not a single instant."""
+def compute_sensitivity_summary(con, evaluation_run_id: str, varied_parameter: str | None = None) -> list[dict]:
+    """The ONE deterministic aggregation function for sensitivity summary
+    rows, computed directly from the already-persisted ``evaluation_sensitivity``
+    table -- never from independently-held in-memory objects. Both
+    ``run_summary.json`` (:mod:`iaq_hfis.evaluate`) and
+    ``sensitivity_*_summary.csv`` (:mod:`iaq_hfis.reporting.exports`) call
+    this exact function so they can never numerically disagree with each
+    other or with the detailed by-point data they're computed from.
+
+    One row per ``(varied_parameter, value)``, each setting appearing
+    exactly once, sorted deterministically. Uses explicit denominators:
+    ``n_eligible`` (rows selected for this parameter/value),
+    ``n_evaluated`` (rows with a non-null completeness_status, i.e. the
+    sweep actually ran), and ``n_valid_comparisons`` (rows where both the
+    swept and reference index_value are non-null, the denominator for the
+    index-difference statistics).
+    """
+    where = "WHERE evaluation_run_id = ?"
+    params: list = [evaluation_run_id]
+    if varied_parameter is not None:
+        where += " AND varied_parameter = ?"
+        params.append(varied_parameter)
+
+    rows = con.execute(
+        f"""
+        SELECT varied_parameter, value, completeness_status, reference_completeness_status,
+               index_class, reference_index_class, index_value, reference_index_value
+        FROM evaluation_sensitivity
+        {where}
+        """,
+        params,
+    ).fetchall()
+
     by_key: dict[tuple[str, float], list[tuple]] = {}
-    for sp, results in points:
-        for r in results:
-            by_key.setdefault((r.varied_parameter, r.value), []).append((sp, r))
+    for row in rows:
+        by_key.setdefault((row[0], row[1]), []).append(row)
 
     summary = []
-    for (varied_parameter, value), pairs in sorted(by_key.items(), key=lambda kv: (kv[0][0], kv[0][1])):
-        n = len(pairs)
-        status_transitions = sum(1 for sp, r in pairs if r.completeness_status != sp.reference_completeness_status)
-        class_transitions = sum(1 for sp, r in pairs if r.index_class != sp.reference_index_class)
-        class_agreement = (n - class_transitions) / n if n > 0 else None
-        diffs = [abs(r.index_value - sp.reference_index_value) for sp, r in pairs if r.index_value is not None and sp.reference_index_value is not None]
+    for (vp, value), pairs in sorted(by_key.items(), key=lambda kv: (kv[0][0], kv[0][1])):
+        n_eligible = len(pairs)
+        evaluated = [p for p in pairs if p[2] is not None]
+        n_evaluated = len(evaluated)
+        n_unavailable = n_eligible - n_evaluated
+        status_transitions = sum(1 for p in evaluated if p[2] != p[3])
+        class_transitions = sum(1 for p in evaluated if p[4] != p[5])
+        class_agreement = (n_evaluated - class_transitions) / n_evaluated if n_evaluated > 0 else None
+        valid = [p for p in evaluated if p[6] is not None and p[7] is not None]
+        n_valid_comparisons = len(valid)
+        diffs = [abs(p[6] - p[7]) for p in valid]
         arr = np.array(diffs) if diffs else None
         summary.append(
             {
-                "varied_parameter": varied_parameter,
+                "varied_parameter": vp,
                 "value": value,
-                "n_samples": n,
+                "n_eligible": n_eligible,
+                "n_evaluated": n_evaluated,
+                "n_unavailable": n_unavailable,
+                "n_valid_comparisons": n_valid_comparisons,
+                "n_samples": n_eligible,  # kept for backward-compatible column name in CSV/JSON consumers
                 "n_status_transitions": status_transitions,
                 "n_class_transitions": class_transitions,
+                "n_agreement": (n_evaluated - class_transitions) if n_evaluated > 0 else 0,
                 "class_agreement_with_reference": class_agreement,
                 "mean_abs_index_diff": float(arr.mean()) if arr is not None else None,
                 "median_abs_index_diff": float(np.median(arr)) if arr is not None else None,

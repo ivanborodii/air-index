@@ -28,6 +28,7 @@ from iaq_hfis.db import AirMonitorSource, DerivedResultsWriter
 from iaq_hfis.fuzzy_engine import MamdaniEngine
 from iaq_hfis.models import ComponentInferenceResult, CoverageResult, IndexInferenceResult
 from iaq_hfis.outdoor_context import fetch_outdoor_context
+from iaq_hfis.provenance import collect_parameter_provenance, engaged_provisional_paths
 from iaq_hfis.quality.hard_checks import run_hard_checks
 from iaq_hfis.quality.soft_checks import run_soft_checks
 from iaq_hfis.reproducibility import collect_environment_metadata
@@ -375,7 +376,10 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
         "n_timestamps_processed": len(computed_timestamps),
         "n_snapshot_retries": source.snapshot_retry_count,
         "completeness_summary": status_counts,
-        "provisional_parameters_used": ctx.provisional_parameters_used + sorted(ctx.provisional_profiles_used),
+        "provisional_parameters_used": (
+            sorted(engaged_provisional_paths(collect_parameter_provenance(settings, sensor_specs, room_profiles), sorted(ctx.provisional_profiles_used)))
+            + ctx.provisional_parameters_used
+        ),
         "environment": environment,
         "performance": performance,
         "selected_evaluation_run_id": None,
