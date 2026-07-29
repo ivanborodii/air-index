@@ -92,7 +92,7 @@ atomically (never hand-edited).
 
 See `latest_run.json` for the full identity chain (config hash, git
 commit, generation timestamp, publication-readiness status) and
-`docs/result_reproducibility.md` (repo root) for how to reproduce it.
+`docs/reproducibility.md` (repo root) for how to reproduce it.
 
 `run_narrative.md` and `article_results_summary.md` are software-generated
 drafts -- review and rewrite before including any text in a publication.
