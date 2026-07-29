@@ -22,8 +22,13 @@ FULL_EVALUATION = {
             "PROPOSED-HFIS": {
                 "n_trials_total": 150, "n_class_changes": 15, "class_change_rate": 0.1, "class_change_rate_ci95": [0.05, 0.15],
                 "mean_abs_index_change": 1.234, "median_abs_index_change": 1.0, "p95_abs_index_change": 2.5, "max_abs_index_change": 3.0,
+                "n_comparable_for_direction": 150, "n_moved_better": 5, "n_moved_worse": 10,
+                "prob_moved_better": 0.0333, "prob_moved_worse": 0.0667,
+                "prob_moved_better_ci95": [0.01, 0.07], "prob_moved_worse_ci95": [0.04, 0.11],
             }
         },
+        "by_variable": [],
+        "by_original_class": [],
     },
     "sensitivity": {
         "n_sample_points": 10,

@@ -111,7 +111,9 @@ def build_run_narrative(summary: dict) -> str:
                 ci = s.get("class_change_rate_ci95")
                 ci_text = f", 95% CI [{_pct(ci[0])}, {_pct(ci[1])}]" if ci else ""
                 lines.append(
-                    f"- {method}: class changed in {_pct(s['class_change_rate'])} of {s['n_trials_total']} trials{ci_text}; "
+                    f"- {method}: class changed in {_pct(s['class_change_rate'])} of {s['n_trials_total']} trials{ci_text} "
+                    f"(moved to a strictly better class in {_pct(s.get('prob_moved_better'))} of trials, a strictly worse class "
+                    f"in {_pct(s.get('prob_moved_worse'))} -- these two sum to the class-change rate); "
                     f"mean absolute index change {_num(s['mean_abs_index_change'], 2)}, p95 {_num(s['p95_abs_index_change'], 2)}."
                 )
         else:

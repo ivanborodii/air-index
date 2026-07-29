@@ -40,6 +40,8 @@ STABILITY_SAMPLES = "stability_samples.csv"
 STABILITY_TRIALS = "stability_trials.csv"
 STABILITY_BY_POINT = "stability_by_point.csv"
 STABILITY_SUMMARY = "stability_summary.csv"
+STABILITY_SUMMARY_BY_VARIABLE = "stability_summary_by_variable.csv"
+STABILITY_SUMMARY_BY_ORIGINAL_CLASS = "stability_summary_by_original_class.csv"
 SENSITIVITY_WINDOW_BY_POINT = "sensitivity_window_by_point.csv"
 SENSITIVITY_WINDOW_SUMMARY = "sensitivity_window_summary.csv"
 SENSITIVITY_COVERAGE_BY_POINT = "sensitivity_coverage_by_point.csv"
@@ -53,6 +55,33 @@ FAULT_INJECTION_EVENTS = "fault_injection_events.csv"
 FAULT_DETECTION_PREDICTIONS = "fault_detection_predictions.csv"
 FAULT_DETECTION_METRICS = "fault_detection_metrics.csv"
 HAMPEL_CALIBRATION = "hampel_calibration.csv"
+
+#: Shared metric columns for every stability aggregation grain (by-point,
+#: overall, by-variable, by-original-class) -- one definition so the four
+#: exports can never silently drift apart in column meaning. "Better"/"worse"
+#: use iaq_hfis.constants.CLASS_SEVERITY; these are class-movement-under-
+#: perturbation statistics, never called "accuracy" (no ground truth here).
+_STABILITY_METRIC_COLUMNS = [
+    ColumnSpec("n_samples", "int", "count", "Number of distinct sampled computed_ts points contributing to this row."),
+    ColumnSpec("n_trials_total", "int", "count", "Total perturbation trials across the contributing points."),
+    ColumnSpec("n_class_changes", "int", "count", "Trials whose class differed from that point/method's own baseline."),
+    ColumnSpec("class_change_rate", "float", "0-1", "n_class_changes / n_trials_total."),
+    ColumnSpec("class_change_rate_ci95_low", "float", "0-1", "95% Wilson score confidence interval lower bound."),
+    ColumnSpec("class_change_rate_ci95_high", "float", "0-1", "95% Wilson score confidence interval upper bound."),
+    ColumnSpec("mean_abs_index_change", "float", "index points", "Mean absolute index change across trials."),
+    ColumnSpec("median_abs_index_change", "float", "index points", "Median absolute index change."),
+    ColumnSpec("p95_abs_index_change", "float", "index points", "95th percentile absolute index change."),
+    ColumnSpec("max_abs_index_change", "float", "index points", "Maximum absolute index change observed."),
+    ColumnSpec("n_comparable_for_direction", "int", "count", "Trials with both a defined trial class and baseline class (denominator for the better/worse probabilities)."),
+    ColumnSpec("n_moved_better", "int", "count", "Trials whose class had strictly lower severity (CLASS_SEVERITY) than the baseline."),
+    ColumnSpec("n_moved_worse", "int", "count", "Trials whose class had strictly higher severity than the baseline."),
+    ColumnSpec("prob_moved_better", "float", "0-1", "n_moved_better / n_comparable_for_direction."),
+    ColumnSpec("prob_moved_worse", "float", "0-1", "n_moved_worse / n_comparable_for_direction."),
+    ColumnSpec("prob_moved_better_ci95_low", "float", "0-1", "95% Wilson score confidence interval lower bound."),
+    ColumnSpec("prob_moved_better_ci95_high", "float", "0-1", "95% Wilson score confidence interval upper bound."),
+    ColumnSpec("prob_moved_worse_ci95_low", "float", "0-1", "95% Wilson score confidence interval lower bound."),
+    ColumnSpec("prob_moved_worse_ci95_high", "float", "0-1", "95% Wilson score confidence interval upper bound."),
+]
 
 COLUMNS: dict[str, list[ColumnSpec]] = {
     INDEX_TIMESERIES: [
@@ -125,25 +154,26 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
     ],
     STABILITY_BY_POINT: [
         ColumnSpec("sample_id", "str", "-", "Sampled computed_ts identifier."),
-        ColumnSpec("selection_reason", "str", "-", "boundary_adjacent | random_comparison."),
         ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
-        ColumnSpec("n_trials", "int", "count", "Number of perturbation trials at this point."),
-        ColumnSpec("n_class_changes", "int", "count", "Trials whose class differed from the baseline."),
-        ColumnSpec("class_change_rate", "float", "0-1", "n_class_changes / n_trials."),
-        ColumnSpec("mean_abs_index_change", "float", "index points", "Mean absolute index change across trials at this point."),
+        ColumnSpec("selection_reason", "str", "-", "boundary_adjacent | random_comparison."),
+        ColumnSpec("boundary_channel", "str", "-", "Channel whose boundary this point is nearest to (boundary_adjacent only)."),
+        ColumnSpec("original_class", "str", "-", "This method's own unperturbed (baseline) class at this point."),
+        *_STABILITY_METRIC_COLUMNS,
     ],
     STABILITY_SUMMARY: [
         ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
-        ColumnSpec("n_samples", "int", "count", "Number of sampled computed_ts points."),
-        ColumnSpec("n_trials_total", "int", "count", "Total perturbation trials across all sampled points."),
-        ColumnSpec("n_class_changes", "int", "count", "Total trials whose class differed from that point's baseline."),
-        ColumnSpec("class_change_rate", "float", "0-1", "Aggregate class-change rate across all sampled points."),
-        ColumnSpec("class_change_rate_ci95_low", "float", "0-1", "95% Wilson score confidence interval lower bound."),
-        ColumnSpec("class_change_rate_ci95_high", "float", "0-1", "95% Wilson score confidence interval upper bound."),
-        ColumnSpec("mean_abs_index_change", "float", "index points", "Mean absolute index change across all trials."),
-        ColumnSpec("median_abs_index_change", "float", "index points", "Median absolute index change."),
-        ColumnSpec("p95_abs_index_change", "float", "index points", "95th percentile absolute index change."),
-        ColumnSpec("max_abs_index_change", "float", "index points", "Maximum absolute index change observed."),
+        *_STABILITY_METRIC_COLUMNS,
+    ],
+    STABILITY_SUMMARY_BY_VARIABLE: [
+        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("selection_reason", "str", "-", "boundary_adjacent | random_comparison."),
+        ColumnSpec("boundary_channel", "str", "-", "Channel whose boundary these points are nearest to (null for random_comparison)."),
+        *_STABILITY_METRIC_COLUMNS,
+    ],
+    STABILITY_SUMMARY_BY_ORIGINAL_CLASS: [
+        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("original_class", "str", "-", "This method's own unperturbed (baseline) class -- does stability depend on where a point started?"),
+        *_STABILITY_METRIC_COLUMNS,
     ],
     SENSITIVITY_WINDOW_BY_POINT: [
         ColumnSpec("sample_id", "str", "-", "Sampled computed_ts identifier."),
@@ -405,58 +435,54 @@ def export_stability_trials(con: duckdb.DuckDBPyConnection, out_dir: Path, evalu
     return _write(df, COLUMNS[STABILITY_TRIALS], out_dir, STABILITY_TRIALS)
 
 
+def _flatten_stability_rows(rows: list[dict]) -> pd.DataFrame:
+    """CI tuples -> _low/_high column pairs for a flat CSV; otherwise a
+    verbatim copy of the shared aggregation rows (never recomputed here)."""
+    flat = []
+    for row in rows:
+        r = dict(row)
+        for key in ("class_change_rate_ci95", "prob_moved_better_ci95", "prob_moved_worse_ci95"):
+            ci = r.pop(key, None)
+            r[f"{key}_low"] = ci[0] if ci is not None else None
+            r[f"{key}_high"] = ci[1] if ci is not None else None
+        flat.append(r)
+    return pd.DataFrame(flat)
+
+
 def export_stability_by_point(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
-    df = con.execute(
-        """
-        SELECT s.sample_id, s.selection_reason, t.method,
-               COUNT(*) AS n_trials,
-               SUM(CASE WHEN t.changed_from_baseline THEN 1 ELSE 0 END) AS n_class_changes,
-               AVG(CASE WHEN t.changed_from_baseline THEN 1.0 ELSE 0.0 END) AS class_change_rate,
-               AVG(t.abs_index_change) AS mean_abs_index_change
-        FROM evaluation_stability_trials t
-        JOIN evaluation_stability_samples s ON s.evaluation_run_id = t.evaluation_run_id AND s.sample_id = t.sample_id
-        WHERE t.evaluation_run_id = ?
-        GROUP BY s.sample_id, s.selection_reason, t.method
-        ORDER BY s.sample_id, t.method
-        """,
-        [evaluation_run_id],
-    ).df()
-    if df.empty:
+    from iaq_hfis.evaluation.multi_point_stability import compute_stability_summary_by_point
+
+    rows = compute_stability_summary_by_point(con, evaluation_run_id)
+    if not rows:
         return None
-    return _write(df, COLUMNS[STABILITY_BY_POINT], out_dir, STABILITY_BY_POINT)
+    return _write(_flatten_stability_rows(rows), COLUMNS[STABILITY_BY_POINT], out_dir, STABILITY_BY_POINT)
 
 
 def export_stability_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
-    from iaq_hfis.evaluation.multi_point_stability import wilson_ci
+    from iaq_hfis.evaluation.multi_point_stability import compute_stability_summary_overall
 
-    df = con.execute(
-        "SELECT sample_id, method, trial_index, trial_class, trial_index_value, changed_from_baseline, abs_index_change "
-        "FROM evaluation_stability_trials WHERE evaluation_run_id = ?",
-        [evaluation_run_id],
-    ).df()
-    if df.empty:
+    rows = compute_stability_summary_overall(con, evaluation_run_id)
+    if not rows:
         return None
-    rows = []
-    for method, g in df.groupby("method"):
-        n = len(g)
-        n_changes = int(g["changed_from_baseline"].sum())
-        ci = wilson_ci(n_changes, n)
-        rows.append(
-            {
-                "method": method,
-                "n_samples": g["sample_id"].nunique(),
-                "n_trials_total": n,
-                "n_class_changes": n_changes,
-                "class_change_rate": n_changes / n if n else None,
-                "class_change_rate_ci95_low": ci[0] if ci else None,
-                "class_change_rate_ci95_high": ci[1] if ci else None,
-                "mean_abs_index_change": float(g["abs_index_change"].mean()) if g["abs_index_change"].notna().any() else None,
-                "median_abs_index_change": float(g["abs_index_change"].median()) if g["abs_index_change"].notna().any() else None,
-                "p95_abs_index_change": float(g["abs_index_change"].quantile(0.95)) if g["abs_index_change"].notna().any() else None,
-                "max_abs_index_change": float(g["abs_index_change"].max()) if g["abs_index_change"].notna().any() else None,
-            }
-        )
-    return _write(pd.DataFrame(rows), COLUMNS[STABILITY_SUMMARY], out_dir, STABILITY_SUMMARY)
+    return _write(_flatten_stability_rows(rows), COLUMNS[STABILITY_SUMMARY], out_dir, STABILITY_SUMMARY)
+
+
+def export_stability_summary_by_variable(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
+    from iaq_hfis.evaluation.multi_point_stability import compute_stability_summary_by_variable
+
+    rows = compute_stability_summary_by_variable(con, evaluation_run_id)
+    if not rows:
+        return None
+    return _write(_flatten_stability_rows(rows), COLUMNS[STABILITY_SUMMARY_BY_VARIABLE], out_dir, STABILITY_SUMMARY_BY_VARIABLE)
+
+
+def export_stability_summary_by_original_class(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
+    from iaq_hfis.evaluation.multi_point_stability import compute_stability_summary_by_original_class
+
+    rows = compute_stability_summary_by_original_class(con, evaluation_run_id)
+    if not rows:
+        return None
+    return _write(_flatten_stability_rows(rows), COLUMNS[STABILITY_SUMMARY_BY_ORIGINAL_CLASS], out_dir, STABILITY_SUMMARY_BY_ORIGINAL_CLASS)
 
 
 def _export_sensitivity_by_point(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str, varied_parameter: str, filename: str) -> Path | None:
@@ -620,6 +646,7 @@ def export_all(
     if evaluation_run_id is None:
         for name in (
             METHOD_COMPARISON, STABILITY_SAMPLES, STABILITY_TRIALS, STABILITY_BY_POINT, STABILITY_SUMMARY,
+            STABILITY_SUMMARY_BY_VARIABLE, STABILITY_SUMMARY_BY_ORIGINAL_CLASS,
             SENSITIVITY_WINDOW_BY_POINT, SENSITIVITY_WINDOW_SUMMARY, SENSITIVITY_COVERAGE_BY_POINT, SENSITIVITY_COVERAGE_SUMMARY,
             MASKING_SUMMARY, REFERENCE_CASE_SUMMARY, CONTINUITY_GRID, CONTINUITY_SUMMARY,
             FAULT_INJECTION_EVENTS, FAULT_DETECTION_PREDICTIONS, FAULT_DETECTION_METRICS, HAMPEL_CALIBRATION,
@@ -634,6 +661,8 @@ def export_all(
             STABILITY_TRIALS: export_stability_trials(con, out_dir, evaluation_run_id),
             STABILITY_BY_POINT: export_stability_by_point(con, out_dir, evaluation_run_id),
             STABILITY_SUMMARY: export_stability_summary(con, out_dir, evaluation_run_id),
+            STABILITY_SUMMARY_BY_VARIABLE: export_stability_summary_by_variable(con, out_dir, evaluation_run_id),
+            STABILITY_SUMMARY_BY_ORIGINAL_CLASS: export_stability_summary_by_original_class(con, out_dir, evaluation_run_id),
             SENSITIVITY_WINDOW_BY_POINT: export_sensitivity_window_by_point(con, out_dir, evaluation_run_id),
             SENSITIVITY_WINDOW_SUMMARY: export_sensitivity_window_summary(con, out_dir, evaluation_run_id),
             SENSITIVITY_COVERAGE_BY_POINT: export_sensitivity_coverage_by_point(con, out_dir, evaluation_run_id),

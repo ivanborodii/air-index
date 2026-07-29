@@ -132,7 +132,15 @@ def build_article_results_summary(summary: dict) -> str:
     if stability:
         lines.append(f"- {stability['n_samples']} sampled points, {stability['n_trials_per_sample']} trials each, seed={stability['seed']}.")
         for method, s in (stability.get("by_method") or {}).items():
-            lines.append(f"  - {method}: class_change_rate={_pct(s['class_change_rate'])}, mean|Δindex|={_num(s['mean_abs_index_change'], 2)}")
+            lines.append(
+                f"  - {method}: class_change_rate={_pct(s['class_change_rate'])} "
+                f"(moved better={_pct(s.get('prob_moved_better'))}, moved worse={_pct(s.get('prob_moved_worse'))}), "
+                f"mean|Δindex|={_num(s['mean_abs_index_change'], 2)}"
+            )
+        lines.append(
+            "- Breakdowns by boundary/channel (`stability_summary_by_variable.csv`) and by originating class "
+            "(`stability_summary_by_original_class.csv`) are exported separately; not repeated here."
+        )
     else:
         lines.append("Not available.")
     lines.append("")
@@ -195,7 +203,7 @@ def build_article_results_summary(summary: dict) -> str:
     lines.append("| Method agreement | `method_comparison.csv`, `reference_case_consistency.csv` |")
     lines.append("| Masking comparison | `masking_summary.csv` |")
     lines.append("| Boundary continuity curves | `continuity_grid.csv`, `continuity_summary.csv` |")
-    lines.append("| Stability under perturbation | `stability_summary.csv`, `stability_trials.csv` |")
+    lines.append("| Stability under perturbation | `stability_summary.csv`, `stability_summary_by_variable.csv`, `stability_summary_by_original_class.csv`, `stability_by_point.csv`, `stability_trials.csv` |")
     lines.append("| Sensitivity to window/coverage | `sensitivity_window_summary.csv`, `sensitivity_coverage_summary.csv` |")
     lines.append("| Fault-detection performance | `fault_detection_metrics.csv` |")
     lines.append("| Parameter provenance (supplementary) | `parameter_provenance.csv` |")

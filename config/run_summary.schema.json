@@ -77,12 +77,14 @@
         },
         "stability": {
           "type": ["object", "null"],
-          "description": "Multi-point stability: deterministic boundary-adjacent + random-comparison sample, all 3 methods.",
+          "description": "Multi-point stability: deterministic boundary-adjacent + random-comparison sample, all 3 methods. class_change_rate/prob_moved_better/prob_moved_worse are agreement-with-self-under-perturbation statistics, never accuracy (no ground truth involved).",
           "properties": {
             "n_samples": {"type": "integer"},
             "n_trials_per_sample": {"type": "integer"},
             "seed": {"type": "integer"},
-            "by_method": {"type": "object"}
+            "by_method": {"type": "object", "description": "Overall summary per method."},
+            "by_variable": {"type": "array", "description": "Summary per (method, selection_reason, boundary_channel)."},
+            "by_original_class": {"type": "array", "description": "Summary per (method, original/baseline class)."}
           }
         },
         "sensitivity": {
@@ -96,11 +98,14 @@
         },
         "continuity": {
           "type": "object",
-          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids).",
+          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids, favorable/acceptable/degraded contexts).",
           "properties": {
             "n_boundaries": {"type": "integer"},
+            "n_contexts": {"type": "integer"},
+            "contexts": {"type": "array", "items": {"type": "string"}},
             "grid_points_per_boundary": {"type": "integer"},
-            "by_boundary_method": {"type": "array"}
+            "by_boundary_method": {"type": "array"},
+            "smoothness_comparison": {"type": "object", "description": "Honest, non-cherry-picked HFIS-vs-CRISP-MAX Lipschitz-ratio smoothness comparison across every (boundary, context) pair tested."}
           }
         },
         "fault_injection": {

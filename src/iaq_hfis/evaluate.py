@@ -50,12 +50,28 @@ from iaq_hfis.evaluation.fault_injection import (
 from iaq_hfis.evaluation.faults import compute_reason_code_frequency, compute_status_proportions
 from iaq_hfis.evaluation.masking import evaluate_masking
 from iaq_hfis.evaluation.multi_point_sensitivity import compute_sensitivity_summary, select_sensitivity_samples
-from iaq_hfis.evaluation.multi_point_stability import select_stability_samples, run_multi_point_stability, summarize_stability
+from iaq_hfis.evaluation.multi_point_stability import (
+    select_stability_samples,
+    run_multi_point_stability,
+    compute_stability_summary_overall,
+    compute_stability_summary_by_variable,
+    compute_stability_summary_by_original_class,
+)
 from iaq_hfis.evaluation.reference_cases import generate_reference_cases, score_against_reference_cases
 from iaq_hfis.evaluation.sensitivity import sweep_coverage_thresholds, sweep_window_minutes
 from iaq_hfis.pipeline import build_runtime_context, infer_from_values
 
 logger = logging.getLogger(__name__)
+
+
+def _jsonify_stability_row(row: dict) -> dict:
+    """Confidence-interval tuples -> JSON-serializable lists; otherwise a
+    verbatim copy of the aggregation row (never recomputed)."""
+    out = dict(row)
+    for key in ("class_change_rate_ci95", "prob_moved_better_ci95", "prob_moved_worse_ci95"):
+        if out.get(key) is not None:
+            out[key] = list(out[key])
+    return out
 
 
 def _fetch_computed_timestamps(con, pipeline_run_id: str, from_ts: datetime, to_ts: datetime, window_minutes: int) -> list[datetime]:
@@ -203,7 +219,9 @@ def run_evaluation(
             # --- Multi-point stability: deterministic boundary-adjacent + random-comparison
             # sample across the whole evaluated range, all 3 methods, N perturbation trials each. ---
             stability_point_results = []
-            stability_summaries = {}
+            stability_summary_overall: list[dict] = []
+            stability_summary_by_variable: list[dict] = []
+            stability_summary_by_original_class: list[dict] = []
             if computed_timestamps:
                 stability_samples = select_stability_samples(
                     con, pipeline_run_id, window_minutes, from_ts, to_ts, settings.control_regions, representative_profile,
@@ -213,7 +231,6 @@ def run_evaluation(
                     stability_point_results = run_multi_point_stability(
                         ctx, representative_profile, stability_samples, settings.evaluation.stability_seed, settings.evaluation.stability_n_trials
                     )
-                    stability_summaries = summarize_stability(stability_point_results)
 
                     for r in stability_point_results:
                         s = r.sample
@@ -243,6 +260,14 @@ def run_evaluation(
                                        VALUES (?,?,?,?,?,?,?,?,?)""",
                                     [evaluation_run_id, pipeline_run_id, s.sample_id, method, trial_index, trial.index_class, trial.index_value, changed, abs_change],
                                 )
+
+                    # Computed from the just-persisted trial/sample rows (never from the in-memory
+                    # stability_point_results objects above) -- the single deterministic aggregation
+                    # function also used by reporting/exports.py's CSV exports, so JSON and CSV can
+                    # never numerically disagree.
+                    stability_summary_overall = compute_stability_summary_overall(con, evaluation_run_id)
+                    stability_summary_by_variable = compute_stability_summary_by_variable(con, evaluation_run_id)
+                    stability_summary_by_original_class = compute_stability_summary_by_original_class(con, evaluation_run_id)
 
             # --- Multi-point sensitivity: window-length and coverage-threshold sweeps at a
             # deterministic, stratified sample of computed_ts across the whole evaluated range. ---
@@ -388,19 +413,9 @@ def run_evaluation(
                 "n_samples": len(stability_point_results),
                 "n_trials_per_sample": settings.evaluation.stability_n_trials,
                 "seed": settings.evaluation.stability_seed,
-                "by_method": {
-                    method: {
-                        "n_trials_total": s.n_trials_total,
-                        "n_class_changes": s.n_class_changes,
-                        "class_change_rate": s.class_change_rate,
-                        "class_change_rate_ci95": list(s.class_change_rate_ci95) if s.class_change_rate_ci95 is not None else None,
-                        "mean_abs_index_change": s.mean_abs_index_change,
-                        "median_abs_index_change": s.median_abs_index_change,
-                        "p95_abs_index_change": s.p95_abs_index_change,
-                        "max_abs_index_change": s.max_abs_index_change,
-                    }
-                    for method, s in stability_summaries.items()
-                },
+                "by_method": {row["method"]: _jsonify_stability_row(row) for row in stability_summary_overall},
+                "by_variable": [_jsonify_stability_row(row) for row in stability_summary_by_variable],
+                "by_original_class": [_jsonify_stability_row(row) for row in stability_summary_by_original_class],
             }
             if stability_point_results
             else None
