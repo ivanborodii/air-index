@@ -20,7 +20,7 @@ from pathlib import Path
 
 from iaq_hfis.config import Settings
 from iaq_hfis.report import _report_dir, load_run_summary
-from iaq_hfis.validation import validate_artifacts
+from iaq_hfis.validation import validate_artifacts, write_artifact_validation_report
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FINAL_SNAPSHOT_DIRNAME = "research_results/final"
@@ -145,6 +145,7 @@ def build_final_snapshot(
 
         artifact_validation_text = "\n".join(validation_report.messages) + f"\n\nRESULT: {'OK' if validation_report.ok else 'FAILED'}\n"
         (staging / "artifact_validation_report.txt").write_text(artifact_validation_text, encoding="utf-8")
+        write_artifact_validation_report(validation_report, staging)
 
         if test_report_text is not None:
             (staging / "test_report.txt").write_text(test_report_text, encoding="utf-8")
@@ -175,6 +176,9 @@ def build_final_snapshot(
                 "article_results_summary": "article_results_summary.md",
                 "article_metrics": "article_metrics.json",
                 "plot_manifest": "plot_manifest.json",
+                "provisional_parameter_assessment": "provisional_parameter_assessment.md",
+                "artifact_validation_json": "artifact_validation.json",
+                "artifact_validation_md": "artifact_validation.md",
                 "exports_dir": "exports/",
                 "plots_dir": "plots/",
             },

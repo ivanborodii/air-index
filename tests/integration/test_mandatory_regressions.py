@@ -195,3 +195,128 @@ def test_final_snapshot_manifest_has_identity_and_correct_checksums(full_run, tm
     # Every file physically present in the snapshot (besides manifest.json itself) is checksummed -- no silent gaps.
     all_files = {str(f.relative_to(final_dir)) for f in final_dir.rglob("*") if f.is_file()}
     assert all_files - {"manifest.json"} == set(manifest["artifact_checksums_sha256"].keys())
+
+
+def _report_dir_for(settings, pipeline_run_id) -> Path:
+    return Path(settings.paths.run_summary_dir).parent / "reports" / pipeline_run_id
+
+
+def test_validate_artifacts_catches_continuity_grid_corruption(full_run):
+    """Mandatory regression test: a tampered continuity_grid.csv (an
+    index_value edited so continuity_summary.csv's max_adjacent_jump no
+    longer recomputes from it) must be caught, not silently trusted."""
+    settings, pipeline_run_id = full_run
+    csv_path = _report_dir_for(settings, pipeline_run_id) / "exports" / "continuity_grid.csv"
+    df_text = csv_path.read_text()
+    lines = df_text.splitlines()
+    header = lines[0].split(",")
+    index_value_col = header.index("index_value")
+    # Corrupt the last data row's index_value to an implausibly large number.
+    parts = lines[-1].split(",")
+    parts[index_value_col] = "999999.0"
+    lines[-1] = ",".join(parts)
+    csv_path.write_text("\n".join(lines) + "\n")
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("continuity_summary.csv disagrees with continuity_grid.csv" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_fault_event_metrics_corruption(full_run):
+    """Mandatory regression test: fault_detection_event_metrics.csv's
+    n_true_events must match the actual count in fault_injection_events.csv
+    -- a tampered count must be caught."""
+    settings, pipeline_run_id = full_run
+    csv_path = _report_dir_for(settings, pipeline_run_id) / "exports" / "fault_detection_event_metrics.csv"
+    df_text = csv_path.read_text()
+    lines = df_text.splitlines()
+    header = lines[0].split(",")
+    n_true_col = header.index("n_true_events")
+    parts = lines[1].split(",")
+    parts[n_true_col] = str(int(parts[n_true_col]) + 100)
+    lines[1] = ",".join(parts)
+    csv_path.write_text("\n".join(lines) + "\n")
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("n_true_events" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_confusion_matrix_diagonal_mismatch(full_run):
+    """Mandatory regression test: the confusion matrix's diagonal cell for
+    a reason code must equal that reason code's row-level TP count."""
+    settings, pipeline_run_id = full_run
+    csv_path = _report_dir_for(settings, pipeline_run_id) / "exports" / "fault_detection_confusion_matrix.csv"
+    df_text = csv_path.read_text()
+    lines = df_text.splitlines()
+    header = lines[0].split(",")
+    count_col = header.index("count")
+    true_col = header.index("true_label")
+    pred_col = header.index("predicted_label")
+    # Find a diagonal row (true_label == predicted_label) and corrupt its count.
+    corrupted = False
+    for i in range(1, len(lines)):
+        parts = lines[i].split(",")
+        if parts[true_col] == parts[pred_col] and not corrupted:
+            parts[count_col] = str(int(parts[count_col]) + 1000)
+            lines[i] = ",".join(parts)
+            corrupted = True
+    assert corrupted, "expected at least one diagonal confusion-matrix cell"
+    csv_path.write_text("\n".join(lines) + "\n")
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("confusion matrix diagonal" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_config_hash_mismatch_between_run_and_evaluate(full_run):
+    """Mandatory regression test: if evaluate's persisted config_hash for
+    the selected evaluation_run_id disagrees with the pipeline's own
+    config_hash, that must be caught -- it means evaluate ran against a
+    different config than the pipeline run it's attached to."""
+    settings, pipeline_run_id = full_run
+    con = duckdb.connect(settings.paths.derived_db_path)
+    try:
+        con.execute("UPDATE evaluation_runs SET config_hash = 'deliberately-wrong-hash' WHERE pipeline_run_id = ?", [pipeline_run_id])
+    finally:
+        con.close()
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("evaluation_runs.config_hash" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_stability_by_variable_total_mismatch(full_run):
+    """Mandatory regression test: stability's by_variable breakdown must
+    sum to the same overall n_trials_total as by_method -- a tampered
+    run_summary.json where they disagree must be caught."""
+    settings, pipeline_run_id = full_run
+    summary_path = Path(settings.paths.run_summary_dir) / f"run_summary_{pipeline_run_id}.json"
+    summary = json.loads(summary_path.read_text())
+    by_variable = summary["evaluation"]["stability"]["by_variable"]
+    assert by_variable, "expected at least one by_variable row"
+    by_variable[0]["n_trials_total"] += 1000
+    summary_path.write_text(json.dumps(summary))
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("by_variable rows for" in v for v in report.violations)
+
+
+def test_validate_artifacts_writes_json_and_md_reports(full_run, tmp_path):
+    from iaq_hfis.validation import write_artifact_validation_report
+
+    settings, pipeline_run_id = full_run
+    report = validate_artifacts(settings, pipeline_run_id)
+    json_path, md_path = write_artifact_validation_report(report, tmp_path)
+    assert json_path.is_file()
+    assert md_path.is_file()
+
+    parsed = json.loads(json_path.read_text())
+    assert parsed["ok"] == report.ok
+    assert parsed["n_checks_passed"] == len(report.checks_passed)
+    assert parsed["n_violations"] == len(report.violations)
+
+    md_text = md_path.read_text()
+    assert "Artifact Validation Report" in md_text
+    assert pipeline_run_id in md_text

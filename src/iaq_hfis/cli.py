@@ -22,7 +22,7 @@ from iaq_hfis.evaluate import run_evaluation
 from iaq_hfis.final_snapshot import build_final_snapshot
 from iaq_hfis.pipeline import run_pipeline
 from iaq_hfis.report import generate_plots, generate_report
-from iaq_hfis.validation import ArtifactValidationError, validate_artifacts
+from iaq_hfis.validation import ArtifactValidationError, report_dir as validation_report_dir, validate_artifacts, write_artifact_validation_report
 
 
 def _parse_ts(value: str) -> datetime:
@@ -181,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
         report = validate_artifacts(settings, args.pipeline_run_id)
         for line in report.messages:
             print(line)
+        json_path, md_path = write_artifact_validation_report(report, validation_report_dir(settings, args.pipeline_run_id))
+        print(f"  written: {json_path}, {md_path}")
         if report.ok:
             print(f"validate-artifacts: OK ({len(report.checks_passed)} checks passed)")
             return 0
