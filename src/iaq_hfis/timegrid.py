@@ -45,7 +45,7 @@ def align_computed_timestamps(
     floor_start = range_start.replace(second=0, microsecond=0)
     excess_minutes = floor_start.minute % recompute_interval_minutes
     floor_start -= timedelta(minutes=excess_minutes)
-    if floor_start < range_start:
+    if floor_start <= range_start:
         floor_start += interval
 
     out = []

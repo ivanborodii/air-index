@@ -32,6 +32,27 @@ def test_5min_alignment_is_deterministic():
     ]
 
 
+def test_alignment_excludes_range_start_when_range_start_is_already_grid_aligned():
+    """Mandatory regression test: (range_start, range_end] must be exclusive
+    on the lower bound even when range_start itself already falls exactly on
+    a recompute-interval boundary (e.g. a round clock time like 09:00:00
+    with a 5-minute interval) -- otherwise the pipeline persists a
+    computed_ts equal to range_start while every downstream consumer
+    (evaluate.py, reporting/exports.py) filters with the documented
+    exclusive `computed_ts > from_ts`, silently dropping that row and
+    producing a persisted-row-count vs evaluated/exported-row-count
+    mismatch."""
+    start = datetime(2026, 7, 29, 9, 0, 0, tzinfo=timezone.utc)  # exactly aligned to a 5-minute grid
+    end = datetime(2026, 7, 29, 9, 15, 0, tzinfo=timezone.utc)
+    result = align_computed_timestamps(start, end, 5)
+    assert start not in result
+    assert result == [
+        datetime(2026, 7, 29, 9, 5, tzinfo=timezone.utc),
+        datetime(2026, 7, 29, 9, 10, tzinfo=timezone.utc),
+        datetime(2026, 7, 29, 9, 15, tzinfo=timezone.utc),
+    ]
+
+
 def test_duplicate_expected_slots_not_double_counted():
     expected = [NOW - timedelta(seconds=30), NOW]
     # a single actual timestamp close to both slots (30s apart, slot spacing 30s):
