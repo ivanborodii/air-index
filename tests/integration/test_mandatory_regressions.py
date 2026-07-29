@@ -1,3 +1,4 @@
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -156,3 +157,41 @@ def test_final_snapshot_contains_no_forbidden_files(full_run, tmp_path):
         assert f.name not in forbidden_names, f"forbidden file found in snapshot: {f}"
     assert (Path(result["final_dir"]) / "latest_run.json").is_file()
     assert (Path(result["final_dir"]) / "README.md").is_file()
+
+
+def test_final_snapshot_manifest_has_identity_and_correct_checksums(full_run, tmp_path):
+    """Mandatory regression test: manifest.json must record the run's full
+    identity chain (run IDs, git commit, config hash, DB checksums, input
+    date range, row counts) and its per-artifact checksums must actually
+    match the files on disk -- a tampered or stale snapshot must be
+    mechanically detectable, not just trusted by convention."""
+    settings, pipeline_run_id = full_run
+    result = build_final_snapshot(settings, pipeline_run_id, final_dir=tmp_path / "final")
+    final_dir = Path(result["final_dir"])
+
+    manifest_path = final_dir / "manifest.json"
+    assert manifest_path.is_file()
+    manifest = json.loads(manifest_path.read_text())
+
+    assert manifest["pipeline_run_id"] == pipeline_run_id
+    assert manifest["evaluation_run_id"]
+    assert manifest["git_commit"] is None or isinstance(manifest["git_commit"], str)
+    assert manifest["config_hash"]
+    assert manifest["input_date_range_utc"]
+    assert manifest["row_counts"]["source_raw_row_count"] is not None
+    assert manifest["row_counts"]["derived_row_counts"]
+
+    derived_db = manifest["databases"]["derived_db_path"]
+    assert derived_db["sha256"] == hashlib.sha256(Path(settings.paths.derived_db_path).read_bytes()).hexdigest()
+
+    # manifest.json is written after checksums are computed, so it never lists itself.
+    assert "manifest.json" not in manifest["artifact_checksums_sha256"]
+    checked = 0
+    for rel_path, expected_sha in manifest["artifact_checksums_sha256"].items():
+        actual = hashlib.sha256((final_dir / rel_path).read_bytes()).hexdigest()
+        assert actual == expected_sha, f"checksum mismatch for {rel_path}"
+        checked += 1
+    assert checked > 5
+    # Every file physically present in the snapshot (besides manifest.json itself) is checksummed -- no silent gaps.
+    all_files = {str(f.relative_to(final_dir)) for f in final_dir.rglob("*") if f.is_file()}
+    assert all_files - {"manifest.json"} == set(manifest["artifact_checksums_sha256"].keys())
