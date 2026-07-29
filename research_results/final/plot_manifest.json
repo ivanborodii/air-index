@@ -9,7 +9,8 @@
       "index_value"
     ],
     "group_by": null,
-    "description": "PROPOSED-HFIS index value over the computed range. Shade/annotate the 25/50/75 class boundaries."
+    "description": "PROPOSED-HFIS index value over the computed range. Shade/annotate the 25/50/75 class boundaries.",
+    "filter_equals": null
   },
   {
     "id": "method_comparison",
@@ -23,7 +24,8 @@
       "weighted_mean_index_value"
     ],
     "group_by": null,
-    "description": "Three index series over the same computed_ts range -- shows where methods diverge."
+    "description": "Three index series over the same computed_ts range -- shows where methods diverge.",
+    "filter_equals": null
   },
   {
     "id": "component_scores",
@@ -35,7 +37,8 @@
       "crisp_score"
     ],
     "group_by": "component",
-    "description": "One line per component (A/V/M), grouped by the 'component' column."
+    "description": "One line per component (A/V/M), grouped by the 'component' column.",
+    "filter_equals": null
   },
   {
     "id": "coverage_over_time",
@@ -47,7 +50,8 @@
       "coverage_ratio"
     ],
     "group_by": "channel",
-    "description": "Coverage ratio per direct-input channel, grouped by 'channel'; overlay the configured min_ratio threshold."
+    "description": "Coverage ratio per direct-input channel, grouped by 'channel'; overlay the configured min_ratio threshold.",
+    "filter_equals": null
   },
   {
     "id": "reason_code_frequency",
@@ -59,7 +63,8 @@
       "count"
     ],
     "group_by": null,
-    "description": "Which fault categories (stuck value, single spike, ...) drove data unavailability."
+    "description": "Which fault categories (stuck value, single spike, ...) drove data unavailability.",
+    "filter_equals": null
   },
   {
     "id": "stability_trials",
@@ -69,7 +74,8 @@
     "x": "trial_class",
     "y": [],
     "group_by": "method",
-    "description": "Count of perturbation trials landing in each class, one series per method, across every sampled point."
+    "description": "Count of perturbation trials landing in each class, one series per method, across every sampled point.",
+    "filter_equals": null
   },
   {
     "id": "stability_summary",
@@ -81,7 +87,8 @@
       "class_change_rate"
     ],
     "group_by": null,
-    "description": "Aggregate class-change rate under perturbation, one bar per method, across all sampled points."
+    "description": "Aggregate class-change rate under perturbation, one bar per method, across all sampled points.",
+    "filter_equals": null
   },
   {
     "id": "sensitivity_window_summary",
@@ -94,7 +101,8 @@
       "p95_abs_index_diff"
     ],
     "group_by": null,
-    "description": "Mean and 95th-percentile absolute index difference from the 15-minute reference, at each window size, aggregated across all sampled points."
+    "description": "Mean and 95th-percentile absolute index difference from the 15-minute reference, at each window size, aggregated across all sampled points.",
+    "filter_equals": null
   },
   {
     "id": "sensitivity_coverage_summary",
@@ -107,7 +115,8 @@
       "p95_abs_index_diff"
     ],
     "group_by": null,
-    "description": "Mean and 95th-percentile absolute index difference from the reference coverage threshold, aggregated across all sampled points."
+    "description": "Mean and 95th-percentile absolute index difference from the reference coverage threshold, aggregated across all sampled points.",
+    "filter_equals": null
   },
   {
     "id": "masking_rate",
@@ -119,7 +128,8 @@
       "masking_rate"
     ],
     "group_by": null,
-    "description": "Fraction of critical-component events hidden by each baseline's aggregation."
+    "description": "Fraction of critical-component events hidden by each baseline's aggregation.",
+    "filter_equals": null
   },
   {
     "id": "reference_case_scores",
@@ -131,11 +141,12 @@
       "macro_f1"
     ],
     "group_by": null,
-    "description": "Macro-F1 consistency with the predefined synthetic boundary-adjacent reference cases, one bar per method -- NOT an empirical accuracy estimate."
+    "description": "Macro-F1 consistency with the predefined synthetic boundary-adjacent reference cases, one bar per method -- NOT an empirical accuracy estimate.",
+    "filter_equals": null
   },
   {
     "id": "continuity_curves",
-    "title": "HFIS vs CRISP-MAX: Index Value Across a Boundary Grid",
+    "title": "HFIS vs CRISP-MAX: Index Value Across a Boundary Grid (favorable context)",
     "source_csv": "continuity_grid.csv",
     "plot_type": "line",
     "x": "input_value",
@@ -143,11 +154,14 @@
       "index_value"
     ],
     "group_by": "method",
-    "description": "Index value across a dense input grid straddling one control-region boundary, one line per method; render one figure per boundary_id."
+    "description": "Index value across a dense input grid straddling one control-region boundary, one line per method, restricted to the favorable other-components context for readability (see continuity_grid.csv for the acceptable/degraded contexts too); render one figure per boundary_id.",
+    "filter_equals": {
+      "context": "favorable"
+    }
   },
   {
     "id": "continuity_summary",
-    "title": "Boundary Continuity: Maximum Adjacent Jump by Method",
+    "title": "Boundary Continuity: Maximum Adjacent Jump by Method (favorable context)",
     "source_csv": "continuity_summary.csv",
     "plot_type": "bar",
     "x": "boundary_id",
@@ -155,11 +169,14 @@
       "max_adjacent_jump"
     ],
     "group_by": "method",
-    "description": "Largest single-step index change across each boundary's grid, grouped by method -- smaller is smoother."
+    "description": "Largest single-step index change across each boundary's grid, grouped by method, restricted to the favorable other-components context for readability -- smaller is smoother.",
+    "filter_equals": {
+      "context": "favorable"
+    }
   },
   {
     "id": "fault_detection_metrics",
-    "title": "Fault-Injection Detection Performance by Reason Code",
+    "title": "Fault-Injection Detection Performance by Reason Code (validation split)",
     "source_csv": "fault_detection_metrics.csv",
     "plot_type": "bar",
     "x": "reason_code",
@@ -169,6 +186,9 @@
       "f1"
     ],
     "group_by": null,
-    "description": "Labeled precision/recall/F1 for each data-quality reason code, from the deterministic fault-injection benchmark (not unlabeled real data)."
+    "description": "Row-level labeled precision/recall/F1 for each data-quality reason code, validation split only (disjoint from calibration -- no parameter was tuned against these numbers), from the deterministic fault-injection benchmark (not unlabeled real data).",
+    "filter_equals": {
+      "dataset_split": "validation"
+    }
   }
 ]

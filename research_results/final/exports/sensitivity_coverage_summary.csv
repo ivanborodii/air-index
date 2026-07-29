@@ -1,4 +1,4 @@
-value,n_samples,n_status_transitions,n_class_transitions,class_agreement_with_reference,mean_abs_index_diff,median_abs_index_diff,p95_abs_index_diff,max_abs_index_diff
-0.7,50,2,3,0.94,1.5648320895522385,0.0,0.0,75.11194029850745
-0.8,50,0,2,0.96,0.0,0.0,0.0,0.0
-0.9,50,2,4,0.92,0.0,0.0,0.0,0.0
+varied_parameter,value,n_eligible,n_evaluated,n_unavailable,n_valid_comparisons,n_samples,n_status_transitions,n_class_transitions,n_agreement,class_agreement_with_reference,mean_abs_index_diff,median_abs_index_diff,p95_abs_index_diff,max_abs_index_diff
+coverage_threshold,0.7,50,50,0,50,50,1,1,49,0.98,1.502238805970149,0.0,0.0,75.11194029850745
+coverage_threshold,0.8,50,50,0,50,50,0,0,50,1.0,0.0,0.0,0.0,0.0
+coverage_threshold,0.9,50,50,0,48,50,3,3,47,0.94,1.5648320895522385,0.0,0.0,75.11194029850745

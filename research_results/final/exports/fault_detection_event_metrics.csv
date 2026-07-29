@@ -1,0 +1,11 @@
+dataset_split,reason_code,temporal_tolerance_samples,n_true_events,n_predicted_events,tp,fp,fn,precision,recall,f1,mean_detection_delay
+calibration,data_loss,1,4,4,4,0,0,1.0,1.0,1.0,0.0
+calibration,gradual_drift,1,4,6,4,2,0,0.6666666666666666,1.0,0.8,0.0
+calibration,out_of_range,1,5,5,5,0,0,1.0,1.0,1.0,0.0
+calibration,single_spike,1,7,112,7,105,0,0.0625,1.0,0.11764705882352941,-2.0
+calibration,stuck_value,1,4,10,4,6,0,0.4,1.0,0.5714285714285715,0.0
+validation,data_loss,1,4,4,4,0,0,1.0,1.0,1.0,0.0
+validation,gradual_drift,1,4,7,4,3,0,0.5714285714285714,1.0,0.7272727272727273,-3.0
+validation,out_of_range,1,5,5,5,0,0,1.0,1.0,1.0,0.0
+validation,single_spike,1,7,114,7,107,0,0.06140350877192982,1.0,0.11570247933884298,-4.0
+validation,stuck_value,1,4,10,4,6,0,0.4,1.0,0.5714285714285715,0.0

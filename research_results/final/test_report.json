@@ -1,0 +1,23 @@
+{
+  "total": 326,
+  "passed": 326,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 0,
+  "wall_seconds": 1894.3631152450107,
+  "exit_code": 0,
+  "ok": true,
+  "environment": {
+    "iaq_hfis_version": "0.1.0",
+    "python_version": "3.13.5",
+    "duckdb_version": "1.5.2",
+    "platform": "Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41",
+    "processor": "aarch64",
+    "cpu_count": 4,
+    "git_commit": "5f284166076b56f1d9b561626544cab87c3e5d4a",
+    "rule_generation_version": "worst-of-max-severity-v1"
+  },
+  "generated_at_utc": "2026-07-29T21:52:58.879111+00:00",
+  "command": "/home/ivan/python_scripts/air_ml/.venv/bin/python3 -m pytest --junit-xml=/home/ivan/python_scripts/air_ml/.pytest_junit_report.xml -q tests/",
+  "stdout_tail": "........................................................................ [ 22%]\n........................................................................ [ 44%]\n........................................................................ [ 66%]\n........................................................................ [ 88%]\n......................................                                   [100%]\n326 passed in 1893.33s (0:31:33)"
+}

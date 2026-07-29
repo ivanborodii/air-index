@@ -1,15 +1,15 @@
 {
-  "pipeline_run_id": "47195a37fb52424cae0411555732c23f",
-  "evaluation_run_id": "fad333e03b9a4ed9ad07646ad653334e",
+  "pipeline_run_id": "a09f711d3c0c44508cd499e12028ae17",
+  "evaluation_run_id": "81fadef3088d4f658fb1cb03ab44d47e",
   "source_time_range": [
-    "2026-07-14T21:01:29+00:00",
-    "2026-07-28T21:01:29+00:00"
+    "2026-07-15T19:11:17+00:00",
+    "2026-07-29T19:11:17+00:00"
   ],
   "window_minutes": 15,
   "coverage_min_ratio": 0.8,
   "config_hash": "49fa03b6c0d202b58e8a533c3bd3e5febb1934234f5fbd081e99ff7a2fea31e1",
-  "git_commit": "a15562a887dec8f334b4addb9652e82be522a152",
-  "result_generation_timestamp_utc": "2026-07-28T23:15:29.222705+00:00",
+  "git_commit": "5f284166076b56f1d9b561626544cab87c3e5d4a",
+  "result_generation_timestamp_utc": "2026-07-29T21:53:19.083357+00:00",
   "publication_readiness": {
     "ready": true,
     "blocking_issues": [],
@@ -41,17 +41,21 @@
       "evaluation.sensitivity_window_minutes"
     ],
     "tests_executed": {
-      "summary": "281 passed in 409.84s (0:06:49)"
+      "ok": true,
+      "total": 326,
+      "passed": 326,
+      "failed": 0,
+      "skipped": 0
     },
     "artifact_validation": {
       "ok": true,
-      "n_checks_passed": 19,
+      "n_checks_passed": 48,
       "n_violations": 0
     }
   },
   "artifact_validation": {
     "ok": true,
-    "n_checks_passed": 19,
+    "n_checks_passed": 48,
     "n_violations": 0
   },
   "paths": {
@@ -60,6 +64,11 @@
     "article_results_summary": "article_results_summary.md",
     "article_metrics": "article_metrics.json",
     "plot_manifest": "plot_manifest.json",
+    "provisional_parameter_assessment": "provisional_parameter_assessment.md",
+    "artifact_validation_json": "artifact_validation.json",
+    "artifact_validation_md": "artifact_validation.md",
+    "test_report_json": "test_report.json",
+    "test_report_md": "test_report.md",
     "exports_dir": "exports/",
     "plots_dir": "plots/"
   }
