@@ -161,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  parameter provenance: {result['parameter_provenance']}")
         print(f"  article results summary: {result['article_results_summary']}")
         print(f"  article metrics: {result['article_metrics']}")
+        print(f"  provisional parameter assessment: {result['provisional_parameter_assessment']}")
         print(f"  generated in {result['generation_seconds']:.1f}s")
         return 0
 

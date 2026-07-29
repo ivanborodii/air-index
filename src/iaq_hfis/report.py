@@ -25,6 +25,7 @@ from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings
 from iaq_hfis.provenance import apply_known_engagement, assess_publication_readiness, collect_parameter_provenance
 from iaq_hfis.reporting import data_dictionary, exports, narrative, plot_manifest
 from iaq_hfis.reporting import summary as summary_module
+from iaq_hfis.reporting.provisional_assessment import PROVISIONAL_PARAMETER_ASSESSMENT_MD, build_provisional_parameter_assessment_markdown
 
 PARAMETER_PROVENANCE_CSV = "parameter_provenance.csv"
 
@@ -95,6 +96,10 @@ def generate_report(settings: Settings, pipeline_run_id: str, sensor_specs: Sens
     narrative_path = narrative.write_run_narrative(summary, report_dir)
     article_md_path, article_json_path = write_article_summary(summary, report_dir)
 
+    report_dir.mkdir(parents=True, exist_ok=True)
+    assessment_path = report_dir / PROVISIONAL_PARAMETER_ASSESSMENT_MD
+    assessment_path.write_text(build_provisional_parameter_assessment_markdown(provenance, summary), encoding="utf-8")
+
     return {
         "report_dir": str(report_dir),
         "csv_paths": {name: (str(path) if path else None) for name, path in csv_paths.items()},
@@ -105,6 +110,7 @@ def generate_report(settings: Settings, pipeline_run_id: str, sensor_specs: Sens
         "run_narrative_md": str(narrative_path),
         "article_results_summary": str(article_md_path),
         "article_metrics": str(article_json_path),
+        "provisional_parameter_assessment": str(assessment_path),
         "generation_seconds": time.perf_counter() - t0,
     }
 
