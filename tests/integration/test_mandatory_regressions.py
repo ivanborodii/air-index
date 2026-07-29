@@ -102,7 +102,7 @@ def test_failed_results_have_null_index_class_and_no_dominant_component(full_run
     try:
         bad = con.execute(
             "SELECT COUNT(*) FROM iaq_index_results WHERE pipeline_run_id = ? AND completeness_status = 'FAILED' "
-            "AND (index_value IS NOT NULL OR index_class IS NOT NULL OR len(dominant_component) > 0)",
+            "AND (index_value IS NOT NULL OR index_class IS NOT NULL OR dominant_component IS NOT NULL OR len(co_dominant_components) > 0)",
             [pipeline_run_id],
         ).fetchone()[0]
         assert bad == 0

@@ -20,7 +20,7 @@ def test_status_proportions_sum_to_one(base_settings):
     for i, (status,) in enumerate(rows):
         con.execute(
             "INSERT INTO iaq_index_results (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs, index_value, index_class, dominant_component, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            [PIPELINE_RUN_ID, NOW.replace(minute=i), 15, status, [], [], None, None, [], [], None, "0.1.0", "hash", NOW],
+            [PIPELINE_RUN_ID, NOW.replace(minute=i), 15, status, [], [], None, None, None, [], None, "0.1.0", "hash", NOW],
         )
     result = compute_status_proportions(con, PIPELINE_RUN_ID, window_minutes=15, from_ts=RANGE_FROM, to_ts=RANGE_TO)
     writer.close()

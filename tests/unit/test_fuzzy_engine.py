@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from iaq_hfis.constants import CLASS_ORDER, OUTPUT_MAX, OUTPUT_MIN
-from iaq_hfis.fuzzy_engine import MamdaniEngine, classify_output, dominant_adverse_component, rule_level_contributors
+from iaq_hfis.fuzzy_engine import MamdaniEngine, classify_output, determine_dominance, rule_level_contributors
 from iaq_hfis.membership import build_monotonic_classes
 from iaq_hfis.models import FiredRule, Rule
 from iaq_hfis.rules import build_rule_base
@@ -113,40 +113,91 @@ def test_v_component_is_pass_through(engine):
     assert result.fired_rules == []
 
 
-# --- dominant_adverse_component: the manuscript's dominant adverse component ---
+# --- determine_dominance: the manuscript's dominant adverse component, via
+# the full priority hierarchy (max-firing rule -> most severe consequent ->
+# causing antecedent(s) -> highest severity -> tie-break by normalized
+# score). Exercised through the real engine (engine.infer_index), which is
+# what actually calls determine_dominance in production -- these are not
+# synthetic FiredRule lists, they are the real 2nd-level rule base firing
+# against real membership degrees, matching every other test in this file. ---
 
 
-def test_dominant_adverse_component_unique_winner():
-    scores = {"A": 90.0, "V": 40.0, "M": 20.0}
-    assert dominant_adverse_component(scores, tie_tolerance=1.0) == ["A"]
+def test_dominance_clearly_dominant_component(engine):
+    degrees = {"A": _degrees("Critical"), "V": _degrees("Favorable"), "M": _degrees("Favorable")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favorable", "M": "Favorable"})
+    dom = result.dominance
+    assert dom.dominant_component == "A"
+    assert dom.co_dominant_components == ["A"]
+    assert dom.worst_component_class == "Critical"
+    assert dom.largest_component_score == _REPRESENTATIVE_SCORE["Critical"]
+    assert dom.dominance_reason == "unique_max_firing_rule"
 
 
-def test_dominant_adverse_component_exact_tie_preserved():
-    scores = {"A": 80.0, "V": 80.0, "M": 20.0}
-    assert dominant_adverse_component(scores, tie_tolerance=1.0) == ["A", "V"]
+def test_dominance_two_components_tied(engine):
+    degrees = {"A": _degrees("Critical"), "V": _degrees("Favorable"), "M": _degrees("Critical")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favorable", "M": "Critical"})
+    dom = result.dominance
+    assert dom.co_dominant_components == ["A", "M"]
+    assert dom.dominant_component == "A"  # alphabetically-first of the tie, deterministic
+    assert dom.dominance_reason == "co_dominant_tie"
 
 
-def test_dominant_adverse_component_near_tie_within_tolerance_preserved():
-    scores = {"A": 80.0, "V": 79.4, "M": 20.0}
-    assert dominant_adverse_component(scores, tie_tolerance=1.0) == ["A", "V"]
+def test_dominance_all_favorable_ties_every_component(engine):
+    degrees = {"A": _degrees("Favorable"), "V": _degrees("Favorable"), "M": _degrees("Favorable")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Favorable", "V": "Favorable", "M": "Favorable"})
+    dom = result.dominance
+    assert dom.co_dominant_components == ["A", "M", "V"]
+    assert dom.worst_component_class == "Favorable"
+    assert dom.dominance_reason == "co_dominant_tie"
 
 
-def test_dominant_adverse_component_near_tie_outside_tolerance_excludes_lower():
-    scores = {"A": 80.0, "V": 77.0, "M": 20.0}
-    assert dominant_adverse_component(scores, tie_tolerance=1.0) == ["A"]
+def test_dominance_one_critical_component_among_lesser_severities(engine):
+    degrees = {"A": _degrees("Critical"), "V": _degrees("Degraded"), "M": _degrees("Acceptable")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Degraded", "M": "Acceptable"})
+    dom = result.dominance
+    assert dom.dominant_component == "A"
+    assert dom.co_dominant_components == ["A"]
+    assert dom.worst_component_class == "Critical"
 
 
-def test_dominant_adverse_component_partial_considers_only_available():
-    # M has no crisp score at all (not passed in) -- PARTIAL naturally excludes it.
-    scores = {"A": 50.0, "V": 90.0}
-    assert dominant_adverse_component(scores, tie_tolerance=1.0) == ["V"]
+def test_dominance_missing_component_under_partial_is_never_consulted(engine):
+    # V is missing entirely (PARTIAL) -- must not appear anywhere in the result.
+    degrees = {"A": _degrees("Critical"), "M": _degrees("Favorable")}
+    result = _infer(engine, degrees, {"A", "M"}, {"A": "Critical", "M": "Favorable"})
+    dom = result.dominance
+    assert dom.dominant_component == "A"
+    assert "V" not in dom.co_dominant_components
+    assert dom.largest_component_score == _REPRESENTATIVE_SCORE["Critical"]
 
 
-def test_dominant_adverse_component_empty_for_failed():
-    assert dominant_adverse_component({}, tie_tolerance=1.0) == []
+def test_dominance_equal_crisp_scores_but_different_memberships_favors_higher_severity_membership(engine):
+    """The key case the priority hierarchy is FOR: two components with the
+    SAME crisp score can still have a clear, non-arbitrary winner, because
+    dominance is decided by rule-firing/antecedent severity, not by naive
+    crisp-score comparison. A is purely Degraded (degree 1.0); M is half
+    Degraded / half Critical (0.5 each) -- despite an engineered tie in
+    crisp_score, M's antecedent reaches Critical severity and wins."""
+    degrees = {
+        "A": {"Favorable": 0.0, "Acceptable": 0.0, "Degraded": 1.0, "Critical": 0.0},
+        "V": _degrees("Favorable"),
+        "M": {"Favorable": 0.0, "Acceptable": 0.0, "Degraded": 0.5, "Critical": 0.5},
+    }
+    scores = {"A": 60.0, "V": 10.0, "M": 60.0}  # equal scores for A and M by construction
+    result = engine.infer_index(degrees, {"A", "V", "M"}, scores, dominant_component_tie_tolerance=1.0)
+    dom = result.dominance
+    assert dom.dominant_component == "M"
+    assert dom.co_dominant_components == ["M"]
+    assert dom.dominance_reason == "tie_broken_by_normalized_score"
 
 
-# --- rule_level_contributors: diagnostic only, distinct from dominant_adverse_component ---
+def test_determine_dominance_no_rules_fired_returns_none():
+    result = determine_dominance(fired_rules=[], component_degrees={}, component_crisp_scores={}, tie_tolerance=1.0)
+    assert result.dominant_component is None
+    assert result.co_dominant_components == []
+    assert result.dominance_reason == "no_rules_fired"
+
+
+# --- rule_level_contributors: diagnostic only, distinct from determine_dominance ---
 
 
 def test_rule_level_contributors_single_winner():

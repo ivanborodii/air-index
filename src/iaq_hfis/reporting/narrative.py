@@ -72,6 +72,11 @@ def build_run_narrative(summary: dict) -> str:
         )
     else:
         lines.append("No timestamps were processed in this run.")
+    dcf = summary.get("dominant_component_frequency") or {}
+    if dcf:
+        total_dominant = sum(dcf.values())
+        parts = ", ".join(f"{c}: {n} ({_pct(n / total_dominant)})" for c, n in sorted(dcf.items()))
+        lines.append(f"Dominant-component frequency across OK/PARTIAL computed timestamps: {parts}.")
     lines.append("")
 
     ev = summary.get("evaluation")

@@ -55,6 +55,7 @@ def build_article_metrics(summary: dict) -> dict:
         "reason_code_frequency": ev.get("reason_code_frequency"),
         "performance": summary.get("performance"),
         "publication_readiness": summary.get("publication_readiness"),
+        "dominant_component_frequency": summary.get("dominant_component_frequency"),
     }
 
 
@@ -94,6 +95,12 @@ def build_article_results_summary(summary: dict) -> str:
         lines.append("See `index_timeseries.csv` (completeness_status=OK rows, group by index_class) for the exact distribution.")
     else:
         lines.append("Not available -- evaluation not run.")
+    dcf = summary.get("dominant_component_frequency") or {}
+    if dcf:
+        lines.append("")
+        lines.append("Dominant-component frequency (which of A/V/M won the priority-hierarchy tie-break, OK/PARTIAL computed_ts only):")
+        for component in sorted(dcf):
+            lines.append(f"- {component}: {dcf[component]} ({_pct(dcf[component] / sum(dcf.values()))})")
     lines.append("")
 
     lines += ["## 5. Inter-method agreement (unlabeled real data)", ""]

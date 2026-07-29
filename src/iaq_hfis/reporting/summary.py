@@ -62,6 +62,12 @@ def build_run_summary_markdown(summary: dict) -> str:
     lines += [f"## {SECTIONS[2]}", ""]
     cs = summary["completeness_summary"]
     lines += [f"- OK: {cs['OK']}", f"- PARTIAL: {cs['PARTIAL']}", f"- FAILED: {cs['FAILED']}", ""]
+    dcf = summary.get("dominant_component_frequency") or {}
+    if dcf:
+        lines.append("Dominant-component frequency (OK/PARTIAL computed_ts only):")
+        for component in sorted(dcf):
+            lines.append(f"- {component}: {dcf[component]}")
+        lines.append("")
 
     lines += [f"## {SECTIONS[3]}", ""]
     provisional = summary.get("provisional_parameters_used") or []

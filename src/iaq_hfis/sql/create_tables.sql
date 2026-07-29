@@ -102,10 +102,25 @@ CREATE TABLE IF NOT EXISTS iaq_index_results (
     missing_inputs          VARCHAR[],
     index_value             DOUBLE,                  -- NULL if FAILED
     index_class             VARCHAR,                 -- NULL if FAILED
-    -- Dominant adverse component(s): the available component(s) with the
-    -- highest adverse crisp score, ties preserved only within
-    -- membership.dominant_component_tie_tolerance. Empty for FAILED.
-    dominant_component      VARCHAR[],
+    -- Dominant adverse component: single, deterministically-chosen primary
+    -- component from the priority hierarchy in fuzzy_engine.determine_dominance
+    -- (max-firing rule -> most severe consequent -> causing antecedent(s) ->
+    -- highest severity -> tie-break by normalized score). NULL for FAILED
+    -- or when no rule fired at all.
+    dominant_component        VARCHAR,
+    -- Every component tied for dominance at the end of the hierarchy
+    -- (length 1 unless a genuine, documented tie survived every step,
+    -- including dominant_component itself). Empty for FAILED.
+    co_dominant_components    VARCHAR[],
+    -- Highest-severity class reached by ANY available component's own
+    -- dominant class -- independent of the tie-breaking mechanics above.
+    worst_component_class     VARCHAR,
+    -- max(component_crisp_scores) among available components.
+    largest_component_score   DOUBLE,
+    -- Which step of the priority hierarchy resolved dominant_component
+    -- (e.g. 'unique_max_firing_rule', 'co_dominant_tie',
+    -- 'tie_broken_by_normalized_score', 'no_rules_fired').
+    dominance_reason          VARCHAR,
     -- Separate diagnostic: which component(s) "bound" the min() in the
     -- fired Mamdani rules (rule-level attribution). NOT the manuscript's
     -- dominant adverse component -- kept only as an optional diagnostic.

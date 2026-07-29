@@ -138,7 +138,7 @@ def _check_timestamp_counts(con, summary: dict, pipeline_run_id: str, window_min
 def _check_failed_rows_are_null(con, pipeline_run_id: str, window_minutes, passed: list[str], violations: list[str]) -> None:
     bad = con.execute(
         "SELECT COUNT(*) FROM iaq_index_results WHERE pipeline_run_id = ? AND window_minutes = ? AND completeness_status = 'FAILED' "
-        "AND (index_value IS NOT NULL OR index_class IS NOT NULL OR len(dominant_component) > 0)",
+        "AND (index_value IS NOT NULL OR index_class IS NOT NULL OR dominant_component IS NOT NULL OR len(co_dominant_components) > 0)",
         [pipeline_run_id, window_minutes],
     ).fetchone()[0]
     if bad == 0:

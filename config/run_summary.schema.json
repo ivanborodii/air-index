@@ -29,6 +29,10 @@
       }
     },
     "provisional_parameters_used": {"type": "array", "items": {"type": "string"}},
+    "dominant_component_frequency": {
+      "type": "object",
+      "description": "How often each component (A/V/M) won fuzzy_engine.determine_dominance's priority hierarchy, across every OK/PARTIAL computed_ts this run (FAILED rows have a null dominant_component and are excluded)."
+    },
     "environment": {
       "type": "object",
       "required": ["iaq_hfis_version", "python_version", "duckdb_version", "platform", "processor", "cpu_count", "git_commit", "rule_generation_version"],

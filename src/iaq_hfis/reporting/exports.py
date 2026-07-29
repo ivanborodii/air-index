@@ -90,7 +90,11 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("completeness_status", "str", "-", "OK | PARTIAL | FAILED."),
         ColumnSpec("index_value", "float", "0-100", "Defuzzified PROPOSED-HFIS index value; null if FAILED."),
         ColumnSpec("index_class", "str", "-", "Favorable | Acceptable | Degraded | Critical; null if FAILED."),
-        ColumnSpec("dominant_component", "str", "-", "Semicolon-joined dominant adverse component(s) (A/V/M), tie-tolerant; empty if FAILED."),
+        ColumnSpec("dominant_component", "str", "-", "Single, deterministically-chosen dominant adverse component (A/V/M) from the priority hierarchy; null if FAILED or no rule fired."),
+        ColumnSpec("co_dominant_components", "str", "-", "Semicolon-joined component(s) tied for dominance (includes dominant_component); length 1 unless a documented tie survived every step."),
+        ColumnSpec("worst_component_class", "str", "-", "Highest-severity class reached by any available component's own dominant class."),
+        ColumnSpec("largest_component_score", "float", "0-100", "max(component crisp scores) among available components."),
+        ColumnSpec("dominance_reason", "str", "-", "Which step of the priority hierarchy resolved dominant_component (see fuzzy_engine.determine_dominance)."),
         ColumnSpec("rule_level_contributors", "str", "-", "Diagnostic only: semicolon-joined component(s) that bound the min() in fired rules -- NOT the dominant adverse component."),
         ColumnSpec("n_rules_fired", "int", "count", "Number of Mamdani rules with nonzero firing strength."),
     ],
@@ -351,7 +355,8 @@ def _write(df: pd.DataFrame, columns: list[ColumnSpec], out_dir: Path, filename:
 
 def export_index_timeseries(con: duckdb.DuckDBPyConnection, out_dir: Path, pipeline_run_id: str, window_minutes: int, from_ts: datetime, to_ts: datetime) -> Path:
     df = con.execute(
-        "SELECT computed_ts, window_minutes, completeness_status, index_value, index_class, dominant_component, rule_level_contributors, n_rules_fired "
+        "SELECT computed_ts, window_minutes, completeness_status, index_value, index_class, dominant_component, "
+        "co_dominant_components, worst_component_class, largest_component_score, dominance_reason, rule_level_contributors, n_rules_fired "
         "FROM iaq_index_results WHERE pipeline_run_id = ? AND window_minutes = ? AND computed_ts > ? AND computed_ts <= ? ORDER BY computed_ts",
         [pipeline_run_id, window_minutes, from_ts, to_ts],
     ).df()

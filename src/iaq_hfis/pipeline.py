@@ -250,16 +250,23 @@ def compute_index_at(
     if writer is not None:
         index_value = index_result.index_value if index_result else None
         index_class = index_result.index_class if index_result else None
-        dominant = index_result.dominant_components if index_result else []
+        dominance = index_result.dominance if index_result else None
         contributors = index_result.rule_level_contributors if index_result else []
         n_fired = index_result.n_rules_fired if index_result else None
         writer.connection.execute(
             """INSERT OR REPLACE INTO iaq_index_results
                (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs,
-                index_value, index_class, dominant_component, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                index_value, index_class, dominant_component, co_dominant_components, worst_component_class,
+                largest_component_score, dominance_reason, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             [pipeline_run_id, computed_ts, window_minutes, completeness.status, completeness.missing_components, completeness.missing_inputs,
-             index_value, index_class, dominant, contributors, n_fired, settings.engine_version, ctx.config_hash, now],
+             index_value, index_class,
+             dominance.dominant_component if dominance else None,
+             dominance.co_dominant_components if dominance else [],
+             dominance.worst_component_class if dominance else None,
+             dominance.largest_component_score if dominance else None,
+             dominance.dominance_reason if dominance else None,
+             contributors, n_fired, settings.engine_version, ctx.config_hash, now],
         )
         writer.connection.execute(
             """INSERT OR REPLACE INTO outdoor_context
@@ -342,6 +349,17 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
                 table: writer.connection.execute(f"SELECT COUNT(*) FROM {table} WHERE pipeline_run_id = ?", [pipeline_run_id]).fetchone()[0]
                 for table in ("observation_quality", "window_aggregates", "component_scores", "iaq_index_results")
             }
+            # Dominant-component frequency: how often each component (A/V/M) was the
+            # deterministic winner of fuzzy_engine.determine_dominance's priority
+            # hierarchy, across every OK/PARTIAL computed_ts this run (FAILED rows
+            # have a null dominant_component and are excluded automatically).
+            dominant_component_frequency = dict(
+                writer.connection.execute(
+                    "SELECT dominant_component, COUNT(*) FROM iaq_index_results "
+                    "WHERE pipeline_run_id = ? AND dominant_component IS NOT NULL GROUP BY 1 ORDER BY 1",
+                    [pipeline_run_id],
+                ).fetchall()
+            )
         finally:
             writer.close()
 
@@ -376,6 +394,7 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
         "n_timestamps_processed": len(computed_timestamps),
         "n_snapshot_retries": source.snapshot_retry_count,
         "completeness_summary": status_counts,
+        "dominant_component_frequency": dominant_component_frequency,
         "provisional_parameters_used": (
             sorted(engaged_provisional_paths(collect_parameter_provenance(settings, sensor_specs, room_profiles), sorted(ctx.provisional_profiles_used)))
             + ctx.provisional_parameters_used
