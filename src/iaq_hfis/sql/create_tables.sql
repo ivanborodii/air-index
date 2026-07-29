@@ -307,6 +307,7 @@ CREATE TABLE IF NOT EXISTS fault_injection_events (
     evaluation_run_id  VARCHAR     NOT NULL,
     pipeline_run_id    VARCHAR     NOT NULL,
     scenario_id        VARCHAR     NOT NULL,
+    dataset_split      VARCHAR     NOT NULL,   -- calibration | validation
     channel            VARCHAR     NOT NULL,
     fault_type         VARCHAR     NOT NULL,
     injected_at_index  INTEGER     NOT NULL,
@@ -319,6 +320,7 @@ CREATE TABLE IF NOT EXISTS fault_detection_predictions (
     evaluation_run_id  VARCHAR     NOT NULL,
     pipeline_run_id    VARCHAR     NOT NULL,
     scenario_id        VARCHAR     NOT NULL,
+    dataset_split      VARCHAR     NOT NULL,   -- calibration | validation
     channel            VARCHAR     NOT NULL,
     sample_index       INTEGER     NOT NULL,
     true_fault_type    VARCHAR,    -- NULL when the sample is genuinely clean/no fault
@@ -328,25 +330,67 @@ CREATE TABLE IF NOT EXISTS fault_detection_predictions (
     PRIMARY KEY (evaluation_run_id, scenario_id, channel, sample_index)
 );
 
+-- Row-level: every affected sample counted individually (a multi-sample
+-- fault contributes multiple TP/FN rows). See fault_detection_event_metrics
+-- below for the corresponding event-level counts (each injected fault
+-- counted once, regardless of duration).
 CREATE TABLE IF NOT EXISTS fault_detection_metrics (
     evaluation_run_id      VARCHAR NOT NULL,
     pipeline_run_id        VARCHAR NOT NULL,
+    dataset_split           VARCHAR NOT NULL,  -- calibration | validation
     reason_code            VARCHAR NOT NULL,
     tp                     INTEGER NOT NULL,
     fp                     INTEGER NOT NULL,
     fn                     INTEGER NOT NULL,
+    tn                     INTEGER NOT NULL,
     precision               DOUBLE,
     recall                  DOUBLE,
     f1                      DOUBLE,
+    specificity              DOUBLE,
     false_positive_rate     DOUBLE,
     mean_detection_delay    DOUBLE,
-    PRIMARY KEY (evaluation_run_id, reason_code)
+    PRIMARY KEY (evaluation_run_id, dataset_split, reason_code)
+);
+
+-- Event-level: one-to-one matching of each injected fault (regardless of
+-- its sample duration) against predicted detection intervals, within a
+-- configurable temporal tolerance. Prevents a single multi-sample fault
+-- from being double-counted as many separate true positives.
+CREATE TABLE IF NOT EXISTS fault_detection_event_metrics (
+    evaluation_run_id           VARCHAR NOT NULL,
+    pipeline_run_id             VARCHAR NOT NULL,
+    dataset_split                VARCHAR NOT NULL,  -- calibration | validation
+    reason_code                 VARCHAR NOT NULL,
+    temporal_tolerance_samples   INTEGER NOT NULL,
+    n_true_events                 INTEGER NOT NULL,
+    n_predicted_events             INTEGER NOT NULL,
+    tp                          INTEGER NOT NULL,
+    fp                          INTEGER NOT NULL,
+    fn                          INTEGER NOT NULL,
+    precision                    DOUBLE,
+    recall                       DOUBLE,
+    f1                           DOUBLE,
+    mean_detection_delay         DOUBLE,
+    PRIMARY KEY (evaluation_run_id, dataset_split, reason_code)
+);
+
+-- Row-level confusion matrix: true label (a reason code, or 'none') against
+-- every reason code actually predicted for that sample (a sample can carry
+-- more than one predicted reason_code).
+CREATE TABLE IF NOT EXISTS fault_detection_confusion_matrix (
+    evaluation_run_id  VARCHAR NOT NULL,
+    pipeline_run_id    VARCHAR NOT NULL,
+    dataset_split       VARCHAR NOT NULL,  -- calibration | validation
+    true_label          VARCHAR NOT NULL,  -- a reason code, or 'none'
+    predicted_label      VARCHAR NOT NULL,  -- a reason code, or 'none'
+    count                INTEGER NOT NULL,
+    PRIMARY KEY (evaluation_run_id, dataset_split, true_label, predicted_label)
 );
 
 CREATE TABLE IF NOT EXISTS hampel_calibration (
     evaluation_run_id  VARCHAR NOT NULL,
     pipeline_run_id    VARCHAR NOT NULL,
-    dataset_split       VARCHAR NOT NULL,  -- development | holdout
+    dataset_split       VARCHAR NOT NULL,  -- calibration | validation
     window_size          INTEGER NOT NULL,
     mad_multiplier         DOUBLE  NOT NULL,
     fault_recall             DOUBLE,

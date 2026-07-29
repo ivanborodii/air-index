@@ -114,10 +114,14 @@
         },
         "fault_injection": {
           "type": "object",
-          "description": "Deterministic, labeled synthetic fault-injection benchmark -- separate from unlabeled real-data reason_code_frequency.",
+          "description": "Deterministic, labeled synthetic fault-injection benchmark -- separate from unlabeled real-data reason_code_frequency. calibration/validation are disjoint scenario sets (no data leakage); validation is the headline, publication-facing split.",
           "properties": {
             "n_scenarios": {"type": "integer"},
-            "metrics_by_reason_code": {"type": "array"},
+            "channels_covered": {"type": "array", "items": {"type": "string"}},
+            "headline_dataset_split": {"type": "string", "enum": ["validation"]},
+            "row_level_metrics_by_split": {"type": "object", "description": "Every affected sample counted individually, keyed by 'calibration'/'validation'."},
+            "event_level_metrics_by_split": {"type": "object", "description": "Each injected fault counted once via one-to-one matching, keyed by 'calibration'/'validation'."},
+            "metrics_by_reason_code": {"type": "array", "description": "Legacy alias: validation split's row-level metrics."},
             "false_rejection_rate_for_genuine_events": {"type": ["number", "null"]},
             "confirmation_recovery_rate": {"type": ["number", "null"]},
             "hampel_calibration": {"type": "object"}

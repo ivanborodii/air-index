@@ -163,17 +163,35 @@ def build_run_narrative(summary: dict) -> str:
         fi = ev.get("fault_injection")
         if fi and fi.get("metrics_by_reason_code"):
             lines.append(
-                f"Deterministic, pre-labeled synthetic scenarios ({fi['n_scenarios']}), fully separate from the "
-                f"unlabeled real-data reason-code frequency below (see fault_detection_metrics.csv)."
+                f"Deterministic, pre-labeled synthetic scenarios ({fi['n_scenarios']} across {', '.join(fi.get('channels_covered') or [])}), "
+                f"fully separate from the unlabeled real-data reason-code frequency below. Numbers here are the {fi.get('headline_dataset_split', 'validation')} "
+                f"split ONLY -- a disjoint scenario set from calibration (which the Hampel grid below is tuned against), so no "
+                f"parameter was tuned against the numbers being reported (see fault_detection_metrics.csv, "
+                f"fault_detection_event_metrics.csv, fault_detection_confusion_matrix.csv for row-level, event-level, and confusion-matrix detail)."
             )
+            weak_codes = []
             for m in fi["metrics_by_reason_code"]:
-                lines.append(f"- {m['reason_code']}: precision={_num(m['precision'], 3)}, recall={_num(m['recall'], 3)}, F1={_num(m['f1'], 3)} (tp={m['tp']}, fp={m['fp']}, fn={m['fn']}).")
+                lines.append(f"- {m['reason_code']} (row-level): precision={_num(m['precision'], 3)}, recall={_num(m['recall'], 3)}, F1={_num(m['f1'], 3)} (tp={m['tp']}, fp={m['fp']}, fn={m['fn']}).")
+                if m["f1"] is not None and m["f1"] < 0.5:
+                    weak_codes.append(m["reason_code"])
+            event_metrics = (fi.get("event_level_metrics_by_split") or {}).get(fi.get("headline_dataset_split", "validation")) or []
+            for m in event_metrics:
+                lines.append(
+                    f"- {m['reason_code']} (event-level, tolerance={m['temporal_tolerance_samples']} samples): "
+                    f"precision={_num(m['precision'], 3)}, recall={_num(m['recall'], 3)}, F1={_num(m['f1'], 3)} "
+                    f"({m['n_true_events']} true event(s), {m['n_predicted_events']} predicted event(s))."
+                )
+            if weak_codes:
+                lines.append(
+                    f"- **Disclosed limitation**: {', '.join(weak_codes)} scored row-level F1 below 0.5 on this benchmark -- "
+                    f"reported here as-is, not hidden or excluded from the summary."
+                )
             if fi.get("false_rejection_rate_for_genuine_events") is not None:
                 lines.append(f"- Genuine sustained events falsely rejected: {_pct(fi['false_rejection_rate_for_genuine_events'])}.")
             hc = fi.get("hampel_calibration") or {}
             if hc:
                 lines.append(
-                    f"- Hampel calibration grid (window_size x mad_multiplier) evaluated on development and holdout "
+                    f"- Hampel calibration grid (window_size x mad_multiplier) evaluated on calibration and validation "
                     f"scenario splits; current configuration (window_size={hc.get('current_window_size')}, "
                     f"mad_multiplier={hc.get('current_mad_multiplier')}) is retained regardless of this synthetic grid's "
                     f"outcome -- see hampel_calibration.csv and 'Provisional parameters engaged' above."

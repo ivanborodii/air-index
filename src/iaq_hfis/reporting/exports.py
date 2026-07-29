@@ -54,6 +54,8 @@ CONTINUITY_SUMMARY = "continuity_summary.csv"
 FAULT_INJECTION_EVENTS = "fault_injection_events.csv"
 FAULT_DETECTION_PREDICTIONS = "fault_detection_predictions.csv"
 FAULT_DETECTION_METRICS = "fault_detection_metrics.csv"
+FAULT_DETECTION_EVENT_METRICS = "fault_detection_event_metrics.csv"
+FAULT_DETECTION_CONFUSION_MATRIX = "fault_detection_confusion_matrix.csv"
 HAMPEL_CALIBRATION = "hampel_calibration.csv"
 
 #: Shared metric columns for every stability aggregation grain (by-point,
@@ -291,14 +293,16 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
     ],
     FAULT_INJECTION_EVENTS: [
         ColumnSpec("scenario_id", "str", "-", "Synthetic scenario identifier."),
+        ColumnSpec("dataset_split", "str", "-", "calibration | validation -- disjoint scenario sets, no data leakage between them."),
         ColumnSpec("channel", "str", "-", "Channel the fault was injected into."),
-        ColumnSpec("fault_type", "str", "-", "single_spike | stuck_value | data_loss | gradual_drift | out_of_range | pm_order_violation."),
+        ColumnSpec("fault_type", "str", "-", "single_spike | stuck_value | data_loss | gradual_drift | out_of_range."),
         ColumnSpec("injected_at_index", "int", "-", "0-based sample index within the scenario where the fault begins."),
         ColumnSpec("duration_samples", "int", "count", "Number of consecutive samples the fault spans."),
         ColumnSpec("description", "str", "-", "Human-readable description of the injected fault."),
     ],
     FAULT_DETECTION_PREDICTIONS: [
         ColumnSpec("scenario_id", "str", "-", "Synthetic scenario identifier."),
+        ColumnSpec("dataset_split", "str", "-", "calibration | validation."),
         ColumnSpec("channel", "str", "-", "Channel under test."),
         ColumnSpec("sample_index", "int", "-", "0-based sample index within the scenario."),
         ColumnSpec("true_fault_type", "str", "-", "Injected fault type at this sample, or null if genuinely clean."),
@@ -307,24 +311,47 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("usable", "bool", "-", "Whether the quality layer counted this sample toward coverage."),
     ],
     FAULT_DETECTION_METRICS: [
+        ColumnSpec("dataset_split", "str", "-", "calibration | validation -- validation is the headline, publication-facing split."),
         ColumnSpec("reason_code", "str", "-", "single_spike | stuck_value | data_loss | gradual_drift | out_of_range."),
-        ColumnSpec("tp", "int", "count", "True positives."),
-        ColumnSpec("fp", "int", "count", "False positives."),
-        ColumnSpec("fn", "int", "count", "False negatives."),
+        ColumnSpec("tp", "int", "count", "Row-level true positives (every affected sample counted individually)."),
+        ColumnSpec("fp", "int", "count", "Row-level false positives."),
+        ColumnSpec("fn", "int", "count", "Row-level false negatives."),
+        ColumnSpec("tn", "int", "count", "Row-level true negatives."),
         ColumnSpec("precision", "float", "0-1", "tp / (tp + fp)."),
         ColumnSpec("recall", "float", "0-1", "tp / (tp + fn)."),
         ColumnSpec("f1", "float", "0-1", "Harmonic mean of precision and recall."),
-        ColumnSpec("false_positive_rate", "float", "0-1", "fp / (fp + true negatives)."),
+        ColumnSpec("specificity", "float", "0-1", "tn / (tn + fp)."),
+        ColumnSpec("false_positive_rate", "float", "0-1", "fp / (fp + tn); 1 - specificity."),
         ColumnSpec("mean_detection_delay", "float", "samples", "Mean number of samples between fault onset and first detection, for sequential faults."),
     ],
+    FAULT_DETECTION_EVENT_METRICS: [
+        ColumnSpec("dataset_split", "str", "-", "calibration | validation -- validation is the headline, publication-facing split."),
+        ColumnSpec("reason_code", "str", "-", "single_spike | stuck_value | data_loss | gradual_drift | out_of_range."),
+        ColumnSpec("temporal_tolerance_samples", "int", "samples", "Matching tolerance used: a predicted detection interval and a true event match if they overlap or are within this many samples."),
+        ColumnSpec("n_true_events", "int", "count", "Injected faults of this type in this split."),
+        ColumnSpec("n_predicted_events", "int", "count", "Predicted detection intervals of this type (contiguous runs of flagged samples, merged within tolerance) in this split."),
+        ColumnSpec("tp", "int", "count", "Event-level true positives (one-to-one matched)."),
+        ColumnSpec("fp", "int", "count", "Predicted events with no matching true event."),
+        ColumnSpec("fn", "int", "count", "True events with no matching predicted event."),
+        ColumnSpec("precision", "float", "0-1", "tp / (tp + fp)."),
+        ColumnSpec("recall", "float", "0-1", "tp / (tp + fn)."),
+        ColumnSpec("f1", "float", "0-1", "Harmonic mean of precision and recall."),
+        ColumnSpec("mean_detection_delay", "float", "samples", "Mean (matched predicted interval start - true event start), across true positives."),
+    ],
+    FAULT_DETECTION_CONFUSION_MATRIX: [
+        ColumnSpec("dataset_split", "str", "-", "calibration | validation."),
+        ColumnSpec("true_label", "str", "-", "The sample's true fault type, or 'none' if genuinely clean/a genuine_event."),
+        ColumnSpec("predicted_label", "str", "-", "A reason code actually predicted for that sample, or 'none' if it carried zero."),
+        ColumnSpec("count", "int", "count", "Number of samples with this (true_label, predicted_label) pair."),
+    ],
     HAMPEL_CALIBRATION: [
-        ColumnSpec("dataset_split", "str", "-", "development | holdout."),
+        ColumnSpec("dataset_split", "str", "-", "calibration | validation."),
         ColumnSpec("window_size", "int", "samples", "Hampel filter window size tested."),
         ColumnSpec("mad_multiplier", "float", "-", "Hampel filter MAD multiplier tested."),
         ColumnSpec("fault_recall", "float", "0-1", "Recall for single_spike detection on this split."),
         ColumnSpec("genuine_event_preservation_rate", "float", "0-1", "Fraction of genuine rapid environmental events not falsely flagged."),
         ColumnSpec("objective_score", "float", "-", "Balanced objective combining fault_recall and genuine_event_preservation_rate."),
-        ColumnSpec("selected", "bool", "-", "Whether this configuration was the one selected from development results."),
+        ColumnSpec("selected", "bool", "-", "Whether this configuration was the one selected from calibration results."),
     ],
 }
 
@@ -584,8 +611,8 @@ def export_continuity_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, eva
 
 def export_fault_injection_events(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
-        "SELECT scenario_id, channel, fault_type, injected_at_index, duration_samples, description "
-        "FROM fault_injection_events WHERE evaluation_run_id = ? ORDER BY scenario_id, channel, injected_at_index",
+        "SELECT scenario_id, dataset_split, channel, fault_type, injected_at_index, duration_samples, description "
+        "FROM fault_injection_events WHERE evaluation_run_id = ? ORDER BY dataset_split, scenario_id, channel, injected_at_index",
         [evaluation_run_id],
     ).df()
     if df.empty:
@@ -595,8 +622,8 @@ def export_fault_injection_events(con: duckdb.DuckDBPyConnection, out_dir: Path,
 
 def export_fault_detection_predictions(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
-        "SELECT scenario_id, channel, sample_index, true_fault_type, predicted_reason_codes, stage2_state, usable "
-        "FROM fault_detection_predictions WHERE evaluation_run_id = ? ORDER BY scenario_id, channel, sample_index",
+        "SELECT scenario_id, dataset_split, channel, sample_index, true_fault_type, predicted_reason_codes, stage2_state, usable "
+        "FROM fault_detection_predictions WHERE evaluation_run_id = ? ORDER BY dataset_split, scenario_id, channel, sample_index",
         [evaluation_run_id],
     ).df()
     if df.empty:
@@ -606,13 +633,36 @@ def export_fault_detection_predictions(con: duckdb.DuckDBPyConnection, out_dir: 
 
 def export_fault_detection_metrics(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
-        "SELECT reason_code, tp, fp, fn, precision, recall, f1, false_positive_rate, mean_detection_delay "
-        "FROM fault_detection_metrics WHERE evaluation_run_id = ? ORDER BY reason_code",
+        "SELECT dataset_split, reason_code, tp, fp, fn, tn, precision, recall, f1, specificity, false_positive_rate, mean_detection_delay "
+        "FROM fault_detection_metrics WHERE evaluation_run_id = ? ORDER BY dataset_split, reason_code",
         [evaluation_run_id],
     ).df()
     if df.empty:
         return None
     return _write(df, COLUMNS[FAULT_DETECTION_METRICS], out_dir, FAULT_DETECTION_METRICS)
+
+
+def export_fault_detection_event_metrics(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
+    df = con.execute(
+        "SELECT dataset_split, reason_code, temporal_tolerance_samples, n_true_events, n_predicted_events, "
+        "tp, fp, fn, precision, recall, f1, mean_detection_delay "
+        "FROM fault_detection_event_metrics WHERE evaluation_run_id = ? ORDER BY dataset_split, reason_code",
+        [evaluation_run_id],
+    ).df()
+    if df.empty:
+        return None
+    return _write(df, COLUMNS[FAULT_DETECTION_EVENT_METRICS], out_dir, FAULT_DETECTION_EVENT_METRICS)
+
+
+def export_fault_detection_confusion_matrix(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
+    df = con.execute(
+        "SELECT dataset_split, true_label, predicted_label, count "
+        "FROM fault_detection_confusion_matrix WHERE evaluation_run_id = ? ORDER BY dataset_split, true_label, predicted_label",
+        [evaluation_run_id],
+    ).df()
+    if df.empty:
+        return None
+    return _write(df, COLUMNS[FAULT_DETECTION_CONFUSION_MATRIX], out_dir, FAULT_DETECTION_CONFUSION_MATRIX)
 
 
 def export_hampel_calibration(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
@@ -654,7 +704,8 @@ def export_all(
             STABILITY_SUMMARY_BY_VARIABLE, STABILITY_SUMMARY_BY_ORIGINAL_CLASS,
             SENSITIVITY_WINDOW_BY_POINT, SENSITIVITY_WINDOW_SUMMARY, SENSITIVITY_COVERAGE_BY_POINT, SENSITIVITY_COVERAGE_SUMMARY,
             MASKING_SUMMARY, REFERENCE_CASE_SUMMARY, CONTINUITY_GRID, CONTINUITY_SUMMARY,
-            FAULT_INJECTION_EVENTS, FAULT_DETECTION_PREDICTIONS, FAULT_DETECTION_METRICS, HAMPEL_CALIBRATION,
+            FAULT_INJECTION_EVENTS, FAULT_DETECTION_PREDICTIONS, FAULT_DETECTION_METRICS,
+            FAULT_DETECTION_EVENT_METRICS, FAULT_DETECTION_CONFUSION_MATRIX, HAMPEL_CALIBRATION,
         ):
             result[name] = None
         return result
@@ -679,6 +730,8 @@ def export_all(
             FAULT_INJECTION_EVENTS: export_fault_injection_events(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_PREDICTIONS: export_fault_detection_predictions(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_METRICS: export_fault_detection_metrics(con, out_dir, evaluation_run_id),
+            FAULT_DETECTION_EVENT_METRICS: export_fault_detection_event_metrics(con, out_dir, evaluation_run_id),
+            FAULT_DETECTION_CONFUSION_MATRIX: export_fault_detection_confusion_matrix(con, out_dir, evaluation_run_id),
             HAMPEL_CALIBRATION: export_hampel_calibration(con, out_dir, evaluation_run_id),
         }
     )

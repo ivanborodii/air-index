@@ -41,10 +41,12 @@ from iaq_hfis.evaluation.continuity import run_continuity_experiment, summarize_
 from iaq_hfis.evaluation.fault_injection import (
     HAMPEL_MULTIPLIER_GRID,
     HAMPEL_WINDOW_GRID,
+    build_confusion_matrix,
     confirmation_recovery_rate,
     false_rejection_rate_for_genuine_events,
     run_benchmark,
     run_hampel_calibration,
+    score_events,
     score_predictions,
 )
 from iaq_hfis.evaluation.faults import compute_reason_code_frequency, compute_status_proportions
@@ -327,7 +329,12 @@ def run_evaluation(
                 )
 
             # --- Fault-injection benchmark: deterministic, labeled synthetic scenarios,
-            # fully separate from the unlabeled real-data reason-code frequency below. ---
+            # fully separate from the unlabeled real-data reason-code frequency below.
+            # Every scenario belongs to exactly one of two disjoint dataset splits
+            # (calibration, validation -- different scenario_ids AND a different
+            # deterministic scale/phase, see fault_injection.build_channel_scenarios),
+            # so the headline, publication-facing numbers (validation split) never
+            # reuse anything the calibration split (or Hampel calibration, below) saw. ---
             fault_events, fault_predictions = run_benchmark(
                 settings.schema_mapping, sensor_specs, settings.hampel, settings.confirmation,
                 settings.confirmation.pm_cross_channel_tolerance_pct, settings.cadence.sample_cadence_seconds,
@@ -335,27 +342,63 @@ def run_evaluation(
             for e in fault_events:
                 con.execute(
                     """INSERT OR REPLACE INTO fault_injection_events
-                       (evaluation_run_id, pipeline_run_id, scenario_id, channel, fault_type, injected_at_index, duration_samples, description)
-                       VALUES (?,?,?,?,?,?,?,?)""",
-                    [evaluation_run_id, pipeline_run_id, e.scenario_id, e.channel, e.fault_type, e.injected_at_index, e.duration_samples, e.description],
+                       (evaluation_run_id, pipeline_run_id, scenario_id, dataset_split, channel, fault_type, injected_at_index, duration_samples, description)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, e.scenario_id, e.dataset_split, e.channel, e.fault_type, e.injected_at_index, e.duration_samples, e.description],
                 )
             for p in fault_predictions:
                 con.execute(
                     """INSERT OR REPLACE INTO fault_detection_predictions
-                       (evaluation_run_id, pipeline_run_id, scenario_id, channel, sample_index, true_fault_type, predicted_reason_codes, stage2_state, usable)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
-                    [evaluation_run_id, pipeline_run_id, p.scenario_id, p.channel, p.sample_index, p.true_fault_type, p.predicted_reason_codes, p.stage2_state, p.usable],
+                       (evaluation_run_id, pipeline_run_id, scenario_id, dataset_split, channel, sample_index, true_fault_type, predicted_reason_codes, stage2_state, usable)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, p.scenario_id, p.dataset_split, p.channel, p.sample_index, p.true_fault_type, p.predicted_reason_codes, p.stage2_state, p.usable],
                 )
-            fault_metrics = score_predictions(fault_predictions)
-            for m in fault_metrics:
-                con.execute(
-                    """INSERT OR REPLACE INTO fault_detection_metrics
-                       (evaluation_run_id, pipeline_run_id, reason_code, tp, fp, fn, precision, recall, f1, false_positive_rate, mean_detection_delay)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                    [evaluation_run_id, pipeline_run_id, m.reason_code, m.tp, m.fp, m.fn, m.precision, m.recall, m.f1, m.false_positive_rate, m.mean_detection_delay],
-                )
-            fault_false_rejection_rate = false_rejection_rate_for_genuine_events(fault_predictions)
-            fault_confirmation_recovery_rate = confirmation_recovery_rate(fault_predictions)
+
+            fault_metrics_by_split: dict[str, list] = {}
+            fault_event_metrics_by_split: dict[str, list] = {}
+            fault_false_rejection_rate_by_split: dict[str, float | None] = {}
+            fault_confirmation_recovery_rate_by_split: dict[str, float | None] = {}
+            for split in ("calibration", "validation"):
+                split_metrics = score_predictions(fault_predictions, dataset_split=split)
+                fault_metrics_by_split[split] = split_metrics
+                for m in split_metrics:
+                    con.execute(
+                        """INSERT OR REPLACE INTO fault_detection_metrics
+                           (evaluation_run_id, pipeline_run_id, dataset_split, reason_code, tp, fp, fn, tn,
+                            precision, recall, f1, specificity, false_positive_rate, mean_detection_delay)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        [evaluation_run_id, pipeline_run_id, split, m.reason_code, m.tp, m.fp, m.fn, m.tn,
+                         m.precision, m.recall, m.f1, m.specificity, m.false_positive_rate, m.mean_detection_delay],
+                    )
+
+                split_event_metrics = score_events(fault_events, fault_predictions, split, temporal_tolerance_samples=1)
+                fault_event_metrics_by_split[split] = split_event_metrics
+                for m in split_event_metrics:
+                    con.execute(
+                        """INSERT OR REPLACE INTO fault_detection_event_metrics
+                           (evaluation_run_id, pipeline_run_id, dataset_split, reason_code, temporal_tolerance_samples,
+                            n_true_events, n_predicted_events, tp, fp, fn, precision, recall, f1, mean_detection_delay)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        [evaluation_run_id, pipeline_run_id, split, m.reason_code, m.temporal_tolerance_samples,
+                         m.n_true_events, m.n_predicted_events, m.tp, m.fp, m.fn, m.precision, m.recall, m.f1, m.mean_detection_delay],
+                    )
+
+                for cell in build_confusion_matrix(fault_predictions, split):
+                    con.execute(
+                        """INSERT OR REPLACE INTO fault_detection_confusion_matrix
+                           (evaluation_run_id, pipeline_run_id, dataset_split, true_label, predicted_label, count)
+                           VALUES (?,?,?,?,?,?)""",
+                        [evaluation_run_id, pipeline_run_id, split, cell.true_label, cell.predicted_label, cell.count],
+                    )
+
+                fault_false_rejection_rate_by_split[split] = false_rejection_rate_for_genuine_events(fault_predictions, dataset_split=split)
+                fault_confirmation_recovery_rate_by_split[split] = confirmation_recovery_rate(fault_predictions, dataset_split=split)
+
+            # Legacy/headline aliases: the validation split is the publication-facing
+            # result (never the split any provisional parameter was tuned against).
+            fault_metrics = fault_metrics_by_split["validation"]
+            fault_false_rejection_rate = fault_false_rejection_rate_by_split["validation"]
+            fault_confirmation_recovery_rate = fault_confirmation_recovery_rate_by_split["validation"]
 
             hampel_calibration_rows = run_hampel_calibration(
                 settings.schema_mapping, sensor_specs, settings.confirmation, settings.confirmation.pm_cross_channel_tolerance_pct,
@@ -448,22 +491,48 @@ def run_evaluation(
         },
         "fault_injection": {
             "n_scenarios": len({e.scenario_id for e in fault_events}),
+            "channels_covered": sorted({e.channel for e in fault_events}),
+            "headline_dataset_split": "validation",
+            "row_level_metrics_by_split": {
+                split: [
+                    {"reason_code": m.reason_code, "tp": m.tp, "fp": m.fp, "fn": m.fn, "tn": m.tn,
+                     "precision": m.precision, "recall": m.recall, "f1": m.f1, "specificity": m.specificity,
+                     "false_positive_rate": m.false_positive_rate, "mean_detection_delay": m.mean_detection_delay}
+                    for m in metrics
+                ]
+                for split, metrics in fault_metrics_by_split.items()
+            },
+            "event_level_metrics_by_split": {
+                split: [
+                    {"reason_code": m.reason_code, "temporal_tolerance_samples": m.temporal_tolerance_samples,
+                     "n_true_events": m.n_true_events, "n_predicted_events": m.n_predicted_events,
+                     "tp": m.tp, "fp": m.fp, "fn": m.fn, "precision": m.precision, "recall": m.recall, "f1": m.f1,
+                     "mean_detection_delay": m.mean_detection_delay}
+                    for m in metrics
+                ]
+                for split, metrics in fault_event_metrics_by_split.items()
+            },
+            # Legacy/headline alias kept for existing consumers (narrative, article_summary): the
+            # validation split's row-level metrics -- never calibration, which is what any
+            # explicitly-provisional parameter (e.g. Hampel window/multiplier) was tuned against.
             "metrics_by_reason_code": [
                 {"reason_code": m.reason_code, "tp": m.tp, "fp": m.fp, "fn": m.fn, "precision": m.precision, "recall": m.recall,
                  "f1": m.f1, "false_positive_rate": m.false_positive_rate, "mean_detection_delay": m.mean_detection_delay}
                 for m in fault_metrics
             ],
+            "false_rejection_rate_for_genuine_events_by_split": fault_false_rejection_rate_by_split,
+            "confirmation_recovery_rate_by_split": fault_confirmation_recovery_rate_by_split,
             "false_rejection_rate_for_genuine_events": fault_false_rejection_rate,
             "confirmation_recovery_rate": fault_confirmation_recovery_rate,
             "hampel_calibration": {
                 "current_window_size": settings.hampel.window_size,
                 "current_mad_multiplier": settings.hampel.mad_multiplier,
                 "candidate_grid": {"window_size": HAMPEL_WINDOW_GRID, "mad_multiplier": HAMPEL_MULTIPLIER_GRID},
-                "holdout_objective_score_for_current_config": next(
-                    (c.objective_score for c in hampel_calibration_rows if c.selected and c.dataset_split == "holdout"), None
+                "validation_objective_score_for_current_config": next(
+                    (c.objective_score for c in hampel_calibration_rows if c.selected and c.dataset_split == "validation"), None
                 ),
-                "best_development_objective_score": max(
-                    (c.objective_score for c in hampel_calibration_rows if c.dataset_split == "development" and c.objective_score is not None), default=None
+                "best_calibration_objective_score": max(
+                    (c.objective_score for c in hampel_calibration_rows if c.dataset_split == "calibration" and c.objective_score is not None), default=None
                 ),
                 "note": "Current configured (window_size, mad_multiplier) is retained regardless of this grid's outcome -- "
                         "a change is only adopted after separate empirical verification against real live data, not from "

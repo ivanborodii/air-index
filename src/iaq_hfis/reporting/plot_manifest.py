@@ -154,12 +154,13 @@ PLOTS: list[PlotSpec] = [
     ),
     PlotSpec(
         id="fault_detection_metrics",
-        title="Fault-Injection Detection Performance by Reason Code",
+        title="Fault-Injection Detection Performance by Reason Code (validation split)",
         source_csv=exports.FAULT_DETECTION_METRICS,
         plot_type="bar",
         x="reason_code",
         y=["precision", "recall", "f1"],
-        description="Labeled precision/recall/F1 for each data-quality reason code, from the deterministic fault-injection benchmark (not unlabeled real data).",
+        filter_equals={"dataset_split": "validation"},
+        description="Row-level labeled precision/recall/F1 for each data-quality reason code, validation split only (disjoint from calibration -- no parameter was tuned against these numbers), from the deterministic fault-injection benchmark (not unlabeled real data).",
     ),
 ]
 

@@ -194,7 +194,10 @@ def collect_parameter_provenance(settings: Settings, sensor_specs: SensorSpecs, 
         None, "MANUSCRIPT_DEFINED", "The manuscript specifies a time-weighted mean aggregation over the rolling window; see aggregation.py.",
         source_file="src/iaq_hfis/aggregation.py", source_key_path="aggregate_channel()", pipeline_stage="aggregation",
         manuscript_reference="Materials and Methods: time-weighted aggregation")
-    add("evaluation.fault_injection_scenarios", "8 deterministic synthetic scenarios (single_spike, out_of_range, stuck_value, data_loss, gradual_drift, 2x genuine_event, pm_order_violation)",
+    add("evaluation.fault_injection_scenarios",
+        "60 deterministic synthetic scenarios across 5 channels (co2, temperature, humidity, pm10, pm2_5) x "
+        "5 reason codes (single_spike incl. one alternate magnitude, out_of_range, stuck_value, data_loss, gradual_drift) "
+        "plus genuine-event preservation checks, split 30/30 into disjoint calibration/validation sets",
         None, "AUTHOR_DEFINED", "Not derived from the manuscript; a fixed, documented synthetic benchmark separate from real-data analysis.",
         source_file="src/iaq_hfis/evaluation/fault_injection.py", pipeline_stage="evaluation_fault_injection")
     add("evaluation.hampel_calibration_grid", "window_size in {7,11,15}, mad_multiplier in {1.0,2.0,3.0}", None, "AUTHOR_DEFINED",

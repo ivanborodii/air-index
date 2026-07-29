@@ -172,9 +172,21 @@ def build_article_results_summary(summary: dict) -> str:
     lines += ["## 11. Fault-injection performance", ""]
     fi = ev.get("fault_injection") if ev else None
     if fi and fi.get("metrics_by_reason_code"):
+        split = fi.get("headline_dataset_split", "validation")
+        lines.append(f"{fi['n_scenarios']} scenarios across {', '.join(fi.get('channels_covered') or [])}; numbers below are the {split} split (disjoint from calibration -- no parameter was tuned against these numbers).")
+        lines.append("")
+        lines.append("Row-level (every affected sample counted individually):")
         for m in fi["metrics_by_reason_code"]:
-            lines.append(f"- {m['reason_code']}: precision={_num(m['precision'])}, recall={_num(m['recall'])}, F1={_num(m['f1'])}.")
+            lines.append(f"- {m['reason_code']}: precision={_num(m['precision'])}, recall={_num(m['recall'])}, F1={_num(m['f1'])}, specificity={_num(m.get('specificity'))} (tp={m['tp']}, fp={m['fp']}, fn={m['fn']}, tn={m.get('tn')}).")
+        event_metrics = (fi.get("event_level_metrics_by_split") or {}).get(split) or []
+        if event_metrics:
+            lines.append("")
+            lines.append("Event-level (each injected fault matched at most once, one-to-one):")
+            for m in event_metrics:
+                lines.append(f"- {m['reason_code']}: precision={_num(m['precision'])}, recall={_num(m['recall'])}, F1={_num(m['f1'])} ({m['n_true_events']} true / {m['n_predicted_events']} predicted event(s)).")
+        lines.append("")
         lines.append(f"- False rejection rate for genuine events: {_pct(fi.get('false_rejection_rate_for_genuine_events'))}.")
+        lines.append("- Full confusion matrix: `fault_detection_confusion_matrix.csv`.")
     else:
         lines.append("Not available.")
     lines.append("")
@@ -212,7 +224,7 @@ def build_article_results_summary(summary: dict) -> str:
     lines.append("| Boundary continuity curves | `continuity_grid.csv`, `continuity_summary.csv` |")
     lines.append("| Stability under perturbation | `stability_summary.csv`, `stability_summary_by_variable.csv`, `stability_summary_by_original_class.csv`, `stability_by_point.csv`, `stability_trials.csv` |")
     lines.append("| Sensitivity to window/coverage | `sensitivity_window_summary.csv`, `sensitivity_coverage_summary.csv` |")
-    lines.append("| Fault-detection performance | `fault_detection_metrics.csv` |")
+    lines.append("| Fault-detection performance | `fault_detection_metrics.csv`, `fault_detection_event_metrics.csv`, `fault_detection_confusion_matrix.csv` |")
     lines.append("| Parameter provenance (supplementary) | `parameter_provenance.csv` |")
     lines.append("")
 
