@@ -37,7 +37,7 @@ from iaq_hfis.baselines import crisp_max, weighted_mean
 from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings, config_hash
 from iaq_hfis.db import AirMonitorSource, DerivedResultsWriter
 from iaq_hfis.evaluation.agreement import pairwise_agreement
-from iaq_hfis.evaluation.continuity import run_continuity_experiment
+from iaq_hfis.evaluation.continuity import run_continuity_experiment, summarize_continuity_smoothness
 from iaq_hfis.evaluation.fault_injection import (
     HAMPEL_MULTIPLIER_GRID,
     HAMPEL_WINDOW_GRID,
@@ -274,26 +274,31 @@ def run_evaluation(
             sensitivity_summary_rows = compute_sensitivity_summary(con, evaluation_run_id) if sensitivity_points else []
 
             # --- Boundary continuity experiment: PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN,
-            # dense deterministic grids around every control-region boundary. ---
+            # dense deterministic grids around every control-region boundary, each swept under
+            # favorable/acceptable/degraded "other components" contexts (see
+            # iaq_hfis.evaluation.continuity module docstring and docs/hfis_vs_crispmax_audit.md
+            # for why a single favorable-only context cannot distinguish HFIS from CRISP-MAX). ---
             continuity_points, continuity_summaries = run_continuity_experiment(
-                ctx, settings.control_regions, representative_profile, settings.evaluation.continuity_grid_points
+                ctx, settings.control_regions, room_profiles, representative_profile, settings.evaluation.continuity_grid_points
             )
             for p in continuity_points:
                 con.execute(
                     """INSERT OR REPLACE INTO evaluation_continuity_grid
-                       (evaluation_run_id, pipeline_run_id, boundary_id, channel, boundary_value, grid_index, input_value, method, index_value, index_class)
-                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                    [evaluation_run_id, pipeline_run_id, p.boundary_id, p.channel, p.boundary_value, p.grid_index, p.input_value, p.method, p.index_value, p.index_class],
+                       (evaluation_run_id, pipeline_run_id, boundary_id, channel, context, boundary_value, grid_index, input_value, method, index_value, index_class)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, p.boundary_id, p.channel, p.context, p.boundary_value, p.grid_index, p.input_value, p.method, p.index_value, p.index_class],
                 )
             for s in continuity_summaries:
                 con.execute(
                     """INSERT OR REPLACE INTO evaluation_continuity_summary
-                       (evaluation_run_id, pipeline_run_id, boundary_id, channel, method, max_adjacent_jump, mean_adjacent_jump,
-                        total_variation, n_class_transitions, class_transition_positions, index_range, monotonicity_violations, masked_by_favorable)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    [evaluation_run_id, pipeline_run_id, s.boundary_id, s.channel, s.method, s.max_adjacent_jump, s.mean_adjacent_jump,
-                     s.total_variation, s.n_class_transitions, ";".join(str(v) for v in s.class_transition_positions), s.index_range,
-                     s.monotonicity_violations, s.masked_by_favorable],
+                       (evaluation_run_id, pipeline_run_id, boundary_id, channel, context, method, max_adjacent_jump, mean_adjacent_jump,
+                        median_adjacent_jump, p95_adjacent_jump, total_variation, local_lipschitz_ratio, n_class_transitions,
+                        class_transition_positions, index_range, monotonicity_violations, masked_by_favorable, area_between_curves_vs_crisp_max)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, s.boundary_id, s.channel, s.context, s.method, s.max_adjacent_jump, s.mean_adjacent_jump,
+                     s.median_adjacent_jump, s.p95_adjacent_jump, s.total_variation, s.local_lipschitz_ratio, s.n_class_transitions,
+                     ";".join(str(v) for v in s.class_transition_positions), s.index_range,
+                     s.monotonicity_violations, s.masked_by_favorable, s.area_between_curves_vs_crisp_max],
                 )
 
             # --- Fault-injection benchmark: deterministic, labeled synthetic scenarios,
@@ -408,17 +413,23 @@ def run_evaluation(
         },
         "continuity": {
             "n_boundaries": len({s.boundary_id for s in continuity_summaries}),
+            "n_contexts": len({s.context for s in continuity_summaries}),
+            "contexts": sorted({s.context for s in continuity_summaries}),
             "grid_points_per_boundary": settings.evaluation.continuity_grid_points,
             "by_boundary_method": [
                 {
-                    "boundary_id": s.boundary_id, "channel": s.channel, "method": s.method,
+                    "boundary_id": s.boundary_id, "channel": s.channel, "context": s.context, "method": s.method,
                     "max_adjacent_jump": s.max_adjacent_jump, "mean_adjacent_jump": s.mean_adjacent_jump,
-                    "total_variation": s.total_variation, "n_class_transitions": s.n_class_transitions,
+                    "median_adjacent_jump": s.median_adjacent_jump, "p95_adjacent_jump": s.p95_adjacent_jump,
+                    "total_variation": s.total_variation, "local_lipschitz_ratio": s.local_lipschitz_ratio,
+                    "n_class_transitions": s.n_class_transitions,
                     "index_range": s.index_range, "monotonicity_violations": s.monotonicity_violations,
                     "masked_by_favorable": s.masked_by_favorable,
+                    "area_between_curves_vs_crisp_max": s.area_between_curves_vs_crisp_max,
                 }
                 for s in continuity_summaries
             ],
+            "smoothness_comparison": summarize_continuity_smoothness(continuity_summaries),
         },
         "fault_injection": {
             "n_scenarios": len({e.scenario_id for e in fault_events}),

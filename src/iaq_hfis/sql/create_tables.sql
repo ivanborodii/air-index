@@ -253,30 +253,36 @@ CREATE TABLE IF NOT EXISTS evaluation_continuity_grid (
     pipeline_run_id    VARCHAR     NOT NULL,
     boundary_id        VARCHAR     NOT NULL,
     channel            VARCHAR     NOT NULL,
+    context             VARCHAR     NOT NULL,   -- favorable | acceptable | degraded (severity of the OTHER, non-swept channels)
     boundary_value     DOUBLE      NOT NULL,
     grid_index         INTEGER     NOT NULL,
     input_value        DOUBLE      NOT NULL,
     method             VARCHAR     NOT NULL,   -- PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN
     index_value        DOUBLE,
     index_class        VARCHAR,
-    PRIMARY KEY (evaluation_run_id, boundary_id, method, grid_index)
+    PRIMARY KEY (evaluation_run_id, boundary_id, context, method, grid_index)
 );
 
 CREATE TABLE IF NOT EXISTS evaluation_continuity_summary (
-    evaluation_run_id          VARCHAR NOT NULL,
-    pipeline_run_id            VARCHAR NOT NULL,
-    boundary_id                VARCHAR NOT NULL,
-    channel                    VARCHAR NOT NULL,
-    method                     VARCHAR NOT NULL,
-    max_adjacent_jump          DOUBLE,
-    mean_adjacent_jump         DOUBLE,
-    total_variation            DOUBLE,
-    n_class_transitions        INTEGER,
-    class_transition_positions VARCHAR,   -- semicolon-joined input_values
-    index_range                DOUBLE,
-    monotonicity_violations    INTEGER,
-    masked_by_favorable        BOOLEAN,
-    PRIMARY KEY (evaluation_run_id, boundary_id, method)
+    evaluation_run_id                  VARCHAR NOT NULL,
+    pipeline_run_id                    VARCHAR NOT NULL,
+    boundary_id                        VARCHAR NOT NULL,
+    channel                            VARCHAR NOT NULL,
+    context                            VARCHAR NOT NULL,   -- favorable | acceptable | degraded
+    method                             VARCHAR NOT NULL,
+    max_adjacent_jump                  DOUBLE,
+    mean_adjacent_jump                 DOUBLE,
+    median_adjacent_jump               DOUBLE,
+    p95_adjacent_jump                  DOUBLE,
+    total_variation                    DOUBLE,
+    local_lipschitz_ratio              DOUBLE,
+    n_class_transitions                INTEGER,
+    class_transition_positions         VARCHAR,   -- semicolon-joined input_values
+    index_range                        DOUBLE,
+    monotonicity_violations            INTEGER,
+    masked_by_favorable                BOOLEAN,
+    area_between_curves_vs_crisp_max   DOUBLE,    -- only populated for method = 'PROPOSED-HFIS'
+    PRIMARY KEY (evaluation_run_id, boundary_id, context, method)
 );
 
 -- Fault-injection benchmark: deterministic synthetic scenarios with known

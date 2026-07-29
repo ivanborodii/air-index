@@ -134,8 +134,9 @@ def build_run_narrative(summary: dict) -> str:
         if by_bm:
             lines.append(
                 f"Deterministic input grids ({continuity['grid_points_per_boundary']} points each) around "
-                f"{continuity['n_boundaries']} control-region boundaries, comparing PROPOSED-HFIS, CRISP-MAX, "
-                f"and WEIGHTED-MEAN numerically (see continuity_grid.csv / continuity_summary.csv)."
+                f"{continuity['n_boundaries']} control-region boundaries, each swept under {continuity.get('n_contexts', 1)} "
+                f"'other components' contexts ({', '.join(continuity.get('contexts', []))}), comparing PROPOSED-HFIS, "
+                f"CRISP-MAX, and WEIGHTED-MEAN numerically (see continuity_grid.csv / continuity_summary.csv)."
             )
             for method in ("PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"):
                 rows = [r for r in by_bm if r["method"] == method and r["max_adjacent_jump"] is not None]
@@ -143,7 +144,10 @@ def build_run_narrative(summary: dict) -> str:
                     continue
                 mean_max_jump = sum(r["max_adjacent_jump"] for r in rows) / len(rows)
                 total_transitions = sum(r["n_class_transitions"] for r in rows)
-                lines.append(f"- {method}: mean largest adjacent-point jump {_num(mean_max_jump, 2)} index points across {len(rows)} boundaries, {total_transitions} class transitions total.")
+                lines.append(f"- {method}: mean largest adjacent-point jump {_num(mean_max_jump, 2)} index points across {len(rows)} boundary/context sweeps, {total_transitions} class transitions total.")
+            smoothness = continuity.get("smoothness_comparison")
+            if smoothness:
+                lines.append(f"- Smoothness (local Lipschitz ratio, {smoothness['n_boundary_context_pairs_compared']} boundary/context pairs compared): {smoothness['conclusion']}")
         else:
             lines.append("Boundary continuity was not computed this run.")
         lines.append("")

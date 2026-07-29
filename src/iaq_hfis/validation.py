@@ -241,7 +241,7 @@ def _check_plot_manifest(report_dir: Path, csv_dir: Path, passed: list[str], vio
         if not csv_path.is_file():
             continue  # legitimately skipped this run (nothing to export) -- not a manifest defect
         cols = set(pd.read_csv(csv_path, nrows=1).columns)
-        wanted = [entry["x"]] + entry.get("y", []) + ([entry["group_by"]] if entry.get("group_by") else [])
+        wanted = [entry["x"]] + entry.get("y", []) + ([entry["group_by"]] if entry.get("group_by") else []) + list((entry.get("filter_equals") or {}).keys())
         missing = [c for c in wanted if c not in cols]
         if missing:
             bad_refs.append(f"plot '{entry['id']}' references missing column(s) {missing} in {entry['source_csv']}")

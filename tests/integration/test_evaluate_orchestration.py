@@ -184,21 +184,27 @@ def test_two_evaluation_runs_do_not_mix_rows(base_settings, sensor_specs, room_p
         con.close()
 
 
-def test_continuity_experiment_covers_every_boundary_and_method(evaluated_run, base_settings):
+def test_continuity_experiment_covers_every_boundary_and_method(evaluated_run, base_settings, room_profiles):
     _, eval_summary = evaluated_run
     continuity = eval_summary["evaluation"]["continuity"]
-    assert continuity["n_boundaries"] == 3 + 3 + 3 + 6 + 6  # pm2_5/pm10/co2 breakpoints + humidity/temperature edges
+    n_profiles = len(room_profiles.profiles)
+    assert continuity["n_boundaries"] == 3 + 3 + 3 + 6 + 6 * n_profiles  # pm2_5/pm10/co2 breakpoints + humidity edges + temperature edges PER room/season profile
+    assert continuity["n_contexts"] == 3
+    assert set(continuity["contexts"]) == {"favorable", "acceptable", "degraded"}
     rows = continuity["by_boundary_method"]
     methods_present = {r["method"] for r in rows}
     assert methods_present == {"PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"}
     assert all(r["max_adjacent_jump"] is not None for r in rows)
+    smoothness = continuity["smoothness_comparison"]
+    assert smoothness["n_boundary_context_pairs_compared"] == continuity["n_boundaries"] * continuity["n_contexts"]
+    assert smoothness["conclusion"]
 
     con = duckdb.connect(base_settings.paths.derived_db_path, read_only=True)
     try:
         evaluation_run_id = eval_summary["evaluation"]["evaluation_run_id"]
         grid_rows = con.execute("SELECT COUNT(*) FROM evaluation_continuity_grid WHERE evaluation_run_id = ?", [evaluation_run_id]).fetchone()[0]
         summary_rows = con.execute("SELECT COUNT(*) FROM evaluation_continuity_summary WHERE evaluation_run_id = ?", [evaluation_run_id]).fetchone()[0]
-        assert grid_rows == continuity["n_boundaries"] * 3 * base_settings.evaluation.continuity_grid_points
-        assert summary_rows == continuity["n_boundaries"] * 3
+        assert grid_rows == continuity["n_boundaries"] * continuity["n_contexts"] * 3 * base_settings.evaluation.continuity_grid_points
+        assert summary_rows == continuity["n_boundaries"] * continuity["n_contexts"] * 3
     finally:
         con.close()

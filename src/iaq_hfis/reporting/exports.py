@@ -229,6 +229,7 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
     CONTINUITY_GRID: [
         ColumnSpec("boundary_id", "str", "-", "Identifier for the control-region boundary under test (channel + breakpoint)."),
         ColumnSpec("channel", "str", "-", "pm2_5 | pm10 | co2 | temperature | humidity."),
+        ColumnSpec("context", "str", "-", "favorable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."),
         ColumnSpec("boundary_value", "float", "channel units", "The control-region breakpoint this grid straddles."),
         ColumnSpec("grid_index", "int", "-", "0-based position within the dense input grid."),
         ColumnSpec("input_value", "float", "channel units", "The perturbed channel's value at this grid point."),
@@ -239,15 +240,20 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
     CONTINUITY_SUMMARY: [
         ColumnSpec("boundary_id", "str", "-", "Identifier for the control-region boundary under test."),
         ColumnSpec("channel", "str", "-", "pm2_5 | pm10 | co2 | temperature | humidity."),
+        ColumnSpec("context", "str", "-", "favorable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."),
         ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
         ColumnSpec("max_adjacent_jump", "float", "index points", "Largest index-value change between adjacent grid points."),
         ColumnSpec("mean_adjacent_jump", "float", "index points", "Mean index-value change between adjacent grid points."),
+        ColumnSpec("median_adjacent_jump", "float", "index points", "Median index-value change between adjacent grid points."),
+        ColumnSpec("p95_adjacent_jump", "float", "index points", "95th percentile index-value change between adjacent grid points."),
         ColumnSpec("total_variation", "float", "index points", "Sum of absolute adjacent index-value changes across the whole grid."),
+        ColumnSpec("local_lipschitz_ratio", "float", "index points / channel unit", "max(|delta index| / |delta input|) between adjacent grid points -- the discrete-grid Lipschitz constant."),
         ColumnSpec("n_class_transitions", "int", "count", "Number of grid points where the index class changed from the previous point."),
         ColumnSpec("class_transition_positions", "str", "-", "Semicolon-joined input_values where a class transition occurred."),
         ColumnSpec("index_range", "float", "index points", "max(index_value) - min(index_value) across the grid."),
         ColumnSpec("monotonicity_violations", "int", "count", "Adjacent-point decreases for a monotonic (higher-is-worse) pollutant channel."),
         ColumnSpec("masked_by_favorable", "bool", "-", "Whether a favorable component prevented the adverse channel from dominating the aggregated result."),
+        ColumnSpec("area_between_curves_vs_crisp_max", "float", "index points x channel units", "Trapezoidal integral of |PROPOSED-HFIS - CRISP-MAX| over the swept input; only populated for method=PROPOSED-HFIS."),
     ],
     FAULT_INJECTION_EVENTS: [
         ColumnSpec("scenario_id", "str", "-", "Synthetic scenario identifier."),
@@ -523,8 +529,8 @@ def export_outdoor_context_timeseries(con: duckdb.DuckDBPyConnection, out_dir: P
 
 def export_continuity_grid(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
-        "SELECT boundary_id, channel, boundary_value, grid_index, input_value, method, index_value, index_class "
-        "FROM evaluation_continuity_grid WHERE evaluation_run_id = ? ORDER BY boundary_id, method, grid_index",
+        "SELECT boundary_id, channel, context, boundary_value, grid_index, input_value, method, index_value, index_class "
+        "FROM evaluation_continuity_grid WHERE evaluation_run_id = ? ORDER BY boundary_id, context, method, grid_index",
         [evaluation_run_id],
     ).df()
     if df.empty:
@@ -534,9 +540,10 @@ def export_continuity_grid(con: duckdb.DuckDBPyConnection, out_dir: Path, evalua
 
 def export_continuity_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
-        "SELECT boundary_id, channel, method, max_adjacent_jump, mean_adjacent_jump, total_variation, n_class_transitions, "
-        "class_transition_positions, index_range, monotonicity_violations, masked_by_favorable "
-        "FROM evaluation_continuity_summary WHERE evaluation_run_id = ? ORDER BY boundary_id, method",
+        "SELECT boundary_id, channel, context, method, max_adjacent_jump, mean_adjacent_jump, median_adjacent_jump, "
+        "p95_adjacent_jump, total_variation, local_lipschitz_ratio, n_class_transitions, "
+        "class_transition_positions, index_range, monotonicity_violations, masked_by_favorable, area_between_curves_vs_crisp_max "
+        "FROM evaluation_continuity_summary WHERE evaluation_run_id = ? ORDER BY boundary_id, context, method",
         [evaluation_run_id],
     ).df()
     if df.empty:

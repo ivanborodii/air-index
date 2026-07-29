@@ -119,7 +119,10 @@ def build_article_results_summary(summary: dict) -> str:
             rows = [r for r in continuity["by_boundary_method"] if r["method"] == method and r["max_adjacent_jump"] is not None]
             if rows:
                 mean_jump = sum(r["max_adjacent_jump"] for r in rows) / len(rows)
-                lines.append(f"- {method}: mean largest adjacent-point jump {_num(mean_jump, 2)} index points across {len(rows)} boundaries (see `continuity_summary.csv` for per-boundary detail).")
+                lines.append(f"- {method}: mean largest adjacent-point jump {_num(mean_jump, 2)} index points across {len(rows)} boundary/context sweeps (see `continuity_summary.csv` for per-boundary detail).")
+        smoothness = continuity.get("smoothness_comparison")
+        if smoothness:
+            lines.append(f"- Smoothness comparison (local Lipschitz ratio, {smoothness['n_boundary_context_pairs_compared']} boundary/context pairs): {smoothness['conclusion']}")
     else:
         lines.append("Not available.")
     lines.append("")
