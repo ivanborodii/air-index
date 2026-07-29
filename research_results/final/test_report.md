@@ -2,17 +2,17 @@
 
 **Result: OK**
 
-- Total: 326
-- Passed: 326
+- Total: 333
+- Passed: 333
 - Failed: 0
 - Errors: 0
 - Skipped: 0
-- Wall time: 1894.4s
+- Wall time: 1894.2s
 - Python version: 3.13.5
 - DuckDB version: 1.5.2
 - Platform: Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41
-- Git commit: 5f284166076b56f1d9b561626544cab87c3e5d4a
-- Generated at (UTC): 2026-07-29T21:52:58.879111+00:00
+- Git commit: dcc19c083be7dd03c58f28e940b3236344ff716f
+- Generated at (UTC): 2026-07-29T22:57:06.163531+00:00
 
 ## Command
 

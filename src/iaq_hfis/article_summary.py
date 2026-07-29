@@ -214,6 +214,12 @@ def build_article_results_summary(summary: dict) -> str:
     else:
         lines.append("None engaged this run.")
     lines.append("")
+    lines.append(
+        "See `run_narrative.md`'s dedicated **Limitations** and **Forbidden overclaims** sections for the full "
+        "discussion, including the PROPOSED-HFIS vs CRISP-MAX equivalence finding (if applicable to this run) and "
+        "what claims this run's data does and does not support."
+    )
+    lines.append("")
 
     lines += ["## 14. Recommended article tables and figures", ""]
     lines.append("| Table/figure | Source CSV |")

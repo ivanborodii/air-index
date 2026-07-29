@@ -1,4 +1,4 @@
-from iaq_hfis.reporting.narrative import CAUTIONS, WARNING_BANNER, build_run_narrative
+from iaq_hfis.reporting.narrative import CAUTIONS, FORBIDDEN_OVERCLAIMS, WARNING_BANNER, build_run_narrative
 
 MINIMAL_SUMMARY = {
     "pipeline_run_id": "abc123",
@@ -127,3 +127,78 @@ def test_agreement_never_called_accuracy():
     assert "accuracy" not in narrative.split("Scientific cautions")[0].lower() or "unlabeled agreement" in narrative.lower()
     # the agreement bullet itself must say "agreement", never "accuracy"
     assert "unlabeled agreement" in narrative
+
+
+def test_dedicated_limitations_section_present():
+    narrative = build_run_narrative(MINIMAL_SUMMARY)
+    assert "## Limitations" in narrative
+    # Limitations must appear before the closing warning banner and before Scientific cautions.
+    assert narrative.index("## Limitations") < narrative.rindex(WARNING_BANNER)
+
+
+def test_forbidden_overclaims_section_present_verbatim():
+    narrative = build_run_narrative(MINIMAL_SUMMARY)
+    assert "## Forbidden overclaims" in narrative
+    for overclaim in FORBIDDEN_OVERCLAIMS:
+        assert overclaim in narrative
+
+
+def test_hfis_crispmax_near_total_agreement_stated_explicitly():
+    """If PROPOSED-HFIS and CRISP-MAX agree on >=95% of real-data
+    timestamps, the narrative must say so explicitly and discuss what
+    HFIS's remaining value is, rather than silently omitting the finding."""
+    summary = dict(MINIMAL_SUMMARY, evaluation=FULL_EVALUATION)
+    narrative = build_run_narrative(summary)
+    assert "effectively equivalent at the classification level" in narrative
+    assert "continuous within-class severity" in narrative
+    assert "docs/hfis_vs_crispmax_audit.md" in narrative
+
+
+def test_hfis_crispmax_equivalence_note_absent_when_agreement_is_low():
+    """The equivalence claim must be data-driven -- it must NOT appear when
+    the two methods do not actually agree near-totally this run."""
+    ev = dict(FULL_EVALUATION, agreement=[{"method_a": "CRISP-MAX", "method_b": "PROPOSED-HFIS", "n": 10, "n_excluded": 0, "percent_agreement": 0.4, "cohens_kappa": 0.1}])
+    summary = dict(MINIMAL_SUMMARY, evaluation=ev)
+    narrative = build_run_narrative(summary)
+    assert "effectively equivalent at the classification level" not in narrative
+    # but the plain agreement number must still be reported
+    assert "40.0%" in narrative
+
+
+def test_continuity_full_tie_triggers_equivalence_note_even_with_low_agreement():
+    ev = dict(
+        FULL_EVALUATION,
+        agreement=[{"method_a": "CRISP-MAX", "method_b": "PROPOSED-HFIS", "n": 10, "n_excluded": 0, "percent_agreement": 0.4, "cohens_kappa": 0.1}],
+        continuity={
+            "n_boundaries": 1, "grid_points_per_boundary": 5, "by_boundary_method": [],
+            "smoothness_comparison": {"n_boundary_context_pairs_compared": 3, "hfis_smoother_count": 0, "crisp_max_smoother_count": 0, "tied_count": 3, "conclusion": "tied"},
+        },
+    )
+    summary = dict(MINIMAL_SUMMARY, evaluation=ev)
+    narrative = build_run_narrative(summary)
+    assert "numerically tied on every one of 3 boundary/context pairs" in narrative
+    assert "effectively equivalent at the classification level" in narrative
+
+
+def test_fault_injection_weak_codes_surfaced_in_limitations():
+    fi = {
+        "n_scenarios": 4, "channels_covered": ["co2"], "headline_dataset_split": "validation",
+        "metrics_by_reason_code": [
+            {"reason_code": "single_spike", "tp": 1, "fp": 50, "fn": 0, "precision": 0.02, "recall": 1.0, "f1": 0.04, "false_positive_rate": 0.1, "mean_detection_delay": 0.0},
+            {"reason_code": "data_loss", "tp": 5, "fp": 0, "fn": 0, "precision": 1.0, "recall": 1.0, "f1": 1.0, "false_positive_rate": 0.0, "mean_detection_delay": 0.0},
+        ],
+        "event_level_metrics_by_split": {}, "false_rejection_rate_for_genuine_events": 0.0, "hampel_calibration": {},
+    }
+    ev = dict(FULL_EVALUATION, fault_injection=fi)
+    summary = dict(MINIMAL_SUMMARY, evaluation=ev)
+    narrative = build_run_narrative(summary)
+    limitations_section = narrative.split("## Limitations")[1].split("## Forbidden overclaims")[0]
+    assert "single_spike" in limitations_section
+    assert "data_loss" not in limitations_section  # only the weak (F1<0.5) code belongs here
+
+
+def test_limitations_present_even_without_evaluation():
+    narrative = build_run_narrative(MINIMAL_SUMMARY)
+    limitations_section = narrative.split("## Limitations")[1].split("## Forbidden overclaims")[0]
+    assert "deterministic, bounded SAMPLES" in limitations_section
+    assert "No empirical, ground-truth-labeled accuracy claim" in limitations_section

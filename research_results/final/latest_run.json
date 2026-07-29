@@ -9,7 +9,7 @@
   "coverage_min_ratio": 0.8,
   "config_hash": "49fa03b6c0d202b58e8a533c3bd3e5febb1934234f5fbd081e99ff7a2fea31e1",
   "git_commit": "5f284166076b56f1d9b561626544cab87c3e5d4a",
-  "result_generation_timestamp_utc": "2026-07-29T21:53:19.083357+00:00",
+  "result_generation_timestamp_utc": "2026-07-29T22:57:23.264554+00:00",
   "publication_readiness": {
     "ready": true,
     "blocking_issues": [],
@@ -42,8 +42,8 @@
     ],
     "tests_executed": {
       "ok": true,
-      "total": 326,
-      "passed": 326,
+      "total": 333,
+      "passed": 333,
       "failed": 0,
       "skipped": 0
     },

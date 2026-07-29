@@ -117,6 +117,8 @@ Event-level (each injected fault matched at most once, one-to-one):
 - membership.output_transition_width
 - profile_selection.season_month_ranges
 
+See `run_narrative.md`'s dedicated **Limitations** and **Forbidden overclaims** sections for the full discussion, including the PROPOSED-HFIS vs CRISP-MAX equivalence finding (if applicable to this run) and what claims this run's data does and does not support.
+
 ## 14. Recommended article tables and figures
 
 | Table/figure | Source CSV |

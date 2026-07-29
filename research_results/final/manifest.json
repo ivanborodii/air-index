@@ -1,7 +1,7 @@
 {
   "pipeline_run_id": "a09f711d3c0c44508cd499e12028ae17",
   "evaluation_run_id": "81fadef3088d4f658fb1cb03ab44d47e",
-  "generation_timestamp_utc": "2026-07-29T21:53:19.083357+00:00",
+  "generation_timestamp_utc": "2026-07-29T22:57:23.264554+00:00",
   "git_commit": "5f284166076b56f1d9b561626544cab87c3e5d4a",
   "config_hash": "49fa03b6c0d202b58e8a533c3bd3e5febb1934234f5fbd081e99ff7a2fea31e1",
   "input_date_range_utc": [
@@ -25,8 +25,8 @@
     },
     "weather_db_path": {
       "path": "air-monitor/data/weather.duckdb",
-      "sha256": "de4ab8a4d04d2a6baab1035d93f8f438a0fd4048a00cbe802d1e718f3c5d6b43",
-      "size_bytes": 536576
+      "sha256": "a24873c208e0e94abe18685ee1841e787aaf8594692b905b65a4bcee86d0b5d8",
+      "size_bytes": 798720
     },
     "derived_db_path": {
       "path": "data/iaq_hfis/iaq_hfis.duckdb",
@@ -37,7 +37,7 @@
   "artifact_checksums_sha256": {
     "README.md": "4a7b55042810d11db3005cc83ba80aea5099a8b453f7797bf9013a7bdcf2e052",
     "article_metrics.json": "cd0441d7cde94994cedf47d35dca44fc1f6104b35ed5fe721973afac8c51d652",
-    "article_results_summary.md": "fa48c40edd2994278140d0440e04447a08d90a4f40c0b04478b44374d10f7a55",
+    "article_results_summary.md": "5713e27509859086803ff98eb51cf55a8536ace4a25925cea2a4594ed44a2a9b",
     "artifact_validation.json": "39791154a6f1e785e1480d570c906e8099dfe27fb95bcc60b87f95f913a16260",
     "artifact_validation.md": "25f612688b948f75c4f02e3fc391d4e31b2098b18c18616c9be030f86358061f",
     "artifact_validation_report.txt": "dea24df2393d68a4d9dee091104278a199cf7c96b2b55e5b8f2cd1a48cea2ec8",
@@ -70,7 +70,7 @@
     "exports/stability_summary_by_original_class.csv": "5300221fe366f141e8d3ad50ec4f14e5bdbb5ab41e3b90ee82ee9afb0de383ad",
     "exports/stability_summary_by_variable.csv": "996b9160e752dddc6b286d6de7cf791e263bf8e2e487ff52fb17517a41cf3d85",
     "exports/stability_trials.csv": "a002580d2b24e1790a8727fc6046f7103fbc1cad6a82c6c0a87cbbc2db7abeae",
-    "latest_run.json": "6dc8a463cef9cb6e0f0d3e5e22d24a479a840a16e96223a50760ddf633541a9e",
+    "latest_run.json": "87a559c46757e086a2e3b516426923d8b866416f8bb0075c7bbbaf14d78f6474",
     "output_data_dictionary.csv": "b2438b91674f625cc71e7efa1e15e6dd9925e0095f78813f239211ddf1cb51e6",
     "parameter_provenance.csv": "40053c174cbe0d191d4db3482c688da0f622da37bad90ae561e86e0e0de344a1",
     "plot_manifest.json": "750fd7b9b7494277f64cff27a489a0ee3aaa144ae8f705827be27be844870ad1",
@@ -89,11 +89,11 @@
     "plots/stability_summary.png": "2caf7e9bb876ecfadeeca065cabf54b821ddfee199340f2bf7e0c88be12a5c1e",
     "plots/stability_trials.png": "62f10808859f2a9d03403f800e08f1a1751fc530f3a4fffacfd7c731a520bba8",
     "provisional_parameter_assessment.md": "24ecaa12d39c7a0a612592daa3b60cc5657792c969c22a229561a632606f77d1",
-    "run_narrative.md": "373452e9cbc2a002321434a741d57002facff56a068720d9866d5a24c320d2e3",
-    "run_summary.json": "eca70bb59995eb9c03fda2140911ba9c2dbd4a46c0f48c713f25f62859c0e4a9",
+    "run_narrative.md": "dacb8504a50b8c38c7e6621a36eff79032b07f97458b3d1ae3336acbe319ba5d",
+    "run_summary.json": "1060900c02c6b2775ad6af3eae9c4025c2a0bf9c451b5fa71d33e04a6f6e72c2",
     "run_summary.md": "9b7bb589a0708a77d39c64ebb69b2431c1012385c086a228566815e2b650b862",
-    "run_summary_a09f711d3c0c44508cd499e12028ae17.json": "eca70bb59995eb9c03fda2140911ba9c2dbd4a46c0f48c713f25f62859c0e4a9",
-    "test_report.json": "9adf174b8b2f5c3b4d06c7081246cfd8a5531877df1474ed6aea220b28b110a2",
-    "test_report.md": "7300f907bee43fbeb65d772fea5e4d0982b9b880e6513db8dc7f1d7fcc360335"
+    "run_summary_a09f711d3c0c44508cd499e12028ae17.json": "1060900c02c6b2775ad6af3eae9c4025c2a0bf9c451b5fa71d33e04a6f6e72c2",
+    "test_report.json": "c7833c32ea24e173f87487d659361fe49babfd988bff1e206b7b283081da45ac",
+    "test_report.md": "3dd9290a83da637a9adbe1fb0cda824ac323f9c6f6fb6451d1aaf3a1c322b85a"
   }
 }

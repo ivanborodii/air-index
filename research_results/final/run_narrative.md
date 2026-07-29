@@ -51,6 +51,30 @@ Deterministic, pre-labeled synthetic scenarios (60 across co2, humidity, pm10, p
 - Genuine sustained events falsely rejected: 0.0%.
 - Hampel calibration grid (window_size x mad_multiplier) evaluated on calibration and validation scenario splits; current configuration (window_size=11, mad_multiplier=1.0) is retained regardless of this synthetic grid's outcome -- see hampel_calibration.csv and 'Provisional parameters engaged' above.
 
+## Limitations
+
+PROPOSED-HFIS and CRISP-MAX agreed on 100.0% of compared timestamps this run (Cohen's kappa=1.000, real unlabeled data -- agreement, not accuracy).
+The boundary continuity experiment additionally found the two methods numerically tied on every one of 99 boundary/context pairs tested this run (see 'Boundary continuity' above and docs/hfis_vs_crispmax_audit.md) -- an intrinsic property of the single-channel-perturbation experimental design (see that section's own note), not independent evidence of general equivalence.
+**PROPOSED-HFIS and CRISP-MAX are effectively equivalent at the classification level on this run's measurements.** Stated explicitly, not minimized: where the two methods coincide numerically, PROPOSED-HFIS's remaining value is structural, not demonstrated as an empirical advantage by this run's results alone -- (a) continuous within-class severity via centroid defuzzification and the explicit per-component membership degrees (component_scores_timeseries.csv's membership_* columns), which CRISP-MAX's raw max() never computes; (b) graded uncertainty representation -- simultaneous partial membership in more than one class per component, with no equivalent in a hard maximum; (c) extensibility -- a two-level rule base can express component-interaction logic (e.g. rules conditioned on two components being simultaneously non-favorable) that a scalar max() cannot express by construction, though the worst-of rule base actually configured here has not been extended to exercise that capability. An independent synthetic check (docs/hfis_vs_crispmax_audit.md section 2) shows the two methods DO diverge substantially (mean |difference| ~5.7 index points on a 0-100 scale) once more than one component is simultaneously close to its most severe class -- a condition this dataset rarely presents (see 'Dominant-component frequency' above: one component typically dominates).
+
+- 16 provisional parameter(s) were engaged this run -- see 'Provisional parameters engaged' above and the generated provisional_parameter_assessment.md for what each one's status actually implies (whether calibrated, against what dataset, whether conclusions depend strongly on it).
+- The boundary continuity experiment and the fault-injection benchmark are both deterministic, synthetic constructions -- they show the inference method and the data-quality detection layer behave as designed on known, controlled inputs; they do not measure performance across the full range of conditions the actual live sensor deployment may encounter.
+- Fault-injection precision is weak for single_spike, stuck_value on this run's validation split (F1 below 0.5) -- disclosed here, not excluded from the summary above.
+- Multi-point stability and sensitivity are deterministic, bounded SAMPLES of the evaluated range (boundary-adjacent + random-comparison for stability; stratified for sensitivity), not exhaustive coverage of every computed_ts.
+- No empirical, ground-truth-labeled accuracy claim exists or is possible for this deployment -- every consistency/agreement/precision figure above is against either unlabeled real data or a synthetic, pre-labeled construction (see 'Forbidden overclaims' below).
+
+## Forbidden overclaims
+
+This narrative, and any prose built from it, must never do the following:
+
+- Do not report agreement (real, unlabeled data) or stability (self-consistency under perturbation) as accuracy.
+- Do not report reference-case or fault-injection consistency/precision/recall against synthetic, pre-labeled data as real-world empirical accuracy.
+- Do not claim a PROVISIONAL parameter is validated because a synthetic benchmark's calibration grid favored its configured value -- that result is scoped to the benchmark, never universal.
+- Do not claim PROPOSED-HFIS is smoother than CRISP-MAX, or vice versa, without checking this run's own continuity smoothness_comparison -- the single-channel-perturbation design can force the two methods to coincide regardless of context (see docs/hfis_vs_crispmax_audit.md).
+- Do not describe a FAILED or PARTIAL-completeness computed_ts's absent index value as low or zero -- it is undefined, not low.
+- Do not use outdoor CO as a proxy for indoor CO2, or WHO 24-hour PM reference points as a compliance assessment for a 15-minute index.
+- Do not present sampled multi-point stability/sensitivity results as exhaustive coverage of every computed_ts.
+
 ## Scientific cautions
 
 - Outdoor carbon monoxide (CO) is a distinct pollutant from indoor CO2 and is never used as a CO2 substitute.
