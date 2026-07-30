@@ -1,6 +1,6 @@
 # iaq_hfis generated run artifacts -- never source, always reproducible from config + raw data.
 # research_results/final/ is the ONE deliberate exception: a tracked, static publication
-# snapshot built by `iaq_hfis finalize` (see docs/result_reproducibility.md). It lives
+# snapshot built by `iaq_hfis finalize` (see docs/reproducibility.md). It lives
 # outside data/iaq_hfis/ specifically so this rule never accidentally ignores it.
 data/iaq_hfis/
 

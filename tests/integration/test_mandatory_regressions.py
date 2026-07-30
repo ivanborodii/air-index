@@ -1,3 +1,4 @@
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -101,7 +102,7 @@ def test_failed_results_have_null_index_class_and_no_dominant_component(full_run
     try:
         bad = con.execute(
             "SELECT COUNT(*) FROM iaq_index_results WHERE pipeline_run_id = ? AND completeness_status = 'FAILED' "
-            "AND (index_value IS NOT NULL OR index_class IS NOT NULL OR len(dominant_component) > 0)",
+            "AND (index_value IS NOT NULL OR index_class IS NOT NULL OR dominant_component IS NOT NULL OR len(co_dominant_components) > 0)",
             [pipeline_run_id],
         ).fetchone()[0]
         assert bad == 0
@@ -156,3 +157,200 @@ def test_final_snapshot_contains_no_forbidden_files(full_run, tmp_path):
         assert f.name not in forbidden_names, f"forbidden file found in snapshot: {f}"
     assert (Path(result["final_dir"]) / "latest_run.json").is_file()
     assert (Path(result["final_dir"]) / "README.md").is_file()
+
+
+def test_final_snapshot_manifest_has_identity_and_correct_checksums(full_run, tmp_path):
+    """Mandatory regression test: manifest.json must record the run's full
+    identity chain (run IDs, git commit, config hash, DB checksums, input
+    date range, row counts) and its per-artifact checksums must actually
+    match the files on disk -- a tampered or stale snapshot must be
+    mechanically detectable, not just trusted by convention."""
+    settings, pipeline_run_id = full_run
+    result = build_final_snapshot(settings, pipeline_run_id, final_dir=tmp_path / "final")
+    final_dir = Path(result["final_dir"])
+
+    manifest_path = final_dir / "manifest.json"
+    assert manifest_path.is_file()
+    manifest = json.loads(manifest_path.read_text())
+
+    assert manifest["pipeline_run_id"] == pipeline_run_id
+    assert manifest["evaluation_run_id"]
+    assert manifest["git_commit"] is None or isinstance(manifest["git_commit"], str)
+    assert manifest["config_hash"]
+    assert manifest["input_date_range_utc"]
+    assert manifest["row_counts"]["source_raw_row_count"] is not None
+    assert manifest["row_counts"]["derived_row_counts"]
+
+    derived_db = manifest["databases"]["derived_db_path"]
+    assert derived_db["sha256"] == hashlib.sha256(Path(settings.paths.derived_db_path).read_bytes()).hexdigest()
+
+    # manifest.json is written after checksums are computed, so it never lists itself.
+    assert "manifest.json" not in manifest["artifact_checksums_sha256"]
+    checked = 0
+    for rel_path, expected_sha in manifest["artifact_checksums_sha256"].items():
+        actual = hashlib.sha256((final_dir / rel_path).read_bytes()).hexdigest()
+        assert actual == expected_sha, f"checksum mismatch for {rel_path}"
+        checked += 1
+    assert checked > 5
+    # Every file physically present in the snapshot (besides manifest.json itself) is checksummed -- no silent gaps.
+    all_files = {str(f.relative_to(final_dir)) for f in final_dir.rglob("*") if f.is_file()}
+    assert all_files - {"manifest.json"} == set(manifest["artifact_checksums_sha256"].keys())
+
+
+def _report_dir_for(settings, pipeline_run_id) -> Path:
+    return Path(settings.paths.run_summary_dir).parent / "reports" / pipeline_run_id
+
+
+def test_validate_artifacts_catches_continuity_grid_corruption(full_run):
+    """Mandatory regression test: a tampered continuity_grid.csv (an
+    index_value edited so continuity_summary.csv's max_adjacent_jump no
+    longer recomputes from it) must be caught, not silently trusted."""
+    settings, pipeline_run_id = full_run
+    csv_path = _report_dir_for(settings, pipeline_run_id) / "exports" / "continuity_grid.csv"
+    df_text = csv_path.read_text()
+    lines = df_text.splitlines()
+    header = lines[0].split(",")
+    index_value_col = header.index("index_value")
+    # Corrupt the last data row's index_value to an implausibly large number.
+    parts = lines[-1].split(",")
+    parts[index_value_col] = "999999.0"
+    lines[-1] = ",".join(parts)
+    csv_path.write_text("\n".join(lines) + "\n")
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("continuity_summary.csv disagrees with continuity_grid.csv" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_fault_event_metrics_corruption(full_run):
+    """Mandatory regression test: fault_detection_event_metrics.csv's
+    n_true_events must match the actual count in fault_injection_events.csv
+    -- a tampered count must be caught."""
+    settings, pipeline_run_id = full_run
+    csv_path = _report_dir_for(settings, pipeline_run_id) / "exports" / "fault_detection_event_metrics.csv"
+    df_text = csv_path.read_text()
+    lines = df_text.splitlines()
+    header = lines[0].split(",")
+    n_true_col = header.index("n_true_events")
+    parts = lines[1].split(",")
+    parts[n_true_col] = str(int(parts[n_true_col]) + 100)
+    lines[1] = ",".join(parts)
+    csv_path.write_text("\n".join(lines) + "\n")
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("n_true_events" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_confusion_matrix_diagonal_mismatch(full_run):
+    """Mandatory regression test: the confusion matrix's diagonal cell for
+    a reason code must equal that reason code's row-level TP count."""
+    settings, pipeline_run_id = full_run
+    csv_path = _report_dir_for(settings, pipeline_run_id) / "exports" / "fault_detection_confusion_matrix.csv"
+    df_text = csv_path.read_text()
+    lines = df_text.splitlines()
+    header = lines[0].split(",")
+    count_col = header.index("count")
+    true_col = header.index("true_label")
+    pred_col = header.index("predicted_label")
+    # Find a diagonal row (true_label == predicted_label) and corrupt its count.
+    corrupted = False
+    for i in range(1, len(lines)):
+        parts = lines[i].split(",")
+        if parts[true_col] == parts[pred_col] and not corrupted:
+            parts[count_col] = str(int(parts[count_col]) + 1000)
+            lines[i] = ",".join(parts)
+            corrupted = True
+    assert corrupted, "expected at least one diagonal confusion-matrix cell"
+    csv_path.write_text("\n".join(lines) + "\n")
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("confusion matrix diagonal" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_config_hash_mismatch_between_run_and_evaluate(full_run):
+    """Mandatory regression test: if evaluate's persisted config_hash for
+    the selected evaluation_run_id disagrees with the pipeline's own
+    config_hash, that must be caught -- it means evaluate ran against a
+    different config than the pipeline run it's attached to."""
+    settings, pipeline_run_id = full_run
+    con = duckdb.connect(settings.paths.derived_db_path)
+    try:
+        con.execute("UPDATE evaluation_runs SET config_hash = 'deliberately-wrong-hash' WHERE pipeline_run_id = ?", [pipeline_run_id])
+    finally:
+        con.close()
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("evaluation_runs.config_hash" in v for v in report.violations)
+
+
+def test_validate_artifacts_catches_stability_by_variable_total_mismatch(full_run):
+    """Mandatory regression test: stability's by_variable breakdown must
+    sum to the same overall n_trials_total as by_method -- a tampered
+    run_summary.json where they disagree must be caught."""
+    settings, pipeline_run_id = full_run
+    summary_path = Path(settings.paths.run_summary_dir) / f"run_summary_{pipeline_run_id}.json"
+    summary = json.loads(summary_path.read_text())
+    by_variable = summary["evaluation"]["stability"]["by_variable"]
+    assert by_variable, "expected at least one by_variable row"
+    by_variable[0]["n_trials_total"] += 1000
+    summary_path.write_text(json.dumps(summary))
+
+    report = validate_artifacts(settings, pipeline_run_id)
+    assert not report.ok
+    assert any("by_variable rows for" in v for v in report.violations)
+
+
+def test_validate_artifacts_writes_json_and_md_reports(full_run, tmp_path):
+    from iaq_hfis.validation import write_artifact_validation_report
+
+    settings, pipeline_run_id = full_run
+    report = validate_artifacts(settings, pipeline_run_id)
+    json_path, md_path = write_artifact_validation_report(report, tmp_path)
+    assert json_path.is_file()
+    assert md_path.is_file()
+
+    parsed = json.loads(json_path.read_text())
+    assert parsed["ok"] == report.ok
+    assert parsed["n_checks_passed"] == len(report.checks_passed)
+    assert parsed["n_violations"] == len(report.violations)
+
+    md_text = md_path.read_text()
+    assert "Artifact Validation Report" in md_text
+    assert pipeline_run_id in md_text
+
+
+def test_final_snapshot_embeds_test_report_when_given(full_run, tmp_path):
+    """Mandatory regression test: build_final_snapshot must write
+    test_report.json/.md into the snapshot when a test_report_summary is
+    given, and fold its pass/fail counts into publication_readiness --
+    per the "do not proceed to publishing if any required test fails"
+    requirement, the snapshot must carry visible evidence of whether tests
+    passed."""
+    settings, pipeline_run_id = full_run
+    fake_test_report = {
+        "total": 42, "passed": 42, "failed": 0, "errors": 0, "skipped": 0,
+        "wall_seconds": 12.3, "exit_code": 0, "ok": True,
+        "environment": {"python_version": "3.13.5", "duckdb_version": "1.5.2", "platform": "Linux-test", "git_commit": "deadbeef"},
+        "generated_at_utc": "2026-07-29T00:00:00+00:00",
+        "command": "pytest tests/ -q",
+        "stdout_tail": "42 passed in 12.3s",
+    }
+    result = build_final_snapshot(settings, pipeline_run_id, test_report_summary=fake_test_report, final_dir=tmp_path / "final")
+    final_dir = Path(result["final_dir"])
+
+    assert (final_dir / "test_report.json").is_file()
+    assert (final_dir / "test_report.md").is_file()
+    parsed = json.loads((final_dir / "test_report.json").read_text())
+    assert parsed["total"] == 42
+    assert parsed["ok"] is True
+
+    summary_path = final_dir / "run_summary.json"
+    summary = json.loads(summary_path.read_text())
+    tests_executed = summary["publication_readiness"]["tests_executed"]
+    assert tests_executed["ok"] is True
+    assert tests_executed["total"] == 42
+    assert tests_executed["passed"] == 42
+    assert tests_executed["failed"] == 0

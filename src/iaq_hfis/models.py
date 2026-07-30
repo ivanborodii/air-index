@@ -69,24 +69,56 @@ class ComponentInferenceResult:
     fired_rules: list[FiredRule] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class DominanceResult:
+    """The manuscript's dominant adverse component, determined by a
+    deterministic priority hierarchy over the fired 2nd-level rules (see
+    :func:`iaq_hfis.fuzzy_engine.determine_dominance` for the full
+    algorithm): (1) the max-firing 2nd-level rule(s), within a tiny
+    floating-point tolerance; (2) among those, the most severe consequent
+    class; (3) the antecedent component(s) that caused it (bound the rule's
+    own min()); (4) among those, the highest-severity antecedent class
+    actually attained; (5) tie-break by larger normalized crisp score,
+    using the configured ``membership.dominant_component_tie_tolerance``.
+
+    ``dominant_component`` is the single, deterministically-chosen primary
+    component (first alphabetically among any final tie).
+    ``co_dominant_components`` is every component tied for dominance at the
+    end of the hierarchy (length 1 unless a genuine, documented tie
+    survived every step, including ``dominant_component`` itself).
+    ``worst_component_class`` is the highest-severity class reached by ANY
+    available component's own dominant class -- independent of the
+    tie-breaking mechanics above, a plain summary of "how bad did any one
+    component get".
+    ``largest_component_score`` is simply max(component_crisp_scores) among
+    available components.
+    ``dominance_reason`` documents which step of the hierarchy actually
+    resolved the choice (or that no rule fired at all).
+    """
+
+    dominant_component: str | None
+    co_dominant_components: list[str]
+    worst_component_class: str | None
+    largest_component_score: float | None
+    dominance_reason: str
+
+
 @dataclass
 class IndexInferenceResult:
     """Output of the second-level (index) Mamdani inference.
 
-    ``dominant_components`` is the manuscript's dominant adverse
-    component(s): the available component(s) with the highest adverse crisp
-    score, ties preserved only within a configurable tolerance (see
-    :func:`iaq_hfis.fuzzy_engine.dominant_adverse_component`).
-    ``rule_level_contributors`` is a separate diagnostic: which
-    component(s) "bound" the min() in the fired Mamdani rules -- useful for
-    debugging rule activation, but NOT the manuscript's dominant adverse
-    component and must never be confused with it.
+    ``dominance`` is the manuscript's dominant adverse component, see
+    :class:`DominanceResult`. ``rule_level_contributors`` is a SEPARATE,
+    older diagnostic: which component(s) "bound" the min() across every
+    fired rule regardless of firing strength or consequent severity --
+    useful for debugging overall rule activation, but NOT the manuscript's
+    dominant adverse component and must never be confused with it.
     """
 
     output_class_degrees: dict[str, float]
     index_value: float | None
     index_class: str | None
-    dominant_components: list[str]
+    dominance: DominanceResult
     rule_level_contributors: list[str] = field(default_factory=list)
     fired_rules: list[FiredRule] = field(default_factory=list)
 

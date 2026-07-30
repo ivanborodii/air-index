@@ -25,6 +25,7 @@ class PlotSpec:
     y: list[str] = field(default_factory=list)
     group_by: str | None = None
     description: str = ""
+    filter_equals: dict[str, str] | None = None  # e.g. {"context": "favorable"} -- restrict to one slice before plotting
 
 
 PLOTS: list[PlotSpec] = [
@@ -131,32 +132,35 @@ PLOTS: list[PlotSpec] = [
     ),
     PlotSpec(
         id="continuity_curves",
-        title="HFIS vs CRISP-MAX: Index Value Across a Boundary Grid",
+        title="HFIS vs CRISP-MAX: Index Value Across a Boundary Grid (favorable context)",
         source_csv=exports.CONTINUITY_GRID,
         plot_type="line",
         x="input_value",
         y=["index_value"],
         group_by="method",
-        description="Index value across a dense input grid straddling one control-region boundary, one line per method; render one figure per boundary_id.",
+        filter_equals={"context": "favorable"},
+        description="Index value across a dense input grid straddling one control-region boundary, one line per method, restricted to the favorable other-components context for readability (see continuity_grid.csv for the acceptable/degraded contexts too); render one figure per boundary_id.",
     ),
     PlotSpec(
         id="continuity_summary",
-        title="Boundary Continuity: Maximum Adjacent Jump by Method",
+        title="Boundary Continuity: Maximum Adjacent Jump by Method (favorable context)",
         source_csv=exports.CONTINUITY_SUMMARY,
         plot_type="bar",
         x="boundary_id",
         y=["max_adjacent_jump"],
         group_by="method",
-        description="Largest single-step index change across each boundary's grid, grouped by method -- smaller is smoother.",
+        filter_equals={"context": "favorable"},
+        description="Largest single-step index change across each boundary's grid, grouped by method, restricted to the favorable other-components context for readability -- smaller is smoother.",
     ),
     PlotSpec(
         id="fault_detection_metrics",
-        title="Fault-Injection Detection Performance by Reason Code",
+        title="Fault-Injection Detection Performance by Reason Code (validation split)",
         source_csv=exports.FAULT_DETECTION_METRICS,
         plot_type="bar",
         x="reason_code",
         y=["precision", "recall", "f1"],
-        description="Labeled precision/recall/F1 for each data-quality reason code, from the deterministic fault-injection benchmark (not unlabeled real data).",
+        filter_equals={"dataset_split": "validation"},
+        description="Row-level labeled precision/recall/F1 for each data-quality reason code, validation split only (disjoint from calibration -- no parameter was tuned against these numbers), from the deterministic fault-injection benchmark (not unlabeled real data).",
     ),
 ]
 
@@ -173,6 +177,9 @@ def validate_plots(plots: list[PlotSpec]) -> None:
                 raise ValueError(f"plot '{p.id}': y column '{y}' not found in {p.source_csv}")
         if p.group_by is not None and p.group_by not in valid_columns:
             raise ValueError(f"plot '{p.id}': group_by column '{p.group_by}' not found in {p.source_csv}")
+        for col in (p.filter_equals or {}):
+            if col not in valid_columns:
+                raise ValueError(f"plot '{p.id}': filter_equals column '{col}' not found in {p.source_csv}")
 
 
 def build_plot_manifest() -> list[dict]:

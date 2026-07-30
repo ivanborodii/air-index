@@ -106,32 +106,45 @@ def test_two_missing_components_gives_failed(run_and_inspect):
 
 
 def test_default_config_works_in_both_seasons(run_and_inspect):
+    # provisional_parameters_used is now the single authoritative catalog
+    # (iaq_hfis.provenance.engaged_provisional_paths), which always includes
+    # every config-level PROVISIONAL parameter (e.g. Hampel filter settings)
+    # regardless of season -- those apply to every computed_ts by
+    # construction. Neither kitchen/cold_period nor kitchen/warm_period is
+    # itself a provisional room profile in the current config, so no
+    # room_profiles.* path should appear.
     winter_ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
     summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
 
     winter_summary, winter_row = run_and_inspect(_clean_rows(computed_ts=winter_ts), computed_ts=winter_ts)
     assert winter_row[0] == "OK"
-    assert winter_summary["provisional_parameters_used"] == []  # kitchen/cold_period is the real manuscript/DBN profile
+    assert winter_summary["provisional_parameters_used"]  # config-level PROVISIONAL params are always engaged
+    assert not any(p.startswith("room_profiles.") for p in winter_summary["provisional_parameters_used"])
 
     summer_summary, summer_row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
     assert summer_row[0] == "OK"
     # Author decision (2026-07-24): kitchen/warm_period deliberately reuses
     # general_residential/warm_period's numbers, not a placeholder -- so no
-    # provisional-profile flag is expected here anymore either.
-    assert summer_summary["provisional_parameters_used"] == []
+    # room_profiles.* provisional entry is expected here either.
+    assert not any(p.startswith("room_profiles.") for p in summer_summary["provisional_parameters_used"])
+    assert set(winter_summary["provisional_parameters_used"]) == set(summer_summary["provisional_parameters_used"])
 
 
 def test_provisional_room_profile_usage_is_tracked_in_run_summary(run_and_inspect, room_profiles):
     # Exercises the tracking mechanism itself (pipeline.py:
-    # RuntimeContext.provisional_profiles_used) independent of which real
-    # profiles happen to be provisional today.
+    # RuntimeContext.provisional_profiles_used, surfaced through
+    # provenance.engaged_provisional_paths) independent of which real
+    # profiles happen to be provisional today. The engaged entry is reported
+    # by its actual provenance path (room_profiles.<room>/<season>.transition_width),
+    # not the raw internal event string -- that path is what parameter_provenance.csv
+    # and every other artifact key off of.
     summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
     profile = room_profiles.find("kitchen", "warm_period")
     profile.provisional = True
 
     summary, row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
     assert row[0] == "OK"
-    assert "room_profile:kitchen/warm_period" in summary["provisional_parameters_used"]
+    assert "room_profiles.kitchen/warm_period.transition_width" in summary["provisional_parameters_used"]
 
 
 def test_run_summary_json_validates_against_schema(run_and_inspect):

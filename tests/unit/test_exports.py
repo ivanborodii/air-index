@@ -22,8 +22,8 @@ def writer(base_settings):
 
 def _insert_index_result(con, computed_ts, window_minutes=15, status="OK", index_value=42.5, index_class="Acceptable", pipeline_run_id=PIPELINE_RUN_ID):
     con.execute(
-        "INSERT INTO iaq_index_results (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs, index_value, index_class, dominant_component, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        [pipeline_run_id, computed_ts, window_minutes, status, [], [], index_value, index_class, ["A"], ["A"], 5, "0.1.0", "hash", NOW],
+        "INSERT INTO iaq_index_results (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs, index_value, index_class, dominant_component, co_dominant_components, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [pipeline_run_id, computed_ts, window_minutes, status, [], [], index_value, index_class, "A", ["A"], ["A"], 5, "0.1.0", "hash", NOW],
     )
 
 
@@ -35,18 +35,19 @@ def test_export_index_timeseries_has_correct_columns_and_data(writer, tmp_path):
     assert list(df.columns) == [c.name for c in exports.COLUMNS[exports.INDEX_TIMESERIES]]
     assert len(df) == 1
     assert df.iloc[0]["index_value"] == 42.5
-    assert df.iloc[0]["dominant_component"] == "A"  # list joined with ';' (single element here)
+    assert df.iloc[0]["dominant_component"] == "A"
+    assert df.iloc[0]["co_dominant_components"] == "A"  # list joined with ';' (single element here)
 
 
-def test_export_index_timeseries_joins_multi_element_lists(writer, tmp_path):
+def test_export_index_timeseries_joins_multi_element_co_dominant_list(writer, tmp_path):
     con = writer.connection
     con.execute(
-        "INSERT INTO iaq_index_results (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs, index_value, index_class, dominant_component, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        [PIPELINE_RUN_ID, NOW, 15, "OK", [], [], 50.0, "Degraded", ["A", "V"], ["A", "V"], 3, "0.1.0", "hash", NOW],
+        "INSERT INTO iaq_index_results (pipeline_run_id, computed_ts, window_minutes, completeness_status, missing_components, missing_inputs, index_value, index_class, dominant_component, co_dominant_components, rule_level_contributors, n_rules_fired, engine_version, config_hash, computed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [PIPELINE_RUN_ID, NOW, 15, "OK", [], [], 50.0, "Degraded", "A", ["A", "V"], ["A", "V"], 3, "0.1.0", "hash", NOW],
     )
     path = exports.export_index_timeseries(con, tmp_path, PIPELINE_RUN_ID, window_minutes=15, from_ts=RANGE_FROM, to_ts=RANGE_TO)
     df = pd.read_csv(path)
-    assert df.iloc[0]["dominant_component"] == "A;V"
+    assert df.iloc[0]["co_dominant_components"] == "A;V"
 
 
 def test_export_index_timeseries_scoped_to_pipeline_run_id(writer, tmp_path):

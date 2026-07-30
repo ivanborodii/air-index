@@ -58,9 +58,11 @@ sampling, SHA-256-derived per-sample seeds -- never Python's randomized
 
 The derived database (`data/iaq_hfis/iaq_hfis.duckdb`) is entirely
 reproducible from raw source data + config -- it is never itself a source
-of truth. If it predates the run-isolated schema (schema_version 2) or its
-version otherwise mismatches the code, `DerivedResultsWriter` raises
-`LegacySchemaError` rather than silently reinterpreting old rows:
+of truth. `iaq_hfis.db.SCHEMA_VERSION` (currently 5; see that module's
+docstring for the full version history) is stamped into the database on
+creation; if an existing file predates it, or its version otherwise
+mismatches the code, `DerivedResultsWriter` raises `LegacySchemaError`
+rather than silently reinterpreting old rows under a newer column layout:
 
 ```bash
 python -m iaq_hfis.cli rebuild-db --confirm
@@ -69,15 +71,32 @@ python -m iaq_hfis.cli rebuild-db --confirm
 This only deletes `paths.derived_db_path` (+ its `.wal`) and recreates it
 empty with the current schema. It never touches `air_monitor.duckdb` or
 `weather.duckdb` (both opened strictly read-only, via the snapshot
-mechanism in `src/iaq_hfis/db.py`).
+mechanism in `src/iaq_hfis/db.py`). See `docs/database_schema.md` for the
+full table-by-table schema.
 
 ## What "final" means
 
 `research_results/final/` is a **tracked, static snapshot** of one
 validated `(pipeline_run_id, evaluation_run_id)` pair's output -- not a
 live/regenerable directory. It is replaced atomically by the final-run
-procedure (see its own `README.md`) and includes `latest_run.json`
-(identity chain + config hashes + git commit + timestamp + publication
-readiness) plus a full copy of the report artifacts and the
-`validate-artifacts` result at the time of publication. If you change
-config or code, the snapshot goes stale -- regenerate it, don't hand-edit it.
+procedure (see its own `README.md`) and includes:
+
+- `latest_run.json` -- identity chain (run IDs, config hashes, git commit,
+  timestamp, publication readiness).
+- `manifest.json` -- the full integrity record: run IDs, git commit,
+  config hash, input date range, raw/derived row counts, a SHA-256
+  checksum for every source database, and a SHA-256 checksum for every
+  file physically present in the snapshot (so a stale or tampered snapshot
+  is mechanically detectable, not just trusted by convention -- see
+  `src/iaq_hfis/final_snapshot.py:_build_manifest`).
+- `artifact_validation.json` / `.md` / `.txt` -- the `validate-artifacts`
+  result at the time of publication, in three equivalent formats.
+- A full copy of every report artifact (`run_summary.md`,
+  `run_narrative.md`, `article_results_summary.md`,
+  `provisional_parameter_assessment.md`, every exported CSV, plots,
+  `plot_manifest.json`, `output_data_dictionary.csv`,
+  `parameter_provenance.csv`).
+
+If you change config or code, the snapshot goes stale -- regenerate it via
+the final-run procedure (`iaq_hfis run` -> `evaluate` -> `report` ->
+`plot` -> `validate-artifacts` -> `finalize`), don't hand-edit it.

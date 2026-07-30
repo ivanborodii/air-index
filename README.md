@@ -2,6 +2,15 @@
 > code documentation** — every public module, class, and function has its
 > own docstring; read the source for exact behavior.
 
+**Further documentation** (`docs/`): `manuscript_method_mapping.md`
+(manuscript section → code mapping), `evaluation_protocol.md` (every
+analysis `evaluate` runs), `database_schema.md` (full DuckDB table
+reference), `result_interpretation.md` (how to read a generated result,
+what claims it does and doesn't support), `reproducibility.md` (identity
+chain, how to reproduce/rebuild), `hfis_vs_crispmax_audit.md` (accidental-
+equivalence audit), `fault_injection_audit.md` (benchmark correctness
+audit).
+
 ---
 
 ## Table of contents
@@ -345,7 +354,10 @@ Full per-parameter machine-readable provenance (path, effective value,
 unit, status, source, engaged-this-run) is generated every `report` call
 into `parameter_provenance.csv` — see `src/iaq_hfis/provenance.py` and
 `docs/manuscript_method_mapping.md`. The table above is a human-readable
-summary; the CSV is the authoritative, testable version.
+summary; the CSV is the authoritative, testable version. For a
+per-PROVISIONAL-parameter assessment (whether it was calibrated, against
+what dataset, whether conclusions depend strongly on it, recommended
+future validation), see the generated `provisional_parameter_assessment.md`.
 
 ### `config/sensor_specs.yaml`
 
@@ -516,8 +528,14 @@ membership functions).
 
 A, V, M are intermediate fuzzy results of one integral method, not
 independent official indices. Alongside `I` and its class, the pipeline
-records `dominant_component` — the component(s) most responsible for the
-activated rules (ties preserved, never arbitrarily broken).
+records the manuscript's dominant adverse component via a deterministic
+5-step priority hierarchy (`fuzzy_engine.determine_dominance`: max-firing
+2nd-level rule → most severe consequent → causing antecedent(s) → highest
+severity → tie-break by normalized score) — `dominant_component` (single,
+deterministic primary), `co_dominant_components` (the full tied set, ties
+preserved and documented), `worst_component_class`,
+`largest_component_score`, and `dominance_reason`. See
+`docs/database_schema.md`.
 
 ## 19. OK / PARTIAL / FAILED
 
@@ -547,7 +565,7 @@ All commands run from the `air_ml/` repo root, module form
 `python -m iaq_hfis.cli <command>` (or use `scripts/run_iaq_hfis.sh` for
 the whole pipeline at once). Every derived-DB row is isolated by
 `pipeline_run_id` (and, for evaluation tables, `evaluation_run_id`) — see
-`docs/result_reproducibility.md`.
+`docs/reproducibility.md`.
 
 ```bash
 # 1. Compute the index over a time range and persist results (creates a fresh pipeline_run_id)
@@ -562,14 +580,17 @@ python -m iaq_hfis.cli run --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:0
 #    creates a NEW evaluation_run_id, never mixes rows with a prior evaluation
 python -m iaq_hfis.cli evaluate --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00 --pipeline-run-id <id>
 
-# 3. Generate run_summary.md, run_narrative.md, CSVs, data dictionary, plot manifest,
-#    parameter_provenance.csv, and publication_readiness (persisted back into run_summary.json)
+# 3. Generate run_summary.md, run_narrative.md, article_results_summary.md, CSVs,
+#    data dictionary, plot manifest, parameter_provenance.csv,
+#    provisional_parameter_assessment.md, and publication_readiness
+#    (persisted back into run_summary.json)
 python -m iaq_hfis.cli report --pipeline-run-id <id>
 
 # 4. Render PNGs from the plot manifest
 python -m iaq_hfis.cli plot --pipeline-run-id <id>
 
-# 5. Cross-check every artifact against the derived DB and each other; exits non-zero on any mismatch
+# 5. Cross-check every artifact against the derived DB and each other; exits non-zero on
+#    any mismatch; writes artifact_validation.json/.md
 python -m iaq_hfis.cli validate-artifacts --pipeline-run-id <id>
 
 # 6. Rebuild the derived database (never touches raw air-monitor/weather source DBs) --
@@ -596,7 +617,8 @@ All in a **new**, dedicated, run-isolated file (`data/iaq_hfis/iaq_hfis.duckdb`)
 — never `air_monitor.duckdb`. Schema: `src/iaq_hfis/sql/create_tables.sql`
 (idempotent `CREATE TABLE IF NOT EXISTS`; schema_version tracked, legacy
 pre-isolation databases are detected and rejected -- see §33 and
-`docs/result_reproducibility.md`).
+`docs/reproducibility.md`). **Full table-by-table reference:
+`docs/database_schema.md`** — the summary below is abbreviated.
 
 | Table | One row per | Key columns |
 |---|---|---|
@@ -604,7 +626,7 @@ pre-isolation databases are detected and rejected -- see §33 and
 | `window_aggregates` | (pipeline_run_id, computed_ts, window_minutes, channel) | n_expected, n_usable, coverage_ratio, weighted_mean |
 | `outdoor_context` | (pipeline_run_id, computed_ts) | forecast_time, age_minutes, is_stale, pm2_5, pm10, temperature_2m |
 | `component_scores` | (pipeline_run_id, computed_ts, window_minutes, component) | available, membership_*, crisp_score, room, season |
-| `iaq_index_results` | (pipeline_run_id, computed_ts, window_minutes) | completeness_status, index_value, index_class, dominant_component, rule_level_contributors |
+| `iaq_index_results` | (pipeline_run_id, computed_ts, window_minutes) | completeness_status, index_value, index_class, dominant_component, co_dominant_components, worst_component_class, dominance_reason, rule_level_contributors |
 | `pipeline_runs` | pipeline_run_id | status, computed_ts_min/max, config_hash, source_git_commit |
 | `evaluation_runs` | evaluation_run_id | pipeline_run_id, status, evaluated_range, config_hash, stability_seed |
 | `baseline_results` | (pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, method) | index_value, index_class, n_components |
@@ -613,10 +635,12 @@ pre-isolation databases are detected and rejected -- see §33 and
 | `evaluation_sensitivity` | (evaluation_run_id, sample_id, varied_parameter, value) | stratum, reference_*, completeness_status, index_value |
 | `evaluation_masking` | (evaluation_run_id, method, severity_threshold) | n_critical_events, n_masked, masking_rate |
 | `evaluation_reference_cases` | (evaluation_run_id, method) | n, macro_f1, cohens_kappa (consistency, not accuracy) |
-| `evaluation_continuity_grid` / `evaluation_continuity_summary` | grid point / (boundary, method) | index_value; max/mean_adjacent_jump, monotonicity_violations |
-| `fault_injection_events` / `fault_detection_predictions` / `fault_detection_metrics` | event / sample / reason_code | fault_type; predicted_reason_codes; tp/fp/fn, precision, recall, f1 |
-| `hampel_calibration` | (evaluation_run_id, split, window_size, mad_multiplier) | fault_recall, genuine_event_preservation_rate, objective_score, selected |
-| `parameter_provenance` | (pipeline_run_id, parameter_path) | effective_value, status, source, engaged |
+| `evaluation_continuity_grid` / `evaluation_continuity_summary` | grid point / (boundary, context, method) | context (favorable/acceptable/degraded); index_value; max/mean_adjacent_jump, local_lipschitz_ratio, area_between_curves_vs_crisp_max |
+| `fault_injection_events` / `fault_detection_predictions` | event / sample | dataset_split (calibration/validation); fault_type; predicted_reason_codes |
+| `fault_detection_metrics` / `fault_detection_event_metrics` | (dataset_split, reason_code) | row-level tp/fp/fn/tn/specificity vs. event-level one-to-one-matched tp/fp/fn |
+| `fault_detection_confusion_matrix` | (dataset_split, true_label, predicted_label) | count |
+| `hampel_calibration` | (evaluation_run_id, dataset_split, window_size, mad_multiplier) | fault_recall, genuine_event_preservation_rate, objective_score, selected |
+| `parameter_provenance` | declared, not currently written (see `docs/database_schema.md`) | `parameter_provenance.csv` is generated directly from Python objects instead |
 
 ## 23. File outputs
 
@@ -627,6 +651,9 @@ run_summaries/run_summary_{pipeline_run_id}.json   # written by `run`, extended 
 reports/{pipeline_run_id}/
   run_summary.md                            # written by `report`
   run_narrative.md
+  article_results_summary.md / article_metrics.json
+  provisional_parameter_assessment.md       # per-provisional-parameter assessment, generated
+  artifact_validation.json / .md            # written by `validate-artifacts`
   output_data_dictionary.csv
   parameter_provenance.csv
   plot_manifest.json
@@ -635,8 +662,9 @@ reports/{pipeline_run_id}/
 ```
 
 Plus the tracked, static publication snapshot `research_results/final/`
-(committed to git, replaced atomically by the final-run procedure) — see
-`research_results/final/README.md`.
+(committed to git, replaced atomically by the final-run procedure, plus
+`manifest.json`'s full checksummed integrity record) — see
+`research_results/final/README.md` and `docs/reproducibility.md`.
 
 ## 24. Every graph-ready CSV, explained
 
@@ -648,22 +676,25 @@ written empty as if it were real data.
 
 | File | Grain | What it's for |
 |---|---|---|
-| `index_timeseries.csv` | one row per computed_ts | The final index value/class over time, plus dominant_component and the rule_level_contributors diagnostic |
+| `index_timeseries.csv` | one row per computed_ts | The final index value/class over time, plus dominant_component/co_dominant_components/dominance_reason and the rule_level_contributors diagnostic |
 | `component_scores_timeseries.csv` | one row per (computed_ts, component) | A/V/M crisp scores and membership degrees over time |
 | `method_comparison.csv` | one row per computed_ts | PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN side by side |
 | `data_quality_summary.csv` | one row per (computed_ts, channel) | Coverage ratio per channel over time |
 | `reason_code_frequency.csv` | one row per reason code | Which fault categories occurred on real data, and how often (unlabeled) |
 | `stability_samples.csv` | one row per sampled point | Which computed_ts were sampled (boundary_adjacent/random_comparison) and their baselines |
 | `stability_trials.csv` | one row per (sample, method, trial) | Class/index outcome of each seeded perturbation trial, tidy across every sample |
-| `stability_by_point.csv` / `stability_summary.csv` | per (sample, method) / per method | Per-point and aggregate class-change rate + index-change stats |
+| `stability_by_point.csv` / `stability_summary.csv` | per (sample, method) / per method | Per-point and overall class-change rate, better/worse-class movement probabilities, index-change stats |
+| `stability_summary_by_variable.csv` / `stability_summary_by_original_class.csv` | per (method, boundary channel) / per (method, originating class) | The same stability metrics broken down by which boundary a point was near, and by which class it started in |
 | `sensitivity_window_by_point.csv` / `sensitivity_window_summary.csv` | per sampled point / per window size | Index value/status at each of 5/15/30/60 min, per-point and aggregated |
 | `sensitivity_coverage_by_point.csv` / `sensitivity_coverage_summary.csv` | per sampled point / per threshold | Index value/status at each of 0.70/0.80/0.90, per-point and aggregated |
 | `masking_summary.csv` | one row per baseline method | Masking rate for CRISP-MAX and WEIGHTED-MEAN |
 | `reference_case_consistency.csv` | one row per method | macro-F1/kappa against the synthetic reference cases — consistency, NOT accuracy |
 | `outdoor_context_timeseries.csv` | one row per computed_ts | Outdoor PM/temperature context (never a direct index input) |
-| `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, method) | HFIS vs CRISP-MAX vs WEIGHTED-MEAN numerical behavior across each control-region boundary |
-| `fault_injection_events.csv` / `fault_detection_predictions.csv` / `fault_detection_metrics.csv` | event / sample / reason_code | The labeled synthetic fault-injection benchmark (separate from real, unlabeled data) |
-| `hampel_calibration.csv` | one row per (split, window_size, mad_multiplier) | Diagnostic Hampel parameter grid; configured value always retained regardless |
+| `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, context, method) | HFIS vs CRISP-MAX vs WEIGHTED-MEAN numerical behavior across every control-region boundary, under favorable/acceptable/degraded "other components" contexts; see `docs/hfis_vs_crispmax_audit.md` |
+| `fault_injection_events.csv` / `fault_detection_predictions.csv` | event / sample | The labeled synthetic fault-injection benchmark (separate from real, unlabeled data); dataset_split = calibration or validation |
+| `fault_detection_metrics.csv` / `fault_detection_event_metrics.csv` | (dataset_split, reason_code) | Row-level vs event-level (one-to-one matched) precision/recall/F1; validation split is the headline, publication-facing number |
+| `fault_detection_confusion_matrix.csv` | (dataset_split, true_label, predicted_label) | Full row-level confusion matrix, including "none" |
+| `hampel_calibration.csv` | one row per (dataset_split, window_size, mad_multiplier) | Diagnostic Hampel parameter grid; configured value always retained regardless |
 | `parameter_provenance.csv` | one row per parameter | Machine-readable status/source/engaged for every scientific/operational parameter |
 
 ## 25. Plotting instructions
@@ -704,7 +735,7 @@ block (`reproducibility.py:collect_environment_metadata`):
 tree (e.g. `git rev-parse HEAD` fails) — reported honestly as unavailable
 rather than erroring or guessing. It is also recorded directly on
 `pipeline_runs.source_git_commit` in the derived DB. See
-`docs/result_reproducibility.md` for the full identity chain
+`docs/reproducibility.md` for the full identity chain
 (`pipeline_run_id` / `evaluation_run_id` / `config_hash` / git commit).
 Also recorded per run: `config_hash` (SHA-256 over all three config
 files' canonical JSON), the exact `computed_ts_range` and `window_minutes`,
@@ -804,6 +835,20 @@ sampling is bounded separately by `stability_max_*`/
 - **Single-device validation.** Everything above was developed and tested
   against one Raspberry Pi 5 with one set of SPS30/SCD41/BME688 units —
   generalization to other sensor batches/models is untested.
+- **The boundary continuity experiment cannot currently show whether HFIS
+  is smoother than CRISP-MAX.** Perturbing one channel while holding every
+  other channel fixed (even under the favorable/acceptable/degraded
+  "other components" contexts) is a case the worst-of rule base is
+  mathematically forced to make both methods agree on exactly, regardless
+  of context — confirmed empirically on the tracked reference run. See
+  `docs/hfis_vs_crispmax_audit.md`, including an independent
+  multi-component synthetic check showing the two methods DO diverge once
+  more than one channel carries signal simultaneously.
+- **Fault-injection precision is weak for single_spike and stuck_value**
+  (materially lower than the other three reason codes, on the validation
+  split of the real benchmark) — disclosed automatically in
+  `run_narrative.md`/`article_results_summary.md` as a "Disclosed
+  limitation," never hidden. See `docs/fault_injection_audit.md`.
 
 ## 30. Scientific cautions
 
@@ -876,7 +921,9 @@ above the `general_residential/warm_period` favorable band:
 7. **Component inference**: A ≈ Favorable (crisp≈13). V ≈ Favorable
    (crisp≈13). M: worst-of(T-class, RH-class) ≈ Degraded (crisp≈74.5).
 8. **Index inference**: worst-of(A,V,M) ⇒ Degraded-dominated rules fire
-   strongest; centroid ≈ **65–67**, class **Degraded**, `dominant_component=[M]`.
+   strongest; centroid ≈ **65–67**, class **Degraded**,
+   `dominant_component=M`, `co_dominant_components=[M]`,
+   `dominance_reason=unique_max_firing_rule`.
 9. **Baselines**: CRISP-MAX ≈ max(13,13,74.5) ≈ 74 (Degraded/Critical
    boundary). WEIGHTED-MEAN ≈ mean(13,13,74.5) ≈ 33 (Acceptable) — this is
    the masking effect (§20): averaging with two deeply-favorable
@@ -903,17 +950,28 @@ live data will differ.)
 
 ## 34. How to interpret the generated result summary
 
+**See `docs/result_interpretation.md` for the full reading guide**
+(trust checks, agreement-vs-consistency-vs-stability-vs-accuracy,
+continuity smoothness claims, provisional-parameter meaning, forbidden
+overclaims) — this section is a shorter walkthrough of `run_summary.md`
+specifically.
+
 Read `run_summary.md` top to bottom:
 
 1. **Run Metadata / Environment** — confirm you're looking at the right
-   run, on the right platform, with the right config hash.
+   run, on the right platform, with the right config hash. Then check
+   `iaq_hfis validate-artifacts` / `artifact_validation.json` — this is
+   the authoritative cross-check; don't trust anything below if it fails.
 2. **Completeness Summary** — how many computed timestamps actually
    produced a trustworthy index (OK), a partial one (PARTIAL), or none
    (FAILED). A high FAILED count means look at data quality (§11–13)
    before trusting anything downstream.
 3. **Provisional Parameters Used** — anything listed here means part of
    this run's numbers depend on a value not yet confirmed by the author
-   (§9, §29). Never quote a result depending on these as final.
+   (§9, §29). Never quote a result depending on these as final; see the
+   generated `provisional_parameter_assessment.md` for what each one's
+   provisional status actually implies (calibrated or not, against what
+   dataset, whether conclusions depend strongly on it).
 4. **Baseline Comparison / Masking / Reference-Case Consistency** — read
    these together: high agreement + low masking + high macro-F1 for
    PROPOSED-HFIS relative to WEIGHTED-MEAN is the evidence the manuscript's

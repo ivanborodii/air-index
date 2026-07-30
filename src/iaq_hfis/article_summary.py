@@ -55,6 +55,7 @@ def build_article_metrics(summary: dict) -> dict:
         "reason_code_frequency": ev.get("reason_code_frequency"),
         "performance": summary.get("performance"),
         "publication_readiness": summary.get("publication_readiness"),
+        "dominant_component_frequency": summary.get("dominant_component_frequency"),
     }
 
 
@@ -94,6 +95,12 @@ def build_article_results_summary(summary: dict) -> str:
         lines.append("See `index_timeseries.csv` (completeness_status=OK rows, group by index_class) for the exact distribution.")
     else:
         lines.append("Not available -- evaluation not run.")
+    dcf = summary.get("dominant_component_frequency") or {}
+    if dcf:
+        lines.append("")
+        lines.append("Dominant-component frequency (which of A/V/M won the priority-hierarchy tie-break, OK/PARTIAL computed_ts only):")
+        for component in sorted(dcf):
+            lines.append(f"- {component}: {dcf[component]} ({_pct(dcf[component] / sum(dcf.values()))})")
     lines.append("")
 
     lines += ["## 5. Inter-method agreement (unlabeled real data)", ""]
@@ -119,7 +126,10 @@ def build_article_results_summary(summary: dict) -> str:
             rows = [r for r in continuity["by_boundary_method"] if r["method"] == method and r["max_adjacent_jump"] is not None]
             if rows:
                 mean_jump = sum(r["max_adjacent_jump"] for r in rows) / len(rows)
-                lines.append(f"- {method}: mean largest adjacent-point jump {_num(mean_jump, 2)} index points across {len(rows)} boundaries (see `continuity_summary.csv` for per-boundary detail).")
+                lines.append(f"- {method}: mean largest adjacent-point jump {_num(mean_jump, 2)} index points across {len(rows)} boundary/context sweeps (see `continuity_summary.csv` for per-boundary detail).")
+        smoothness = continuity.get("smoothness_comparison")
+        if smoothness:
+            lines.append(f"- Smoothness comparison (local Lipschitz ratio, {smoothness['n_boundary_context_pairs_compared']} boundary/context pairs): {smoothness['conclusion']}")
     else:
         lines.append("Not available.")
     lines.append("")
@@ -129,7 +139,15 @@ def build_article_results_summary(summary: dict) -> str:
     if stability:
         lines.append(f"- {stability['n_samples']} sampled points, {stability['n_trials_per_sample']} trials each, seed={stability['seed']}.")
         for method, s in (stability.get("by_method") or {}).items():
-            lines.append(f"  - {method}: class_change_rate={_pct(s['class_change_rate'])}, mean|Δindex|={_num(s['mean_abs_index_change'], 2)}")
+            lines.append(
+                f"  - {method}: class_change_rate={_pct(s['class_change_rate'])} "
+                f"(moved better={_pct(s.get('prob_moved_better'))}, moved worse={_pct(s.get('prob_moved_worse'))}), "
+                f"mean|Δindex|={_num(s['mean_abs_index_change'], 2)}"
+            )
+        lines.append(
+            "- Breakdowns by boundary/channel (`stability_summary_by_variable.csv`) and by originating class "
+            "(`stability_summary_by_original_class.csv`) are exported separately; not repeated here."
+        )
     else:
         lines.append("Not available.")
     lines.append("")
@@ -154,9 +172,21 @@ def build_article_results_summary(summary: dict) -> str:
     lines += ["## 11. Fault-injection performance", ""]
     fi = ev.get("fault_injection") if ev else None
     if fi and fi.get("metrics_by_reason_code"):
+        split = fi.get("headline_dataset_split", "validation")
+        lines.append(f"{fi['n_scenarios']} scenarios across {', '.join(fi.get('channels_covered') or [])}; numbers below are the {split} split (disjoint from calibration -- no parameter was tuned against these numbers).")
+        lines.append("")
+        lines.append("Row-level (every affected sample counted individually):")
         for m in fi["metrics_by_reason_code"]:
-            lines.append(f"- {m['reason_code']}: precision={_num(m['precision'])}, recall={_num(m['recall'])}, F1={_num(m['f1'])}.")
+            lines.append(f"- {m['reason_code']}: precision={_num(m['precision'])}, recall={_num(m['recall'])}, F1={_num(m['f1'])}, specificity={_num(m.get('specificity'))} (tp={m['tp']}, fp={m['fp']}, fn={m['fn']}, tn={m.get('tn')}).")
+        event_metrics = (fi.get("event_level_metrics_by_split") or {}).get(split) or []
+        if event_metrics:
+            lines.append("")
+            lines.append("Event-level (each injected fault matched at most once, one-to-one):")
+            for m in event_metrics:
+                lines.append(f"- {m['reason_code']}: precision={_num(m['precision'])}, recall={_num(m['recall'])}, F1={_num(m['f1'])} ({m['n_true_events']} true / {m['n_predicted_events']} predicted event(s)).")
+        lines.append("")
         lines.append(f"- False rejection rate for genuine events: {_pct(fi.get('false_rejection_rate_for_genuine_events'))}.")
+        lines.append("- Full confusion matrix: `fault_detection_confusion_matrix.csv`.")
     else:
         lines.append("Not available.")
     lines.append("")
@@ -184,6 +214,12 @@ def build_article_results_summary(summary: dict) -> str:
     else:
         lines.append("None engaged this run.")
     lines.append("")
+    lines.append(
+        "See `run_narrative.md`'s dedicated **Limitations** and **Forbidden overclaims** sections for the full "
+        "discussion, including the PROPOSED-HFIS vs CRISP-MAX equivalence finding (if applicable to this run) and "
+        "what claims this run's data does and does not support."
+    )
+    lines.append("")
 
     lines += ["## 14. Recommended article tables and figures", ""]
     lines.append("| Table/figure | Source CSV |")
@@ -192,9 +228,9 @@ def build_article_results_summary(summary: dict) -> str:
     lines.append("| Method agreement | `method_comparison.csv`, `reference_case_consistency.csv` |")
     lines.append("| Masking comparison | `masking_summary.csv` |")
     lines.append("| Boundary continuity curves | `continuity_grid.csv`, `continuity_summary.csv` |")
-    lines.append("| Stability under perturbation | `stability_summary.csv`, `stability_trials.csv` |")
+    lines.append("| Stability under perturbation | `stability_summary.csv`, `stability_summary_by_variable.csv`, `stability_summary_by_original_class.csv`, `stability_by_point.csv`, `stability_trials.csv` |")
     lines.append("| Sensitivity to window/coverage | `sensitivity_window_summary.csv`, `sensitivity_coverage_summary.csv` |")
-    lines.append("| Fault-detection performance | `fault_detection_metrics.csv` |")
+    lines.append("| Fault-detection performance | `fault_detection_metrics.csv`, `fault_detection_event_metrics.csv`, `fault_detection_confusion_matrix.csv` |")
     lines.append("| Parameter provenance (supplementary) | `parameter_provenance.csv` |")
     lines.append("")
 

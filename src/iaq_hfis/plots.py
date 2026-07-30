@@ -78,6 +78,13 @@ def render_plot(spec: dict, csv_dir: Path, out_dir: Path) -> Path | None:
         logger.info("skipping plot '%s': %s has no rows this run", spec["id"], spec["source_csv"])
         return None
 
+    if spec.get("filter_equals"):
+        for col, value in spec["filter_equals"].items():
+            df = df[df[col] == value]
+        if df.empty:
+            logger.info("skipping plot '%s': no rows match filter %s in %s", spec["id"], spec["filter_equals"], spec["source_csv"])
+            return None
+
     if spec["y"] and all(df[y].isna().all() for y in spec["y"]):
         # e.g. masking_rate is null for every row when n_critical_events=0 this run --
         # a bar/line chart of all-NaN values renders as a misleading "all zero" chart,

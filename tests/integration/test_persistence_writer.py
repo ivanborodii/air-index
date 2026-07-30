@@ -22,7 +22,7 @@ _INSERT_SQL = """INSERT OR REPLACE INTO iaq_index_results
 
 
 def _row(pipeline_run_id: str, index_value: float) -> list:
-    return [pipeline_run_id, NOW, 15, "OK", [], [], index_value, "Acceptable", ["A"], ["A"], 30, "0.1.0", "abc123", NOW]
+    return [pipeline_run_id, NOW, 15, "OK", [], [], index_value, "Acceptable", "A", ["A"], 30, "0.1.0", "abc123", NOW]
 
 
 def test_schema_creates_all_derived_tables(base_settings):

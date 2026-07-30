@@ -29,6 +29,10 @@
       }
     },
     "provisional_parameters_used": {"type": "array", "items": {"type": "string"}},
+    "dominant_component_frequency": {
+      "type": "object",
+      "description": "How often each component (A/V/M) won fuzzy_engine.determine_dominance's priority hierarchy, across every OK/PARTIAL computed_ts this run (FAILED rows have a null dominant_component and are excluded)."
+    },
     "environment": {
       "type": "object",
       "required": ["iaq_hfis_version", "python_version", "duckdb_version", "platform", "processor", "cpu_count", "git_commit", "rule_generation_version"],
@@ -77,12 +81,14 @@
         },
         "stability": {
           "type": ["object", "null"],
-          "description": "Multi-point stability: deterministic boundary-adjacent + random-comparison sample, all 3 methods.",
+          "description": "Multi-point stability: deterministic boundary-adjacent + random-comparison sample, all 3 methods. class_change_rate/prob_moved_better/prob_moved_worse are agreement-with-self-under-perturbation statistics, never accuracy (no ground truth involved).",
           "properties": {
             "n_samples": {"type": "integer"},
             "n_trials_per_sample": {"type": "integer"},
             "seed": {"type": "integer"},
-            "by_method": {"type": "object"}
+            "by_method": {"type": "object", "description": "Overall summary per method."},
+            "by_variable": {"type": "array", "description": "Summary per (method, selection_reason, boundary_channel)."},
+            "by_original_class": {"type": "array", "description": "Summary per (method, original/baseline class)."}
           }
         },
         "sensitivity": {
@@ -96,19 +102,26 @@
         },
         "continuity": {
           "type": "object",
-          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids).",
+          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids, favorable/acceptable/degraded contexts).",
           "properties": {
             "n_boundaries": {"type": "integer"},
+            "n_contexts": {"type": "integer"},
+            "contexts": {"type": "array", "items": {"type": "string"}},
             "grid_points_per_boundary": {"type": "integer"},
-            "by_boundary_method": {"type": "array"}
+            "by_boundary_method": {"type": "array"},
+            "smoothness_comparison": {"type": "object", "description": "Honest, non-cherry-picked HFIS-vs-CRISP-MAX Lipschitz-ratio smoothness comparison across every (boundary, context) pair tested."}
           }
         },
         "fault_injection": {
           "type": "object",
-          "description": "Deterministic, labeled synthetic fault-injection benchmark -- separate from unlabeled real-data reason_code_frequency.",
+          "description": "Deterministic, labeled synthetic fault-injection benchmark -- separate from unlabeled real-data reason_code_frequency. calibration/validation are disjoint scenario sets (no data leakage); validation is the headline, publication-facing split.",
           "properties": {
             "n_scenarios": {"type": "integer"},
-            "metrics_by_reason_code": {"type": "array"},
+            "channels_covered": {"type": "array", "items": {"type": "string"}},
+            "headline_dataset_split": {"type": "string", "enum": ["validation"]},
+            "row_level_metrics_by_split": {"type": "object", "description": "Every affected sample counted individually, keyed by 'calibration'/'validation'."},
+            "event_level_metrics_by_split": {"type": "object", "description": "Each injected fault counted once via one-to-one matching, keyed by 'calibration'/'validation'."},
+            "metrics_by_reason_code": {"type": "array", "description": "Legacy alias: validation split's row-level metrics."},
             "false_rejection_rate_for_genuine_events": {"type": ["number", "null"]},
             "confirmation_recovery_rate": {"type": ["number", "null"]},
             "hampel_calibration": {"type": "object"}

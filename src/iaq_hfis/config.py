@@ -177,7 +177,7 @@ class MembershipConfig(BaseModel):
     # tolerance for dominant-adverse-component attribution. Two available
     # components are both reported as dominant only when their crisp scores
     # (0-100 scale) differ by no more than this amount; otherwise only the
-    # strictly higher one is reported. See fuzzy_engine.dominant_adverse_component.
+    # strictly higher one is reported. See fuzzy_engine.determine_dominance.
     dominant_component_tie_tolerance: float = Field(ge=0, default=1.0)
 
 

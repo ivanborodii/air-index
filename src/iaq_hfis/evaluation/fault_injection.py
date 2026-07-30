@@ -32,6 +32,14 @@ _STATUS_MAP = {"ok": "VALID", "partial": "VALID", "failed": "INVALID", "disabled
 REASON_CODES = ["single_spike", "stuck_value", "data_loss", "gradual_drift", "out_of_range"]
 
 
+def dataset_split_of(scenario_id: str) -> str:
+    """"calibration" | "validation", derived from the scenario_id suffix
+    every scenario builder appends -- the single place this mapping lives,
+    so events/predictions/metrics can never disagree on which split a
+    scenario belongs to."""
+    return "validation" if scenario_id.endswith("_validation") else "calibration"
+
+
 @dataclass(frozen=True)
 class FaultEvent:
     scenario_id: str
@@ -40,6 +48,10 @@ class FaultEvent:
     injected_at_index: int
     duration_samples: int
     description: str
+
+    @property
+    def dataset_split(self) -> str:
+        return dataset_split_of(self.scenario_id)
 
 
 @dataclass(frozen=True)
@@ -51,6 +63,10 @@ class SamplePrediction:
     predicted_reason_codes: list[str]
     stage2_state: str
     usable: bool
+
+    @property
+    def dataset_split(self) -> str:
+        return dataset_split_of(self.scenario_id)
 
 
 @dataclass
@@ -73,105 +89,224 @@ def _timestamps(n: int, cadence_seconds: int) -> list[datetime]:
     return [_START + timedelta(seconds=cadence_seconds * i) for i in range(n)]
 
 
-def build_co2_scenarios(cadence_seconds: int, n: int = 40, variant: str = "dev") -> list[Scenario]:
-    """``variant`` selects a deterministic parameter set: "dev" for
-    calibration/development, "holdout" for a structurally similar but
-    numerically distinct set used only for the final, one-time holdout
-    evaluation (see :func:`run_hampel_calibration`)."""
-    scale = 1.0 if variant == "dev" else 1.15
-    phase = 0 if variant == "dev" else 3
-    scenarios = []
+def build_channel_scenarios(
+    channel: str,
+    cadence_seconds: int,
+    n: int,
+    variant: str,
+    base: float,
+    amplitude: float,
+    spike_magnitude: float,
+    oor_value: float,
+    stuck_value: float,
+    drift_step_magnitude: float,
+    genuine_step_magnitude: float,
+    include_genuine_events: bool = True,
+    spike_magnitude_alt: float | None = None,
+    stuck_len_alt: int | None = None,
+    dual_channel: bool = False,
+) -> list[Scenario]:
+    """Generic single-input-channel fault-scenario builder, parameterized so
+    the same deterministic construction applies to any of CO2, temperature,
+    humidity, PM2.5, or PM10 -- each channel gets its own physically
+    plausible baseline/amplitude/magnitudes (declared uncertainty and
+    technical range differ per datasheet), but the fault *shapes* (spike,
+    out-of-range, stuck, data-loss, drift, genuine event) are identical
+    across channels so their detection performance is directly comparable.
 
-    def osc(base: float, amplitude: float) -> list[float]:
+    ``dual_channel=True`` (temperature, humidity) populates a synthetic
+    secondary-sensor reading that exactly tracks the primary value, so the
+    real dual-channel confirmation logic (:func:`iaq_hfis.quality.confirmation.confirm_dual_channel_event`)
+    has something to corroborate against. Without this, a genuine sustained
+    event can NEVER reach "confirmed usable" for these two channels -- their
+    confirmation requires agreement with a duplicate sensor OR a
+    corroborating outdoor trend (neither available in a synthetic, isolated
+    scenario), so omitting secondary_values entirely would silently and
+    permanently fail every genuine-event scenario for these channels
+    regardless of the fault-detection logic's actual correctness.
+
+    ``variant`` selects a deterministic parameter set: "calibration" for
+    grid-search/development, "validation" for a structurally similar but
+    numerically distinct set used only for final, one-time held-out
+    reporting (see :func:`run_benchmark` / :func:`run_hampel_calibration`) --
+    no scenario or timestamp is ever shared between the two variants, so
+    there is no data leakage between calibrating a parameter and reporting
+    its performance.
+
+    ``spike_magnitude_alt``/``stuck_len_alt``, when given, add a SECOND
+    single_spike/stuck_value scenario at a different magnitude/duration --
+    "multiple magnitudes/durations where meaningful" is deliberately scoped
+    to one extra variant per fault type per channel here (not an exhaustive
+    sweep); see docs/fault_injection_audit.md for the disclosed limitation.
+    """
+    scale = 1.0 if variant == "calibration" else 1.15
+    phase = 0 if variant == "calibration" else 3
+    scenarios: list[Scenario] = []
+
+    def osc() -> list[float]:
         return [base + amplitude * math.sin(2 * math.pi * (i + phase) / 7.0) for i in range(n)]
 
-    # single_spike: one isolated large deviation that reverts immediately (not confirmed).
-    values = osc(700.0, 10.0)
-    labels: list[str | None] = [None] * n
-    spike_idx = n // 2
-    values[spike_idx] = 700.0 + 400.0 * scale
-    labels[spike_idx] = "single_spike"
-    scenarios.append(Scenario(f"co2_single_spike_{variant}", "co2", _timestamps(n, cadence_seconds), values, labels,
-                               [FaultEvent(f"co2_single_spike_{variant}", "co2", "single_spike", spike_idx, 1, "One isolated large deviation reverting immediately.")]))
+    def secondary_for(values: list[float | None]) -> list[float | None] | None:
+        # Synthetic secondary sensor that exactly tracks the primary -- see the
+        # dual_channel docstring above for why this is necessary, not optional,
+        # for temperature/humidity's confirmation logic to ever succeed here.
+        return list(values) if dual_channel else None
+
+    def add_spike(suffix: str, magnitude: float) -> None:
+        values = osc()
+        labels: list[str | None] = [None] * n
+        idx = n // 2
+        values[idx] = base + magnitude * scale
+        labels[idx] = "single_spike"
+        sid = f"{channel}_single_spike{suffix}_{variant}"
+        scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
+                                   [FaultEvent(sid, channel, "single_spike", idx, 1, f"One isolated large deviation ({magnitude:+.1f}) reverting immediately.")],
+                                   secondary_values=secondary_for(values)))
+
+    add_spike("", spike_magnitude)
+    if spike_magnitude_alt is not None:
+        add_spike("_alt", spike_magnitude_alt)
 
     # out_of_range: one value outside the sensor's datasheet technical range.
-    values = osc(700.0, 10.0)
+    values = osc()
     labels = [None] * n
     oor_idx = n // 2
-    values[oor_idx] = 999999.0  # far outside SCD4x's 400-40000ppm technical range
+    values[oor_idx] = oor_value
     labels[oor_idx] = "out_of_range"
-    scenarios.append(Scenario(f"co2_out_of_range_{variant}", "co2", _timestamps(n, cadence_seconds), values, labels,
-                               [FaultEvent(f"co2_out_of_range_{variant}", "co2", "out_of_range", oor_idx, 1, "One value far outside the datasheet technical range.")]))
+    sid = f"{channel}_out_of_range_{variant}"
+    scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
+                               [FaultEvent(sid, channel, "out_of_range", oor_idx, 1, "One value far outside the datasheet technical range.")],
+                               secondary_values=secondary_for(values)))
 
-    # stuck_value: a run of exactly-equal values (sensor frozen).
-    values = osc(700.0, 10.0)
-    labels = [None] * n
-    stuck_start, stuck_len = n // 2, 8
-    for i in range(stuck_start, stuck_start + stuck_len):
-        values[i] = 705.0
-        labels[i] = "stuck_value"
-    scenarios.append(Scenario(f"co2_stuck_value_{variant}", "co2", _timestamps(n, cadence_seconds), values, labels,
-                               [FaultEvent(f"co2_stuck_value_{variant}", "co2", "stuck_value", stuck_start, stuck_len, "8 consecutive identical readings.")]))
+    def add_stuck(suffix: str, stuck_len: int) -> None:
+        values = osc()
+        labels: list[str | None] = [None] * n
+        stuck_start = n // 2
+        for i in range(stuck_start, stuck_start + stuck_len):
+            values[i] = stuck_value
+            labels[i] = "stuck_value"
+        sid = f"{channel}_stuck_value{suffix}_{variant}"
+        scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
+                                   [FaultEvent(sid, channel, "stuck_value", stuck_start, stuck_len, f"{stuck_len} consecutive identical readings.")],
+                                   secondary_values=secondary_for(values)))
+
+    add_stuck("", 8)
+    if stuck_len_alt is not None:
+        add_stuck("_alt", stuck_len_alt)
 
     # data_loss: a run of missing samples (no raw row at all).
-    values = osc(700.0, 10.0)
+    values = osc()
     labels = [None] * n
     loss_start, loss_len = n // 2, 5
     for i in range(loss_start, loss_start + loss_len):
         values[i] = None
         labels[i] = "data_loss"
-    scenarios.append(Scenario(f"co2_data_loss_{variant}", "co2", _timestamps(n, cadence_seconds), values, labels,
-                               [FaultEvent(f"co2_data_loss_{variant}", "co2", "data_loss", loss_start, loss_len, "5 consecutive missing samples.")]))
+    sid = f"{channel}_data_loss_{variant}"
+    scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
+                               [FaultEvent(sid, channel, "data_loss", loss_start, loss_len, "5 consecutive missing samples.")],
+                               secondary_values=secondary_for(values)))
 
     # gradual_drift: a slow monotonic run whose cumulative magnitude clearly exceeds the real
-    # drift gate (declared CO2 uncertainty x gradual_drift_magnitude_multiplier = 70 x 3 = 210ppm),
-    # NOT explained by the gentle baseline oscillation.
-    values = osc(700.0, 10.0)
+    # drift gate, NOT explained by the gentle baseline oscillation.
+    values = osc()
     labels = [None] * n
     drift_start, drift_len = n // 2, 10
     for j, i in enumerate(range(drift_start, drift_start + drift_len)):
-        values[i] = 700.0 + 35.0 * scale * (j + 1)  # cumulative ~350ppm over 10 steps, well beyond the 210ppm gate
+        values[i] = base + drift_step_magnitude * scale * (j + 1)
         labels[i] = "gradual_drift"
-    scenarios.append(Scenario(f"co2_gradual_drift_{variant}", "co2", _timestamps(n, cadence_seconds), values, labels,
-                               [FaultEvent(f"co2_gradual_drift_{variant}", "co2", "gradual_drift", drift_start, drift_len, "Steep 10-step monotonic ramp exceeding the magnitude gate.")]))
+    sid = f"{channel}_gradual_drift_{variant}"
+    scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
+                               [FaultEvent(sid, channel, "gradual_drift", drift_start, drift_len, "Steep 10-step monotonic ramp exceeding the magnitude gate.")],
+                               secondary_values=secondary_for(values)))
 
-    # genuine_rapid_event: a large but PERSISTENT step change (e.g. window opened) -- a real
-    # environmental event, not a sensor fault. Must remain usable after persistence confirmation.
-    values = osc(700.0, 10.0)
-    labels = [None] * n
-    step_start = n // 2
-    for i in range(step_start, n):
-        values[i] = 700.0 + 300.0 * scale  # sustained shift, holds for the rest of the scenario
-        labels[i] = "genuine_event"
-    scenarios.append(Scenario(f"co2_genuine_rapid_event_{variant}", "co2", _timestamps(n, cadence_seconds), values, labels,
-                               [FaultEvent(f"co2_genuine_rapid_event_{variant}", "co2", "genuine_event", step_start, n - step_start, "Sustained step change (e.g. ventilation) -- must remain usable, not be discarded as a fault.")]))
+    if include_genuine_events:
+        # genuine_rapid_event: a large but PERSISTENT step change (e.g. window opened) -- a real
+        # environmental event, not a sensor fault. Must remain usable after persistence confirmation.
+        values = osc()
+        labels = [None] * n
+        step_start = n // 2
+        for i in range(step_start, n):
+            values[i] = base + genuine_step_magnitude * scale
+            labels[i] = "genuine_event"
+        sid = f"{channel}_genuine_rapid_event_{variant}"
+        scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
+                                   [FaultEvent(sid, channel, "genuine_event", step_start, n - step_start, "Sustained step change -- must remain usable, not be discarded as a fault.")],
+                                   secondary_values=secondary_for(values)))
 
-    # persistent_real_change: similar but a gradual (not instant) sustained rise that holds --
-    # must not be discarded as gradual_drift once it has persisted past the drift window.
-    values = osc(700.0, 10.0)
-    labels = [None] * n
-    rise_start = n // 2
-    for j, i in enumerate(range(rise_start, n)):
-        values[i] = 700.0 + min(200.0 * scale, 20.0 * scale * (j + 1))
-        labels[i] = "genuine_event"
-    scenarios.append(Scenario(f"co2_persistent_real_change_{variant}", "co2", _timestamps(n, cadence_seconds), values, labels,
-                               [FaultEvent(f"co2_persistent_real_change_{variant}", "co2", "genuine_event", rise_start, n - rise_start, "Gradual but sustained real rise that plateaus and holds -- a genuine change, not a transient fault.")]))
+        # persistent_real_change: similar but a gradual (not instant) sustained rise that holds --
+        # must not be discarded as gradual_drift once it has persisted past the drift window.
+        values = osc()
+        labels = [None] * n
+        rise_start = n // 2
+        for j, i in enumerate(range(rise_start, n)):
+            values[i] = base + min(genuine_step_magnitude * scale * 2.0 / 3.0, (genuine_step_magnitude * scale / 10.0) * (j + 1))
+            labels[i] = "genuine_event"
+        sid = f"{channel}_persistent_real_change_{variant}"
+        scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
+                                   [FaultEvent(sid, channel, "genuine_event", rise_start, n - rise_start, "Gradual but sustained real rise that plateaus and holds -- a genuine change, not a transient fault.")],
+                                   secondary_values=secondary_for(values)))
 
     return scenarios
 
 
-def build_pm_scenario(cadence_seconds: int, n: int = 40) -> Scenario:
-    pm2_5 = _oscillate(4.0, 0.2, n)
+def build_co2_scenarios(cadence_seconds: int, n: int = 40, variant: str = "calibration") -> list[Scenario]:
+    return build_channel_scenarios(
+        "co2", cadence_seconds, n, variant,
+        base=700.0, amplitude=10.0, spike_magnitude=400.0, oor_value=999999.0,  # far outside SCD4x's 400-40'000ppm range
+        stuck_value=705.0, drift_step_magnitude=35.0, genuine_step_magnitude=300.0,
+        spike_magnitude_alt=120.0,  # a materially smaller spike, closer to the detection threshold
+    )
+
+
+def build_temperature_scenarios(cadence_seconds: int, n: int = 40, variant: str = "calibration") -> list[Scenario]:
+    return build_channel_scenarios(
+        "temperature", cadence_seconds, n, variant,
+        base=20.0, amplitude=0.3, spike_magnitude=8.0, oor_value=200.0,  # far outside BME688's -40..85 degC range
+        stuck_value=20.2, drift_step_magnitude=0.4, genuine_step_magnitude=4.0,
+        spike_magnitude_alt=2.5, dual_channel=True,
+    )
+
+
+def build_humidity_scenarios(cadence_seconds: int, n: int = 40, variant: str = "calibration") -> list[Scenario]:
+    return build_channel_scenarios(
+        "humidity", cadence_seconds, n, variant,
+        base=45.0, amplitude=2.0, spike_magnitude=35.0, oor_value=150.0,  # far outside the 0-100% RH range
+        stuck_value=46.0, drift_step_magnitude=3.0, genuine_step_magnitude=25.0,
+        spike_magnitude_alt=15.0, dual_channel=True,
+    )
+
+
+def build_pm10_scenarios(cadence_seconds: int, n: int = 40, variant: str = "calibration") -> list[Scenario]:
+    return build_channel_scenarios(
+        "pm10", cadence_seconds, n, variant,
+        base=6.0, amplitude=0.3, spike_magnitude=40.0, oor_value=99999.0,  # far outside SPS30's 0-1'000 ug/m3 range
+        stuck_value=6.5, drift_step_magnitude=8.0, genuine_step_magnitude=30.0,
+        include_genuine_events=False,  # genuine-event preservation is only benchmarked for CO2 (Hampel calibration target)
+    )
+
+
+def build_pm_scenario(cadence_seconds: int, n: int = 40, variant: str = "calibration") -> Scenario:
+    scale = 1.0 if variant == "calibration" else 1.15
+    phase = 0 if variant == "calibration" else 3
+    pm2_5 = [4.0 + 0.2 * math.sin(2 * math.pi * (i + phase) / 7.0) for i in range(n)]
     pm1 = [v - 0.5 for v in pm2_5]
     pm4 = [v + 0.5 for v in pm2_5]
     pm10 = [v + 1.0 for v in pm2_5]
     labels: list[str | None] = [None] * n
     idx = n // 2
-    pm1[idx] = pm2_5[idx] + 5.0  # PM1 > PM2.5 -- violates cumulative-mass ordering
-    labels[idx] = "pm_order_violation"
+    pm1[idx] = pm2_5[idx] + 5.0 * scale  # PM1 > PM2.5 -- violates cumulative-mass ordering
+    # The real quality layer has no distinct PM_ORDER_VIOLATION reason code (see
+    # iaq_hfis.constants.ReasonCode) -- check_pm_ordering() correctly reuses
+    # 'out_of_range' for a physically-implausible mass ordering. The true label
+    # here MUST match that, not an unscoreable label absent from REASON_CODES:
+    # confirmed bug fix (2026) -- "pm_order_violation" could never be a true
+    # positive against any tracked reason code and silently inflated
+    # out_of_range's false-positive count every time this scenario ran.
+    labels[idx] = "out_of_range"
+    sid = f"pm2_5_order_violation_{variant}"
     return Scenario(
-        "pm2_5_order_violation", "pm2_5", _timestamps(n, cadence_seconds), pm2_5, labels,
-        [FaultEvent("pm2_5_order_violation", "pm2_5", "pm_order_violation", idx, 1, "PM1 mass exceeds PM2.5 mass at one sample, violating cumulative ordering.")],
+        sid, "pm2_5", _timestamps(n, cadence_seconds), pm2_5, labels,
+        [FaultEvent(sid, "pm2_5", "out_of_range", idx, 1, "PM1 mass exceeds PM2.5 mass at one sample, violating cumulative ordering -- correctly classified as out_of_range (no distinct PM-ordering reason code exists).")],
         aux_pm={"mass_pm1_0": pm1, "mass_pm4_0": pm4, "mass_pm10": pm10},
     )
 
@@ -230,6 +365,22 @@ def run_scenario(
     return predictions
 
 
+def build_all_scenarios(cadence_seconds: int) -> list[Scenario]:
+    """Every fault-injection scenario across every benchmarked channel
+    (CO2, temperature, humidity, PM10, PM2.5 order-check) and both dataset
+    splits (calibration, validation) -- disjoint scenario_ids and a
+    different deterministic scale/phase per split, so nothing here can leak
+    from calibration into the validation numbers actually reported."""
+    scenarios: list[Scenario] = []
+    for variant in ("calibration", "validation"):
+        scenarios += build_co2_scenarios(cadence_seconds, variant=variant)
+        scenarios += build_temperature_scenarios(cadence_seconds, variant=variant)
+        scenarios += build_humidity_scenarios(cadence_seconds, variant=variant)
+        scenarios += build_pm10_scenarios(cadence_seconds, variant=variant)
+        scenarios.append(build_pm_scenario(cadence_seconds, variant=variant))
+    return scenarios
+
+
 def run_benchmark(
     schema_mapping: SchemaMappingConfig,
     sensor_specs: SensorSpecs,
@@ -238,7 +389,7 @@ def run_benchmark(
     pm_ordering_tolerance_pct: float,
     cadence_seconds: int,
 ) -> tuple[list[FaultEvent], list[SamplePrediction]]:
-    scenarios = build_co2_scenarios(cadence_seconds) + [build_pm_scenario(cadence_seconds)]
+    scenarios = build_all_scenarios(cadence_seconds)
     events = [e for s in scenarios for e in s.events]
     predictions = [p for s in scenarios for p in run_scenario(s, schema_mapping, sensor_specs, hampel_cfg, confirmation_cfg, pm_ordering_tolerance_pct)]
     return events, predictions
@@ -250,17 +401,29 @@ class FaultDetectionMetric:
     tp: int
     fp: int
     fn: int
+    tn: int
     precision: float | None
     recall: float | None
     f1: float | None
+    specificity: float | None
     false_positive_rate: float | None
     mean_detection_delay: float | None
 
 
-def score_predictions(predictions: list[SamplePrediction]) -> list[FaultDetectionMetric]:
-    """TP/FP/FN per reason code, computed against ``true_fault_type``.
-    'genuine_event' true labels are never a fault -- any reason_code
-    predicted there counts as a false positive under that reason_code."""
+def score_predictions(predictions: list[SamplePrediction], dataset_split: str | None = None) -> list[FaultDetectionMetric]:
+    """Row-level TP/FP/FN/TN per reason code, computed against
+    ``true_fault_type``. 'genuine_event' true labels are never a fault --
+    any reason_code predicted there counts as a false positive under that
+    reason_code. See :func:`match_events` for the corresponding event-level
+    metrics (row-level counts every affected sample; event-level counts
+    each injected fault once, regardless of its duration).
+
+    ``dataset_split``, when given, restricts scoring to "calibration" or
+    "validation" predictions only -- the final, publication-facing numbers
+    must come from the validation split (never calibration, which is what
+    any provisional parameter was tuned against)."""
+    if dataset_split is not None:
+        predictions = [p for p in predictions if p.dataset_split == dataset_split]
     metrics = []
     for code in REASON_CODES:
         tp = fp = fn = 0
@@ -286,15 +449,178 @@ def score_predictions(predictions: list[SamplePrediction]) -> list[FaultDetectio
         recall = tp / (tp + fn) if (tp + fn) > 0 else None
         f1 = (2 * precision * recall / (precision + recall)) if precision and recall and (precision + recall) > 0 else None
         n_negative = sum(1 for p in predictions if p.true_fault_type != code)
+        tn = n_negative - fp
         fpr = fp / n_negative if n_negative > 0 else None
-        metrics.append(FaultDetectionMetric(code, tp, fp, fn, precision, recall, f1, fpr, (sum(delays) / len(delays)) if delays else None))
+        specificity = 1.0 - fpr if fpr is not None else None
+        metrics.append(FaultDetectionMetric(code, tp, fp, fn, tn, precision, recall, f1, specificity, fpr, (sum(delays) / len(delays)) if delays else None))
     return metrics
 
 
-def false_rejection_rate_for_genuine_events(predictions: list[SamplePrediction]) -> float | None:
+@dataclass(frozen=True)
+class EventDetectionMetric:
+    reason_code: str
+    dataset_split: str
+    temporal_tolerance_samples: int
+    n_true_events: int
+    n_predicted_events: int
+    tp: int
+    fp: int
+    fn: int
+    precision: float | None
+    recall: float | None
+    f1: float | None
+    mean_detection_delay: float | None
+
+
+def _group_into_intervals(indices: list[int], temporal_tolerance_samples: int) -> list[tuple[int, int]]:
+    """Groups a sorted set of sample indices where a reason_code was
+    predicted into contiguous "predicted event" intervals [start, end],
+    merging indices no more than ``temporal_tolerance_samples`` apart into
+    the SAME interval -- otherwise a single multi-sample detection would be
+    double-counted as many separate events."""
+    if not indices:
+        return []
+    ordered = sorted(set(indices))
+    intervals: list[tuple[int, int]] = []
+    start = prev = ordered[0]
+    for idx in ordered[1:]:
+        if idx - prev <= temporal_tolerance_samples + 1:
+            prev = idx
+        else:
+            intervals.append((start, prev))
+            start = prev = idx
+    intervals.append((start, prev))
+    return intervals
+
+
+def match_events(
+    events: list[FaultEvent], predictions: list[SamplePrediction], reason_code: str, temporal_tolerance_samples: int = 1
+) -> EventDetectionMetric:
+    """Event-level matching for one reason_code: each injected fault
+    (regardless of how many samples it spans) is matched to at most one
+    predicted detection interval, and vice versa (one-to-one) -- this is
+    what prevents a single multi-sample fault from being double-counted as
+    N separate true positives (a real risk of the row-level metric alone).
+
+    Matching, per scenario: predicted sample indices carrying ``reason_code``
+    are grouped into contiguous intervals (:func:`_group_into_intervals`,
+    same tolerance); a true event and a predicted interval match if they
+    overlap or are within ``temporal_tolerance_samples`` of each other.
+    Matching is greedy by absolute start-distance (deterministic, and exact
+    for the benchmark's one-event-per-scenario scenarios; still well-defined
+    if a scenario is ever extended to carry multiple events of the same
+    type). Every scenario is self-contained (a short, isolated synthetic
+    series) with only one event of a given fault type -- there is no
+    warm-up period, no pre-existing anomaly carried over from a previous
+    scenario, and no possibility of overlapping windows between scenarios,
+    since each scenario_id is scored independently and never concatenated
+    with another.
+    """
+    tp = fp = fn = 0
+    n_true_events = 0
+    n_predicted_events = 0
+    delays: list[int] = []
+    scenario_ids = {e.scenario_id for e in events} | {p.scenario_id for p in predictions}
+    for scenario_id in scenario_ids:
+        true_events = [e for e in events if e.scenario_id == scenario_id and e.fault_type == reason_code]
+        n_true_events += len(true_events)
+        predicted_indices = [p.sample_index for p in predictions if p.scenario_id == scenario_id and reason_code in p.predicted_reason_codes]
+        predicted_intervals = _group_into_intervals(predicted_indices, temporal_tolerance_samples)
+        n_predicted_events += len(predicted_intervals)
+
+        remaining_intervals = list(predicted_intervals)
+        # Deterministic greedy matching: true events processed in start order, each
+        # matched to its nearest still-unmatched predicted interval within tolerance.
+        for true_event in sorted(true_events, key=lambda e: e.injected_at_index):
+            t_start, t_end = true_event.injected_at_index, true_event.injected_at_index + true_event.duration_samples - 1
+            best = None
+            best_dist = None
+            for interval in remaining_intervals:
+                p_start, p_end = interval
+                overlap = p_start <= t_end and p_end >= t_start
+                dist = 0 if overlap else min(abs(p_start - t_end), abs(t_start - p_end))
+                if dist <= temporal_tolerance_samples and (best is None or dist < best_dist):
+                    best, best_dist = interval, dist
+            if best is not None:
+                tp += 1
+                delays.append(best[0] - t_start)
+                remaining_intervals.remove(best)
+            else:
+                fn += 1
+        fp += len(remaining_intervals)  # predicted intervals with no matching true event
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else None
+    recall = tp / (tp + fn) if (tp + fn) > 0 else None
+    f1 = (2 * precision * recall / (precision + recall)) if precision and recall and (precision + recall) > 0 else None
+    return EventDetectionMetric(
+        reason_code=reason_code, dataset_split="", temporal_tolerance_samples=temporal_tolerance_samples,
+        n_true_events=n_true_events, n_predicted_events=n_predicted_events,
+        tp=tp, fp=fp, fn=fn, precision=precision, recall=recall, f1=f1,
+        mean_detection_delay=(sum(delays) / len(delays)) if delays else None,
+    )
+
+
+def score_events(
+    events: list[FaultEvent], predictions: list[SamplePrediction], dataset_split: str, temporal_tolerance_samples: int = 1
+) -> list[EventDetectionMetric]:
+    """Event-level metrics for every reason code, restricted to one dataset
+    split (matching only ever happens WITHIN a scenario, and every
+    scenario belongs to exactly one split, so this restriction cannot
+    accidentally match a calibration event against a validation
+    prediction)."""
+    split_events = [e for e in events if e.dataset_split == dataset_split]
+    split_predictions = [p for p in predictions if p.dataset_split == dataset_split]
+    results = []
+    for code in REASON_CODES:
+        m = match_events(split_events, split_predictions, code, temporal_tolerance_samples)
+        results.append(EventDetectionMetric(
+            reason_code=m.reason_code, dataset_split=dataset_split, temporal_tolerance_samples=m.temporal_tolerance_samples,
+            n_true_events=m.n_true_events, n_predicted_events=m.n_predicted_events,
+            tp=m.tp, fp=m.fp, fn=m.fn, precision=m.precision, recall=m.recall, f1=m.f1,
+            mean_detection_delay=m.mean_detection_delay,
+        ))
+    return results
+
+
+@dataclass(frozen=True)
+class ConfusionMatrixCell:
+    dataset_split: str
+    true_label: str  # a REASON_CODES value or "none"
+    predicted_label: str  # a REASON_CODES value or "none"
+    count: int
+
+
+def build_confusion_matrix(predictions: list[SamplePrediction], dataset_split: str) -> list[ConfusionMatrixCell]:
+    """Row-level confusion matrix: for every sample, its true label (a
+    reason code, or "none" if genuinely clean/a genuine_event) against
+    EVERY reason code it was actually predicted as (a sample can carry more
+    than one predicted reason_code; "none" is used if it carried zero).
+    Restricted to one dataset split, same isolation rationale as
+    :func:`score_events`."""
+    labels = REASON_CODES + ["none"]
+    counts: dict[tuple[str, str], int] = {}
+    for p in predictions:
+        if p.dataset_split != dataset_split:
+            continue
+        true_label = p.true_fault_type if p.true_fault_type in REASON_CODES else "none"
+        predicted_labels = [c for c in p.predicted_reason_codes if c in REASON_CODES] or ["none"]
+        for predicted_label in predicted_labels:
+            key = (true_label, predicted_label)
+            counts[key] = counts.get(key, 0) + 1
+    return [
+        ConfusionMatrixCell(dataset_split, true_label, predicted_label, counts.get((true_label, predicted_label), 0))
+        for true_label in labels
+        for predicted_label in labels
+        if counts.get((true_label, predicted_label), 0) > 0
+    ]
+
+
+def false_rejection_rate_for_genuine_events(predictions: list[SamplePrediction], dataset_split: str | None = None) -> float | None:
     """Of samples labeled 'genuine_event' (a real environmental change, not
     a fault), the fraction that ended up unusable -- these must NOT be
     discarded."""
+    if dataset_split is not None:
+        predictions = [p for p in predictions if p.dataset_split == dataset_split]
     genuine = [p for p in predictions if p.true_fault_type == "genuine_event"]
     if not genuine:
         return None
@@ -302,10 +628,12 @@ def false_rejection_rate_for_genuine_events(predictions: list[SamplePrediction])
     return rejected / len(genuine)
 
 
-def confirmation_recovery_rate(predictions: list[SamplePrediction]) -> float | None:
+def confirmation_recovery_rate(predictions: list[SamplePrediction], dataset_split: str | None = None) -> float | None:
     """Of samples that reached SUSPECT (a candidate anomaly), the fraction
     ultimately confirmed usable -- i.e. correctly recovered rather than
     discarded."""
+    if dataset_split is not None:
+        predictions = [p for p in predictions if p.dataset_split == dataset_split]
     suspect = [p for p in predictions if p.stage2_state == "SUSPECT"]
     if not suspect:
         return None
@@ -323,7 +651,7 @@ HAMPEL_MULTIPLIER_GRID = [1.0, 2.0, 3.0]
 
 @dataclass(frozen=True)
 class HampelCalibrationRow:
-    dataset_split: str  # "development" | "holdout"
+    dataset_split: str  # "calibration" | "validation"
     window_size: int
     mad_multiplier: float
     fault_recall: float | None
@@ -360,12 +688,15 @@ def run_hampel_calibration(
     """Documented calibration protocol (task spec section 10.3):
 
     1. Grid-search ``HAMPEL_WINDOW_GRID`` x ``HAMPEL_MULTIPLIER_GRID`` on the
-       *development* scenario split only.
+       *calibration* scenario split only.
     2. Score each combination by a balanced objective: single_spike recall
        (fault_recall) and the fraction of genuine sustained events NOT
        falsely rejected (genuine_event_preservation_rate), averaged.
-    3. Report the *holdout* split's performance for the config actually
-       kept in use -- computed once, not used to pick the parameters.
+    3. Report the *validation* split's performance for the config actually
+       kept in use -- computed once, not used to pick the parameters. The
+       calibration and validation splits use disjoint scenario_ids AND a
+       different deterministic scale/phase (see build_channel_scenarios),
+       so no scenario or timestamp is shared between them -- no leakage.
     4. The originally configured (window_size, mad_multiplier) is always
        marked ``selected`` here: per the calibration policy, a change is
        only adopted after separate empirical verification against real
@@ -374,10 +705,10 @@ def run_hampel_calibration(
        diagnostic, not a proposal to silently override the configured value.
     """
     rows: list[HampelCalibrationRow] = []
-    dev_scenarios = _hampel_affected_scenarios(cadence_seconds, "dev")
-    holdout_scenarios = _hampel_affected_scenarios(cadence_seconds, "holdout")
+    calibration_scenarios = _hampel_affected_scenarios(cadence_seconds, "calibration")
+    validation_scenarios = _hampel_affected_scenarios(cadence_seconds, "validation")
 
-    for split, scenarios in (("development", dev_scenarios), ("holdout", holdout_scenarios)):
+    for split, scenarios in (("calibration", calibration_scenarios), ("validation", validation_scenarios)):
         for window_size in HAMPEL_WINDOW_GRID:
             for mad_multiplier in HAMPEL_MULTIPLIER_GRID:
                 hampel_cfg = HampelConfig(window_size=window_size, mad_multiplier=mad_multiplier)

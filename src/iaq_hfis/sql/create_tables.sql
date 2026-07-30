@@ -102,10 +102,25 @@ CREATE TABLE IF NOT EXISTS iaq_index_results (
     missing_inputs          VARCHAR[],
     index_value             DOUBLE,                  -- NULL if FAILED
     index_class             VARCHAR,                 -- NULL if FAILED
-    -- Dominant adverse component(s): the available component(s) with the
-    -- highest adverse crisp score, ties preserved only within
-    -- membership.dominant_component_tie_tolerance. Empty for FAILED.
-    dominant_component      VARCHAR[],
+    -- Dominant adverse component: single, deterministically-chosen primary
+    -- component from the priority hierarchy in fuzzy_engine.determine_dominance
+    -- (max-firing rule -> most severe consequent -> causing antecedent(s) ->
+    -- highest severity -> tie-break by normalized score). NULL for FAILED
+    -- or when no rule fired at all.
+    dominant_component        VARCHAR,
+    -- Every component tied for dominance at the end of the hierarchy
+    -- (length 1 unless a genuine, documented tie survived every step,
+    -- including dominant_component itself). Empty for FAILED.
+    co_dominant_components    VARCHAR[],
+    -- Highest-severity class reached by ANY available component's own
+    -- dominant class -- independent of the tie-breaking mechanics above.
+    worst_component_class     VARCHAR,
+    -- max(component_crisp_scores) among available components.
+    largest_component_score   DOUBLE,
+    -- Which step of the priority hierarchy resolved dominant_component
+    -- (e.g. 'unique_max_firing_rule', 'co_dominant_tie',
+    -- 'tie_broken_by_normalized_score', 'no_rules_fired').
+    dominance_reason          VARCHAR,
     -- Separate diagnostic: which component(s) "bound" the min() in the
     -- fired Mamdani rules (rule-level attribution). NOT the manuscript's
     -- dominant adverse component -- kept only as an optional diagnostic.
@@ -253,30 +268,36 @@ CREATE TABLE IF NOT EXISTS evaluation_continuity_grid (
     pipeline_run_id    VARCHAR     NOT NULL,
     boundary_id        VARCHAR     NOT NULL,
     channel            VARCHAR     NOT NULL,
+    context             VARCHAR     NOT NULL,   -- favorable | acceptable | degraded (severity of the OTHER, non-swept channels)
     boundary_value     DOUBLE      NOT NULL,
     grid_index         INTEGER     NOT NULL,
     input_value        DOUBLE      NOT NULL,
     method             VARCHAR     NOT NULL,   -- PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN
     index_value        DOUBLE,
     index_class        VARCHAR,
-    PRIMARY KEY (evaluation_run_id, boundary_id, method, grid_index)
+    PRIMARY KEY (evaluation_run_id, boundary_id, context, method, grid_index)
 );
 
 CREATE TABLE IF NOT EXISTS evaluation_continuity_summary (
-    evaluation_run_id          VARCHAR NOT NULL,
-    pipeline_run_id            VARCHAR NOT NULL,
-    boundary_id                VARCHAR NOT NULL,
-    channel                    VARCHAR NOT NULL,
-    method                     VARCHAR NOT NULL,
-    max_adjacent_jump          DOUBLE,
-    mean_adjacent_jump         DOUBLE,
-    total_variation            DOUBLE,
-    n_class_transitions        INTEGER,
-    class_transition_positions VARCHAR,   -- semicolon-joined input_values
-    index_range                DOUBLE,
-    monotonicity_violations    INTEGER,
-    masked_by_favorable        BOOLEAN,
-    PRIMARY KEY (evaluation_run_id, boundary_id, method)
+    evaluation_run_id                  VARCHAR NOT NULL,
+    pipeline_run_id                    VARCHAR NOT NULL,
+    boundary_id                        VARCHAR NOT NULL,
+    channel                            VARCHAR NOT NULL,
+    context                            VARCHAR NOT NULL,   -- favorable | acceptable | degraded
+    method                             VARCHAR NOT NULL,
+    max_adjacent_jump                  DOUBLE,
+    mean_adjacent_jump                 DOUBLE,
+    median_adjacent_jump               DOUBLE,
+    p95_adjacent_jump                  DOUBLE,
+    total_variation                    DOUBLE,
+    local_lipschitz_ratio              DOUBLE,
+    n_class_transitions                INTEGER,
+    class_transition_positions         VARCHAR,   -- semicolon-joined input_values
+    index_range                        DOUBLE,
+    monotonicity_violations            INTEGER,
+    masked_by_favorable                BOOLEAN,
+    area_between_curves_vs_crisp_max   DOUBLE,    -- only populated for method = 'PROPOSED-HFIS'
+    PRIMARY KEY (evaluation_run_id, boundary_id, context, method)
 );
 
 -- Fault-injection benchmark: deterministic synthetic scenarios with known
@@ -286,6 +307,7 @@ CREATE TABLE IF NOT EXISTS fault_injection_events (
     evaluation_run_id  VARCHAR     NOT NULL,
     pipeline_run_id    VARCHAR     NOT NULL,
     scenario_id        VARCHAR     NOT NULL,
+    dataset_split      VARCHAR     NOT NULL,   -- calibration | validation
     channel            VARCHAR     NOT NULL,
     fault_type         VARCHAR     NOT NULL,
     injected_at_index  INTEGER     NOT NULL,
@@ -298,6 +320,7 @@ CREATE TABLE IF NOT EXISTS fault_detection_predictions (
     evaluation_run_id  VARCHAR     NOT NULL,
     pipeline_run_id    VARCHAR     NOT NULL,
     scenario_id        VARCHAR     NOT NULL,
+    dataset_split      VARCHAR     NOT NULL,   -- calibration | validation
     channel            VARCHAR     NOT NULL,
     sample_index       INTEGER     NOT NULL,
     true_fault_type    VARCHAR,    -- NULL when the sample is genuinely clean/no fault
@@ -307,25 +330,67 @@ CREATE TABLE IF NOT EXISTS fault_detection_predictions (
     PRIMARY KEY (evaluation_run_id, scenario_id, channel, sample_index)
 );
 
+-- Row-level: every affected sample counted individually (a multi-sample
+-- fault contributes multiple TP/FN rows). See fault_detection_event_metrics
+-- below for the corresponding event-level counts (each injected fault
+-- counted once, regardless of duration).
 CREATE TABLE IF NOT EXISTS fault_detection_metrics (
     evaluation_run_id      VARCHAR NOT NULL,
     pipeline_run_id        VARCHAR NOT NULL,
+    dataset_split           VARCHAR NOT NULL,  -- calibration | validation
     reason_code            VARCHAR NOT NULL,
     tp                     INTEGER NOT NULL,
     fp                     INTEGER NOT NULL,
     fn                     INTEGER NOT NULL,
+    tn                     INTEGER NOT NULL,
     precision               DOUBLE,
     recall                  DOUBLE,
     f1                      DOUBLE,
+    specificity              DOUBLE,
     false_positive_rate     DOUBLE,
     mean_detection_delay    DOUBLE,
-    PRIMARY KEY (evaluation_run_id, reason_code)
+    PRIMARY KEY (evaluation_run_id, dataset_split, reason_code)
+);
+
+-- Event-level: one-to-one matching of each injected fault (regardless of
+-- its sample duration) against predicted detection intervals, within a
+-- configurable temporal tolerance. Prevents a single multi-sample fault
+-- from being double-counted as many separate true positives.
+CREATE TABLE IF NOT EXISTS fault_detection_event_metrics (
+    evaluation_run_id           VARCHAR NOT NULL,
+    pipeline_run_id             VARCHAR NOT NULL,
+    dataset_split                VARCHAR NOT NULL,  -- calibration | validation
+    reason_code                 VARCHAR NOT NULL,
+    temporal_tolerance_samples   INTEGER NOT NULL,
+    n_true_events                 INTEGER NOT NULL,
+    n_predicted_events             INTEGER NOT NULL,
+    tp                          INTEGER NOT NULL,
+    fp                          INTEGER NOT NULL,
+    fn                          INTEGER NOT NULL,
+    precision                    DOUBLE,
+    recall                       DOUBLE,
+    f1                           DOUBLE,
+    mean_detection_delay         DOUBLE,
+    PRIMARY KEY (evaluation_run_id, dataset_split, reason_code)
+);
+
+-- Row-level confusion matrix: true label (a reason code, or 'none') against
+-- every reason code actually predicted for that sample (a sample can carry
+-- more than one predicted reason_code).
+CREATE TABLE IF NOT EXISTS fault_detection_confusion_matrix (
+    evaluation_run_id  VARCHAR NOT NULL,
+    pipeline_run_id    VARCHAR NOT NULL,
+    dataset_split       VARCHAR NOT NULL,  -- calibration | validation
+    true_label          VARCHAR NOT NULL,  -- a reason code, or 'none'
+    predicted_label      VARCHAR NOT NULL,  -- a reason code, or 'none'
+    count                INTEGER NOT NULL,
+    PRIMARY KEY (evaluation_run_id, dataset_split, true_label, predicted_label)
 );
 
 CREATE TABLE IF NOT EXISTS hampel_calibration (
     evaluation_run_id  VARCHAR NOT NULL,
     pipeline_run_id    VARCHAR NOT NULL,
-    dataset_split       VARCHAR NOT NULL,  -- development | holdout
+    dataset_split       VARCHAR NOT NULL,  -- calibration | validation
     window_size          INTEGER NOT NULL,
     mad_multiplier         DOUBLE  NOT NULL,
     fault_recall             DOUBLE,

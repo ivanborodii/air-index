@@ -32,6 +32,7 @@ from datetime import datetime
 import numpy as np
 
 from iaq_hfis.baselines import BaselineResult, crisp_max, weighted_mean
+from iaq_hfis.constants import CLASS_SEVERITY
 from iaq_hfis.pipeline import RuntimeContext, infer_from_values
 from iaq_hfis.schema import RAW_COLUMN_TO_SENSOR_SPEC, channel_uncertainty
 
@@ -223,24 +224,12 @@ def run_multi_point_stability(ctx: RuntimeContext, profile, samples: list[Stabil
     return results
 
 
-@dataclass(frozen=True)
-class MethodStabilitySummary:
-    method: str
-    n_samples: int
-    n_trials_total: int
-    n_class_changes: int
-    class_change_rate: float
-    class_change_rate_ci95: tuple[float, float] | None
-    mean_abs_index_change: float | None
-    median_abs_index_change: float | None
-    p95_abs_index_change: float | None
-    max_abs_index_change: float | None
-
-
 def wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float] | None:
     """95% Wilson score confidence interval for a binomial proportion --
     reproducible (closed-form, no resampling) and reasonable for small n,
-    unlike the normal approximation. Returns None when n == 0."""
+    unlike the normal approximation. Returns None when n == 0. Intervals
+    from very small n (e.g. a single sample point's 30 trials) will be
+    wide -- that width is the honest signal, not hidden."""
     if n == 0:
         return None
     p = successes / n
@@ -250,32 +239,118 @@ def wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float] | 
     return (max(0.0, center - half_width), min(1.0, center + half_width))
 
 
-def summarize_stability(results: list[SamplePointResult]) -> dict[str, MethodStabilitySummary]:
-    summaries: dict[str, MethodStabilitySummary] = {}
-    for method in METHODS:
-        n_changes = 0
-        n_trials_total = 0
-        abs_changes: list[float] = []
-        for r in results:
-            baseline = r.baseline[method]
-            for trial in r.trials[method]:
-                n_trials_total += 1
-                if trial.index_class != baseline.index_class:
-                    n_changes += 1
-                if trial.index_value is not None and baseline.index_value is not None:
-                    abs_changes.append(abs(trial.index_value - baseline.index_value))
-        rate = (n_changes / n_trials_total) if n_trials_total > 0 else 0.0
+def _fetch_stability_rows(con, evaluation_run_id: str) -> list[tuple]:
+    """(method, trial_class, changed_from_baseline, abs_index_change,
+    sample_id, selection_reason, boundary_channel, baseline_class) --
+    joined directly from the persisted trial/sample tables so every
+    aggregation dimension below reads the exact same rows."""
+    return con.execute(
+        """
+        SELECT t.method, t.trial_class, t.changed_from_baseline, t.abs_index_change,
+               s.sample_id, s.selection_reason, s.boundary_channel,
+               CASE t.method
+                   WHEN 'PROPOSED-HFIS' THEN s.baseline_class_hfis
+                   WHEN 'CRISP-MAX' THEN s.baseline_class_crisp_max
+                   WHEN 'WEIGHTED-MEAN' THEN s.baseline_class_weighted_mean
+               END AS baseline_class
+        FROM evaluation_stability_trials t
+        JOIN evaluation_stability_samples s
+          ON s.evaluation_run_id = t.evaluation_run_id AND s.sample_id = t.sample_id
+        WHERE t.evaluation_run_id = ?
+        """,
+        [evaluation_run_id],
+    ).fetchall()
+
+
+def _aggregate_stability_rows(rows: list[tuple], key_fields: list[str], key_fn) -> list[dict]:
+    """The ONE deterministic aggregation function for every stability
+    summary grouping (overall / by-variable / by-original-class /
+    by-point) -- always computed directly from the persisted
+    evaluation_stability_trials rows (via ``_fetch_stability_rows``), never
+    independently recomputed. Both ``run_summary.json`` (:mod:`iaq_hfis.evaluate`)
+    and every ``stability_*.csv`` export (:mod:`iaq_hfis.reporting.exports`)
+    call this exact function, so they can never numerically disagree.
+
+    "Better"/"worse" is determined by :data:`iaq_hfis.constants.CLASS_SEVERITY`
+    (lower severity = better); this is a class-agreement/movement statistic,
+    never called "accuracy" -- there is no ground truth here, only
+    consistency of the method's own output under input perturbation.
+    """
+    by_key: dict[tuple, list[tuple]] = {}
+    for row in rows:
+        by_key.setdefault(key_fn(row), []).append(row)
+
+    out = []
+    for key in sorted(by_key.keys(), key=lambda k: tuple(str(x) for x in k)):
+        group = by_key[key]
+        n_trials = len(group)
+        n_changes = sum(1 for r in group if r[2])
+        abs_changes = [r[3] for r in group if r[3] is not None]
         arr = np.array(abs_changes) if abs_changes else None
-        summaries[method] = MethodStabilitySummary(
-            method=method,
-            n_samples=len(results),
-            n_trials_total=n_trials_total,
-            n_class_changes=n_changes,
-            class_change_rate=rate,
-            class_change_rate_ci95=wilson_ci(n_changes, n_trials_total),
-            mean_abs_index_change=float(arr.mean()) if arr is not None else None,
-            median_abs_index_change=float(np.median(arr)) if arr is not None else None,
-            p95_abs_index_change=float(np.percentile(arr, 95)) if arr is not None else None,
-            max_abs_index_change=float(arr.max()) if arr is not None else None,
+
+        n_better, n_worse, n_comparable = 0, 0, 0
+        for r in group:
+            trial_class, baseline_class = r[1], r[7]
+            ts, bs = CLASS_SEVERITY.get(trial_class), CLASS_SEVERITY.get(baseline_class)
+            if ts is None or bs is None:
+                continue
+            n_comparable += 1
+            if ts < bs:
+                n_better += 1
+            elif ts > bs:
+                n_worse += 1
+
+        entry = dict(zip(key_fields, key))
+        entry.update(
+            {
+                "n_samples": len({r[4] for r in group}),
+                "n_trials_total": n_trials,
+                "n_class_changes": n_changes,
+                "class_change_rate": (n_changes / n_trials) if n_trials else None,
+                "class_change_rate_ci95": wilson_ci(n_changes, n_trials),
+                "mean_abs_index_change": float(arr.mean()) if arr is not None else None,
+                "median_abs_index_change": float(np.median(arr)) if arr is not None else None,
+                "p95_abs_index_change": float(np.percentile(arr, 95)) if arr is not None else None,
+                "max_abs_index_change": float(arr.max()) if arr is not None else None,
+                "n_comparable_for_direction": n_comparable,
+                "n_moved_better": n_better,
+                "n_moved_worse": n_worse,
+                "prob_moved_better": (n_better / n_comparable) if n_comparable else None,
+                "prob_moved_worse": (n_worse / n_comparable) if n_comparable else None,
+                "prob_moved_better_ci95": wilson_ci(n_better, n_comparable),
+                "prob_moved_worse_ci95": wilson_ci(n_worse, n_comparable),
+            }
         )
-    return summaries
+        out.append(entry)
+    return out
+
+
+def compute_stability_summary_overall(con, evaluation_run_id: str) -> list[dict]:
+    rows = _fetch_stability_rows(con, evaluation_run_id)
+    return _aggregate_stability_rows(rows, ["method"], key_fn=lambda r: (r[0],))
+
+
+def compute_stability_summary_by_variable(con, evaluation_run_id: str) -> list[dict]:
+    """Aggregated by (method, selection_reason, boundary_channel) -- the
+    channel whose boundary a sample was selected as adjacent to
+    (``boundary_channel`` is null for random_comparison samples, grouped
+    under selection_reason alone)."""
+    rows = _fetch_stability_rows(con, evaluation_run_id)
+    return _aggregate_stability_rows(rows, ["method", "selection_reason", "boundary_channel"], key_fn=lambda r: (r[0], r[5], r[6]))
+
+
+def compute_stability_summary_by_original_class(con, evaluation_run_id: str) -> list[dict]:
+    """Aggregated by (method, original_class) -- the method's own baseline
+    (unperturbed) class at each sample point, i.e. does stability differ
+    depending on which class a point started in."""
+    rows = [r for r in _fetch_stability_rows(con, evaluation_run_id) if r[7] is not None]
+    return _aggregate_stability_rows(rows, ["method", "original_class"], key_fn=lambda r: (r[0], r[7]))
+
+
+def compute_stability_summary_by_point(con, evaluation_run_id: str) -> list[dict]:
+    """Per (sample_id, method) -- the finest-grained breakdown, one row per
+    sampled point per method."""
+    rows = _fetch_stability_rows(con, evaluation_run_id)
+    return _aggregate_stability_rows(
+        rows, ["sample_id", "method", "selection_reason", "boundary_channel", "original_class"], key_fn=lambda r: (r[4], r[0], r[5], r[6], r[7])
+    )

@@ -12,36 +12,120 @@ baselines can reuse it without changes here.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
-from iaq_hfis.constants import CLASS_ORDER, OUTPUT_BOUNDARIES
+from iaq_hfis.constants import CLASS_ORDER, CLASS_SEVERITY, OUTPUT_BOUNDARIES
 from iaq_hfis.membership import Shape, evaluate_memberships
-from iaq_hfis.models import ComponentInferenceResult, FiredRule, IndexInferenceResult, Rule
+from iaq_hfis.models import ComponentInferenceResult, DominanceResult, FiredRule, IndexInferenceResult, Rule
 from iaq_hfis.rules import RuleBase, generate_component_rules
 
+#: Floating-point tolerance for "same firing strength" (step 1 of
+#: determine_dominance) -- deliberately tiny and NOT the configured
+#: membership.dominant_component_tie_tolerance (which is a much coarser,
+#: index-point-scale tolerance used only at the final score tie-break step).
+_FIRING_STRENGTH_EPS = 1e-9
 
-def dominant_adverse_component(component_crisp_scores: dict[str, float], tie_tolerance: float) -> list[str]:
-    """The manuscript's dominant adverse component: the available
-    component with the highest adverse crisp score (0-100 scale, higher =
-    worse, the same scale and centroid the final index itself uses).
 
-    Multiple components are returned only when their crisp scores are
-    within ``tie_tolerance`` of the maximum (an exact tie, or a near-tie
-    within the configured tolerance); a component outside tolerance is
-    excluded even if nominally high. Empty input (e.g. a FAILED result, or
-    no components with a defined crisp score) returns an empty list --
-    never a placeholder.
+def _own_dominant_class(class_degrees: dict[str, float]) -> str | None:
+    """The single class a component's own membership degrees favor most.
+    Ties in degree (e.g. exactly at a crossover point) resolve to the
+    more severe of the tied classes, consistent with this codebase's
+    worst-of philosophy everywhere else (rules.py, masking, etc.)."""
+    if not class_degrees:
+        return None
+    max_degree = max(class_degrees.values())
+    tied = [c for c in CLASS_ORDER if class_degrees.get(c) == max_degree]
+    if not tied:
+        return None
+    return max(tied, key=lambda c: CLASS_SEVERITY[c])
+
+
+def determine_dominance(
+    fired_rules: list[FiredRule],
+    component_degrees: dict[str, dict[str, float]],
+    component_crisp_scores: dict[str, float],
+    tie_tolerance: float,
+) -> DominanceResult:
+    """The manuscript's dominant adverse component, via a deterministic
+    priority hierarchy over the 2nd-level (index) fired rules:
+
+    1. The max-firing rule(s), within a tiny floating-point tolerance
+       (:data:`_FIRING_STRENGTH_EPS` -- NOT the configured score tolerance).
+    2. Among those, the rule(s) with the most severe consequent class.
+    3. The antecedent component(s) that CAUSED that consequent -- i.e.
+       whichever antecedent(s) attained each such rule's own minimum degree
+       (the one(s) that actually constrained its firing strength).
+    4. Among those causing components, keep only the one(s) whose own
+       antecedent class (in the rules that named them) reached the highest
+       severity.
+    5. Tie-break by larger normalized crisp score, using the configured
+       ``tie_tolerance`` (index points) -- components remaining within
+       tolerance of the maximum score are kept as a documented co-dominant
+       tie; the deterministic primary is the alphabetically-first of them.
+
+    See :class:`iaq_hfis.models.DominanceResult` for the returned fields.
     """
     scored = {c: s for c, s in component_crisp_scores.items() if s is not None}
-    if not scored:
-        return []
-    max_score = max(scored.values())
-    return sorted(c for c, s in scored.items() if (max_score - s) <= tie_tolerance)
+    largest_component_score = max(scored.values()) if scored else None
+    own_classes = [cls for cls in (_own_dominant_class(cd) for cd in component_degrees.values()) if cls is not None]
+    worst_component_class = max(own_classes, key=lambda c: CLASS_SEVERITY[c]) if own_classes else None
+
+    active = [fr for fr in fired_rules if fr.firing_strength > 0]
+    if not active:
+        return DominanceResult(
+            dominant_component=None, co_dominant_components=[],
+            worst_component_class=worst_component_class, largest_component_score=largest_component_score,
+            dominance_reason="no_rules_fired",
+        )
+
+    # Step 1: max-firing rule(s), floating-point-safe tolerance only.
+    max_strength = max(fr.firing_strength for fr in active)
+    top_by_strength = [fr for fr in active if max_strength - fr.firing_strength <= _FIRING_STRENGTH_EPS]
+
+    # Step 2: among those, the most severe consequent class.
+    max_consequent_severity = max(CLASS_SEVERITY[fr.rule.consequent_class] for fr in top_by_strength)
+    top_by_consequent = [fr for fr in top_by_strength if CLASS_SEVERITY[fr.rule.consequent_class] == max_consequent_severity]
+
+    # Step 3 + 4: the antecedent component(s) causing that consequent, kept only at
+    # the highest severity any of them actually attained across the selected rules.
+    component_best_severity: dict[str, int] = {}
+    for fr in top_by_consequent:
+        min_degree = min(fr.antecedent_degrees.values())
+        for name, cls in fr.rule.antecedents:
+            if fr.antecedent_degrees[name] == min_degree:
+                sev = CLASS_SEVERITY[cls]
+                component_best_severity[name] = max(component_best_severity.get(name, -1), sev)
+    max_component_severity = max(component_best_severity.values())
+    finalists = sorted(name for name, sev in component_best_severity.items() if sev == max_component_severity)
+
+    # Step 5: tie-break by larger normalized score.
+    finalist_scores = {c: scored[c] for c in finalists if c in scored}
+    if not finalist_scores:
+        co_dominant = finalists
+        reason = "tied_no_score_available"
+    else:
+        max_score = max(finalist_scores.values())
+        co_dominant = sorted(c for c in finalists if c in finalist_scores and (max_score - finalist_scores[c]) <= tie_tolerance)
+        if len(top_by_strength) == 1 and len(top_by_consequent) == 1 and len(co_dominant) == 1:
+            reason = "unique_max_firing_rule"
+        elif len(co_dominant) > 1:
+            reason = "co_dominant_tie"
+        else:
+            reason = "tie_broken_by_normalized_score"
+
+    dominant = co_dominant[0] if co_dominant else (finalists[0] if finalists else None)
+    return DominanceResult(
+        dominant_component=dominant, co_dominant_components=co_dominant,
+        worst_component_class=worst_component_class, largest_component_score=largest_component_score,
+        dominance_reason=reason,
+    )
 
 
 def rule_level_contributors(fired_rules: list[FiredRule]) -> list[str]:
     """Diagnostic only -- NOT the manuscript's dominant adverse component
-    (see :func:`dominant_adverse_component`). The component(s) most
+    (see :func:`determine_dominance`). The component(s) most
     responsible for the activated rules: for every rule with
     firing_strength > 0, its "binding" component(s) are whichever
     antecedent(s) attained the rule's minimum degree (the one(s) that
@@ -152,17 +236,18 @@ class MamdaniEngine:
 
         index_value = self._centroid(class_activation)
         index_class = classify_output(index_value) if index_value is not None else None
-        # Dominant adverse component is computed from available components'
-        # crisp scores only -- PARTIAL naturally considers only those,
-        # since unavailable components have no crisp score.
+        # Dominance is computed from available components only -- PARTIAL
+        # naturally considers only those, since unavailable components have
+        # no crisp score and never appear in component_degrees/fired rules.
         available_crisp_scores = {c: s for c, s in component_crisp_scores.items() if c in available_components}
-        dominant = dominant_adverse_component(available_crisp_scores, dominant_component_tie_tolerance)
+        available_degrees = {c: d for c, d in component_degrees.items() if c in available_components}
+        dominance = determine_dominance(fired, available_degrees, available_crisp_scores, dominant_component_tie_tolerance)
         contributors = rule_level_contributors(fired)
         return IndexInferenceResult(
             output_class_degrees=class_activation,
             index_value=index_value,
             index_class=index_class,
-            dominant_components=dominant,
+            dominance=dominance,
             rule_level_contributors=contributors,
             fired_rules=fired,
         )

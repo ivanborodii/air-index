@@ -35,7 +35,18 @@ logger = logging.getLogger(__name__)
 #: (and, for evaluation tables, evaluation_run_id). Version 1 (pre-isolation)
 #: rows must never be silently reinterpreted as version 2 rows -- see
 #: LegacySchemaError below and iaq_hfis.cli's rebuild-db command.
-SCHEMA_VERSION = 2
+#: Version 3: evaluation_continuity_grid/evaluation_continuity_summary gained
+#: a `context` column (favorable/acceptable/degraded) and new summary metrics
+#: (median/p95 adjacent jump, local_lipschitz_ratio, area_between_curves_vs_crisp_max).
+#: Version 4: iaq_index_results.dominant_component changed from VARCHAR[] to a
+#: single VARCHAR (the deterministic priority-hierarchy result), plus new
+#: co_dominant_components/worst_component_class/largest_component_score/
+#: dominance_reason columns -- see fuzzy_engine.determine_dominance.
+#: Version 5: fault_injection_events/fault_detection_predictions/
+#: fault_detection_metrics gained a dataset_split column (calibration |
+#: validation); fault_detection_metrics gained tn/specificity; two new
+#: tables (fault_detection_event_metrics, fault_detection_confusion_matrix).
+SCHEMA_VERSION = 5
 
 #: Tables whose presence with a pre-isolation column set indicates a legacy
 #: (schema version 1) derived database.

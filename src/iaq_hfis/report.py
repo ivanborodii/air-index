@@ -22,9 +22,10 @@ import pandas as pd
 from iaq_hfis import plots
 from iaq_hfis.article_summary import write_article_summary
 from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings
-from iaq_hfis.provenance import assess_publication_readiness, collect_parameter_provenance, mark_engagement
+from iaq_hfis.provenance import apply_known_engagement, assess_publication_readiness, collect_parameter_provenance
 from iaq_hfis.reporting import data_dictionary, exports, narrative, plot_manifest
 from iaq_hfis.reporting import summary as summary_module
+from iaq_hfis.reporting.provisional_assessment import PROVISIONAL_PARAMETER_ASSESSMENT_MD, build_provisional_parameter_assessment_markdown
 
 PARAMETER_PROVENANCE_CSV = "parameter_provenance.csv"
 
@@ -71,7 +72,11 @@ def generate_report(settings: Settings, pipeline_run_id: str, sensor_specs: Sens
     to_ts = datetime.fromisoformat(summary["computed_ts_range"][1])
     evaluation_run_id = summary.get("selected_evaluation_run_id")
 
-    provenance = mark_engagement(collect_parameter_provenance(settings, sensor_specs, room_profiles), summary.get("provisional_parameters_used") or [])
+    # provisional_parameters_used was already decided authoritatively at 'run' time (pipeline.py);
+    # here we only mark each catalog row's 'engaged' flag from that already-persisted list --
+    # never re-derive engagement independently, which is exactly how run_summary.md/run_narrative.md
+    # (reading this same top-level field) previously disagreed with publication_readiness.
+    provenance = apply_known_engagement(collect_parameter_provenance(settings, sensor_specs, room_profiles), summary.get("provisional_parameters_used") or [])
     summary["publication_readiness"] = assess_publication_readiness(summary, provenance)
     _write_run_summary(settings, pipeline_run_id, summary)
 
@@ -91,6 +96,10 @@ def generate_report(settings: Settings, pipeline_run_id: str, sensor_specs: Sens
     narrative_path = narrative.write_run_narrative(summary, report_dir)
     article_md_path, article_json_path = write_article_summary(summary, report_dir)
 
+    report_dir.mkdir(parents=True, exist_ok=True)
+    assessment_path = report_dir / PROVISIONAL_PARAMETER_ASSESSMENT_MD
+    assessment_path.write_text(build_provisional_parameter_assessment_markdown(provenance, summary), encoding="utf-8")
+
     return {
         "report_dir": str(report_dir),
         "csv_paths": {name: (str(path) if path else None) for name, path in csv_paths.items()},
@@ -101,6 +110,7 @@ def generate_report(settings: Settings, pipeline_run_id: str, sensor_specs: Sens
         "run_narrative_md": str(narrative_path),
         "article_results_summary": str(article_md_path),
         "article_metrics": str(article_json_path),
+        "provisional_parameter_assessment": str(assessment_path),
         "generation_seconds": time.perf_counter() - t0,
     }
 
