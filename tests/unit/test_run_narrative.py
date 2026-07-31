@@ -11,15 +11,15 @@ MINIMAL_SUMMARY = {
 
 FULL_EVALUATION = {
     "evaluation_run_id": "eval123",
-    "agreement": [{"method_a": "CRISP-MAX", "method_b": "PROPOSED-HFIS", "n": 3, "n_excluded": 0, "percent_agreement": 1.0, "cohens_kappa": 1.0}],
-    "masking": [{"method": "WEIGHTED-MEAN", "severity_threshold": "Critical", "n_critical_events": 2, "n_masked": 1, "masking_rate": 0.5}],
-    "reference_cases": {"PROPOSED-HFIS": {"n": 42, "n_excluded": 0, "macro_f1": 0.9166666666666666, "cohens_kappa": 0.8721461187214611}},
+    "agreement": [{"method_a": "FUZZY_COMPONENT_MAX", "method_b": "PROPOSED_HFIS", "n": 3, "n_excluded": 0, "percent_agreement": 1.0, "cohens_kappa": 1.0}],
+    "masking": [{"method": "WEIGHTED_MEAN", "severity_threshold": "Critical", "n_critical_events": 2, "n_masked": 1, "masking_rate": 0.5}],
+    "reference_cases": {"PROPOSED_HFIS": {"n": 42, "n_excluded": 0, "macro_f1": 0.9166666666666666, "cohens_kappa": 0.8721461187214611}},
     "stability": {
         "n_samples": 5,
         "n_trials_per_sample": 30,
         "seed": 42,
         "by_method": {
-            "PROPOSED-HFIS": {
+            "PROPOSED_HFIS": {
                 "n_trials_total": 150, "n_class_changes": 15, "class_change_rate": 0.1, "class_change_rate_ci95": [0.05, 0.15],
                 "mean_abs_index_change": 1.234, "median_abs_index_change": 1.0, "p95_abs_index_change": 2.5, "max_abs_index_change": 3.0,
                 "n_comparable_for_direction": 150, "n_moved_better": 5, "n_moved_worse": 10,
@@ -85,7 +85,7 @@ def test_masking_numbers_traceable_to_summary():
 def test_reference_case_numbers_traceable_to_summary():
     summary = dict(MINIMAL_SUMMARY, evaluation=FULL_EVALUATION)
     narrative = build_run_narrative(summary)
-    score = FULL_EVALUATION["reference_cases"]["PROPOSED-HFIS"]
+    score = FULL_EVALUATION["reference_cases"]["PROPOSED_HFIS"]
     assert f"{score['macro_f1']:.3f}" in narrative
     assert f"{score['cohens_kappa']:.3f}" in narrative
     assert "not empirical accuracy" in narrative
@@ -97,12 +97,12 @@ def test_stability_numbers_traceable_to_summary():
     stability = FULL_EVALUATION["stability"]
     assert str(stability["n_samples"]) in narrative
     assert str(stability["seed"]) in narrative
-    s = stability["by_method"]["PROPOSED-HFIS"]
+    s = stability["by_method"]["PROPOSED_HFIS"]
     assert f"{s['class_change_rate']:.1%}" in narrative
 
 
 def test_masking_none_rate_explained_not_fabricated():
-    ev = dict(FULL_EVALUATION, masking=[{"method": "CRISP-MAX", "severity_threshold": "Critical", "n_critical_events": 0, "n_masked": 0, "masking_rate": None}])
+    ev = dict(FULL_EVALUATION, masking=[{"method": "FUZZY_COMPONENT_MAX", "severity_threshold": "Critical", "n_critical_events": 0, "n_masked": 0, "masking_rate": None}])
     summary = dict(MINIMAL_SUMMARY, evaluation=ev)
     narrative = build_run_narrative(summary)
     assert "could not be computed" in narrative
@@ -144,7 +144,7 @@ def test_forbidden_overclaims_section_present_verbatim():
 
 
 def test_hfis_crispmax_near_total_agreement_stated_explicitly():
-    """If PROPOSED-HFIS and CRISP-MAX agree on >=95% of real-data
+    """If PROPOSED_HFIS and FUZZY_COMPONENT_MAX agree on >=95% of real-data
     timestamps, the narrative must say so explicitly and discuss what
     HFIS's remaining value is, rather than silently omitting the finding."""
     summary = dict(MINIMAL_SUMMARY, evaluation=FULL_EVALUATION)
@@ -157,7 +157,7 @@ def test_hfis_crispmax_near_total_agreement_stated_explicitly():
 def test_hfis_crispmax_equivalence_note_absent_when_agreement_is_low():
     """The equivalence claim must be data-driven -- it must NOT appear when
     the two methods do not actually agree near-totally this run."""
-    ev = dict(FULL_EVALUATION, agreement=[{"method_a": "CRISP-MAX", "method_b": "PROPOSED-HFIS", "n": 10, "n_excluded": 0, "percent_agreement": 0.4, "cohens_kappa": 0.1}])
+    ev = dict(FULL_EVALUATION, agreement=[{"method_a": "FUZZY_COMPONENT_MAX", "method_b": "PROPOSED_HFIS", "n": 10, "n_excluded": 0, "percent_agreement": 0.4, "cohens_kappa": 0.1}])
     summary = dict(MINIMAL_SUMMARY, evaluation=ev)
     narrative = build_run_narrative(summary)
     assert "effectively equivalent at the classification level" not in narrative
@@ -168,7 +168,7 @@ def test_hfis_crispmax_equivalence_note_absent_when_agreement_is_low():
 def test_continuity_full_tie_triggers_equivalence_note_even_with_low_agreement():
     ev = dict(
         FULL_EVALUATION,
-        agreement=[{"method_a": "CRISP-MAX", "method_b": "PROPOSED-HFIS", "n": 10, "n_excluded": 0, "percent_agreement": 0.4, "cohens_kappa": 0.1}],
+        agreement=[{"method_a": "FUZZY_COMPONENT_MAX", "method_b": "PROPOSED_HFIS", "n": 10, "n_excluded": 0, "percent_agreement": 0.4, "cohens_kappa": 0.1}],
         continuity={
             "n_boundaries": 1, "grid_points_per_boundary": 5, "by_boundary_method": [],
             "smoothness_comparison": {"n_boundary_context_pairs_compared": 3, "hfis_smoother_count": 0, "crisp_max_smoother_count": 0, "tied_count": 3, "conclusion": "tied"},

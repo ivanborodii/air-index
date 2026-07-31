@@ -1,0 +1,209 @@
+[
+  {
+    "id": "index_timeseries",
+    "title": "IAQ Index Over Time",
+    "source_csv": "index_timeseries.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "index_value"
+    ],
+    "group_by": null,
+    "description": "PROPOSED_HFIS index value over the computed range. Shade/annotate the 25/50/75 class boundaries.",
+    "filter_equals": null
+  },
+  {
+    "id": "method_comparison",
+    "title": "PROPOSED_HFIS vs FUZZY_COMPONENT_MAX vs CRISP_CLASS_MAX vs WEIGHTED_MEAN",
+    "source_csv": "method_comparison.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "proposed_index_value",
+      "crisp_max_index_value",
+      "crisp_class_max_index_value",
+      "weighted_mean_index_value"
+    ],
+    "group_by": null,
+    "description": "Four index series over the same computed_ts range -- shows where methods diverge.",
+    "filter_equals": null
+  },
+  {
+    "id": "component_scores",
+    "title": "Component Crisp Scores Over Time",
+    "source_csv": "component_scores_timeseries.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "crisp_score"
+    ],
+    "group_by": "component",
+    "description": "One line per component (A/V/M), grouped by the 'component' column.",
+    "filter_equals": null
+  },
+  {
+    "id": "coverage_over_time",
+    "title": "Channel Coverage Ratio Over Time",
+    "source_csv": "data_quality_summary.csv",
+    "plot_type": "line",
+    "x": "computed_ts",
+    "y": [
+      "coverage_ratio"
+    ],
+    "group_by": "channel",
+    "description": "Coverage ratio per direct-input channel, grouped by 'channel'; overlay the configured min_ratio threshold.",
+    "filter_equals": null
+  },
+  {
+    "id": "reason_code_frequency",
+    "title": "Data-Quality Reason Code Frequency",
+    "source_csv": "reason_code_frequency.csv",
+    "plot_type": "bar",
+    "x": "reason_code",
+    "y": [
+      "count"
+    ],
+    "group_by": null,
+    "description": "Which fault categories (stuck value, single spike, ...) drove data unavailability.",
+    "filter_equals": null
+  },
+  {
+    "id": "stability_trials",
+    "title": "Stability: Trial Outcomes by Method",
+    "source_csv": "stability_trials.csv",
+    "plot_type": "histogram",
+    "x": "trial_class",
+    "y": [],
+    "group_by": "method",
+    "description": "Count of perturbation trials landing in each class, one series per method, across every sampled point.",
+    "filter_equals": null
+  },
+  {
+    "id": "stability_summary",
+    "title": "Stability: Class-Change Rate by Method",
+    "source_csv": "stability_summary.csv",
+    "plot_type": "bar",
+    "x": "method",
+    "y": [
+      "class_change_rate"
+    ],
+    "group_by": null,
+    "description": "Aggregate class-change rate under perturbation, one bar per method, across all sampled points.",
+    "filter_equals": null
+  },
+  {
+    "id": "sensitivity_window_summary",
+    "title": "Sensitivity to Window Duration",
+    "source_csv": "sensitivity_window_summary.csv",
+    "plot_type": "line",
+    "x": "value",
+    "y": [
+      "mean_abs_index_diff",
+      "p95_abs_index_diff"
+    ],
+    "group_by": null,
+    "description": "Mean and 95th-percentile absolute index difference from the 15-minute reference, at each window size, aggregated across all sampled points.",
+    "filter_equals": null
+  },
+  {
+    "id": "sensitivity_coverage_summary",
+    "title": "Sensitivity to Coverage Threshold",
+    "source_csv": "sensitivity_coverage_summary.csv",
+    "plot_type": "line",
+    "x": "value",
+    "y": [
+      "mean_abs_index_diff",
+      "p95_abs_index_diff"
+    ],
+    "group_by": null,
+    "description": "Mean and 95th-percentile absolute index difference from the reference coverage threshold, aggregated across all sampled points.",
+    "filter_equals": null
+  },
+  {
+    "id": "masking_rate",
+    "title": "Masking Rate: FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN",
+    "source_csv": "masking_summary.csv",
+    "plot_type": "bar",
+    "x": "method",
+    "y": [
+      "masking_rate"
+    ],
+    "group_by": null,
+    "description": "Fraction of critical-component events hidden by each baseline's aggregation.",
+    "filter_equals": null
+  },
+  {
+    "id": "reference_case_scores",
+    "title": "Reference-Case Consistency (Macro-F1) by Method",
+    "source_csv": "reference_case_consistency.csv",
+    "plot_type": "bar",
+    "x": "method",
+    "y": [
+      "macro_f1"
+    ],
+    "group_by": null,
+    "description": "Macro-F1 consistency with the predefined synthetic boundary-adjacent reference cases, one bar per method -- NOT an empirical accuracy estimate.",
+    "filter_equals": null
+  },
+  {
+    "id": "continuity_curves",
+    "title": "HFIS vs FUZZY_COMPONENT_MAX: Index Value Across a Boundary Grid (favorable context)",
+    "source_csv": "continuity_grid.csv",
+    "plot_type": "line",
+    "x": "input_value",
+    "y": [
+      "index_value"
+    ],
+    "group_by": "method",
+    "description": "Index value across a dense input grid straddling one control-region boundary, one line per method, restricted to the favorable other-components context for readability (see continuity_grid.csv for the acceptable/degraded contexts too); render one figure per boundary_id.",
+    "filter_equals": {
+      "context": "favorable"
+    }
+  },
+  {
+    "id": "continuity_summary",
+    "title": "Boundary Continuity: Maximum Adjacent Jump by Method (favorable context)",
+    "source_csv": "continuity_summary.csv",
+    "plot_type": "bar",
+    "x": "boundary_id",
+    "y": [
+      "max_adjacent_jump"
+    ],
+    "group_by": "method",
+    "description": "Largest single-step index change across each boundary's grid, grouped by method, restricted to the favorable other-components context for readability -- smaller is smoother.",
+    "filter_equals": {
+      "context": "favorable"
+    }
+  },
+  {
+    "id": "fault_detection_metrics",
+    "title": "Fault-Injection Detection Performance by Reason Code (validation split)",
+    "source_csv": "fault_detection_metrics.csv",
+    "plot_type": "bar",
+    "x": "reason_code",
+    "y": [
+      "precision",
+      "recall",
+      "f1"
+    ],
+    "group_by": null,
+    "description": "Row-level labeled precision/recall/F1 for each data-quality reason code, validation split only (disjoint from calibration -- no parameter was tuned against these numbers), from the deterministic fault-injection benchmark (not unlabeled real data).",
+    "filter_equals": {
+      "dataset_split": "validation"
+    }
+  },
+  {
+    "id": "multi_component_grid_summary",
+    "title": "Multi-Component Grid: Mean Absolute Score Difference by Method Pair",
+    "source_csv": "multi_component_grid_summary.csv",
+    "plot_type": "bar",
+    "x": "method_a",
+    "y": [
+      "mean_abs_diff",
+      "p95_abs_diff"
+    ],
+    "group_by": "method_b",
+    "description": "Mean and p95 |method_a - method_b| across the independent (A, V, M) grid (default 41^3 = 68,921 combinations) -- the aggregate score-difference distribution between every pair of methods, not just at boundaries.",
+    "filter_equals": null
+  }
+]

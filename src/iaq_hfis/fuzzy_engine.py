@@ -6,7 +6,7 @@ The engine needs class-shaped output curves (built from
 same curves are reused to give A and M a numeric ``crisp_score`` alongside
 their fuzzy class degrees — this is NOT required by the manuscript's core
 index computation (which only ever needs class degrees to feed the next
-level's rules) but is exposed now so the Phase 2 CRISP-MAX / WEIGHTED-MEAN
+level's rules) but is exposed now so the Phase 2 FUZZY_COMPONENT_MAX / WEIGHTED_MEAN
 baselines can reuse it without changes here.
 """
 

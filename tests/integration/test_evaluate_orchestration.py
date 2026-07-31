@@ -97,7 +97,7 @@ def test_evaluation_tables_created_and_populated(evaluated_run, base_settings):
     baseline_rows = con.execute("SELECT method, COUNT(*) FROM baseline_results GROUP BY 1").fetchall()
     con.close()
     methods = {r[0] for r in baseline_rows}
-    assert methods == {"CRISP-MAX", "WEIGHTED-MEAN"}
+    assert methods == {"FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN"}
 
 
 def test_evaluation_never_references_raw_tables(base_settings):
@@ -113,13 +113,20 @@ def test_evaluation_never_references_raw_tables(base_settings):
 def test_agreement_results_present_for_every_method_pair(evaluated_run):
     _, eval_summary = evaluated_run
     pairs = {(a["method_a"], a["method_b"]) for a in eval_summary["evaluation"]["agreement"]}
-    assert pairs == {("CRISP-MAX", "PROPOSED-HFIS"), ("CRISP-MAX", "WEIGHTED-MEAN"), ("PROPOSED-HFIS", "WEIGHTED-MEAN")}
+    assert pairs == {
+        ("CRISP_CLASS_MAX", "FUZZY_COMPONENT_MAX"),
+        ("CRISP_CLASS_MAX", "PROPOSED_HFIS"),
+        ("CRISP_CLASS_MAX", "WEIGHTED_MEAN"),
+        ("FUZZY_COMPONENT_MAX", "PROPOSED_HFIS"),
+        ("FUZZY_COMPONENT_MAX", "WEIGHTED_MEAN"),
+        ("PROPOSED_HFIS", "WEIGHTED_MEAN"),
+    }
 
 
-def test_reference_cases_scored_for_all_three_methods(evaluated_run):
+def test_reference_cases_scored_for_all_four_methods(evaluated_run):
     _, eval_summary = evaluated_run
     rc = eval_summary["evaluation"]["reference_cases"]
-    assert set(rc.keys()) == {"PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"}
+    assert set(rc.keys()) == {"PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN"}
     for method, score in rc.items():
         assert score["n"] > 0
         assert score["macro_f1"] is not None
@@ -193,7 +200,7 @@ def test_continuity_experiment_covers_every_boundary_and_method(evaluated_run, b
     assert set(continuity["contexts"]) == {"favorable", "acceptable", "degraded"}
     rows = continuity["by_boundary_method"]
     methods_present = {r["method"] for r in rows}
-    assert methods_present == {"PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"}
+    assert methods_present == {"PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN"}
     assert all(r["max_adjacent_jump"] is not None for r in rows)
     smoothness = continuity["smoothness_comparison"]
     assert smoothness["n_boundary_context_pairs_compared"] == continuity["n_boundaries"] * continuity["n_contexts"]
@@ -204,7 +211,7 @@ def test_continuity_experiment_covers_every_boundary_and_method(evaluated_run, b
         evaluation_run_id = eval_summary["evaluation"]["evaluation_run_id"]
         grid_rows = con.execute("SELECT COUNT(*) FROM evaluation_continuity_grid WHERE evaluation_run_id = ?", [evaluation_run_id]).fetchone()[0]
         summary_rows = con.execute("SELECT COUNT(*) FROM evaluation_continuity_summary WHERE evaluation_run_id = ?", [evaluation_run_id]).fetchone()[0]
-        assert grid_rows == continuity["n_boundaries"] * continuity["n_contexts"] * 3 * base_settings.evaluation.continuity_grid_points
-        assert summary_rows == continuity["n_boundaries"] * continuity["n_contexts"] * 3
+        assert grid_rows == continuity["n_boundaries"] * continuity["n_contexts"] * 4 * base_settings.evaluation.continuity_grid_points
+        assert summary_rows == continuity["n_boundaries"] * continuity["n_contexts"] * 4
     finally:
         con.close()

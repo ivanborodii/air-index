@@ -92,18 +92,23 @@ def _two_sided_test_points(ranges: TwoSidedRanges, offset: float) -> list[tuple[
     return points
 
 
-def _baseline_values(control_regions, room_profile: RoomTemperatureProfile) -> dict[str, float]:
+def _baseline_values(control_regions, room_profile: RoomTemperatureProfile | None) -> dict[str, float]:
     values = dict(_FAVORABLE_BASELINE)
-    values["temperature"] = sum(room_profile.ranges.favorable) / 2
+    if room_profile is not None:
+        values["temperature"] = sum(room_profile.ranges.favorable) / 2
     values["humidity"] = sum(control_regions.relative_humidity.favorable) / 2
     return values
 
 
-def generate_reference_cases(control_regions, room_profile: RoomTemperatureProfile, offset: float = 0.5) -> list[ReferenceCase]:
+def generate_reference_cases(control_regions, room_profile: RoomTemperatureProfile | None, offset: float = 0.5) -> list[ReferenceCase]:
     """One case per boundary-adjacent test point for every direct-input
     channel. ``offset`` is a small crisp-classification margin (distinct
     from the membership transition width) chosen to land unambiguously on
     one side of the boundary for labeling purposes.
+
+    ``room_profile`` may be ``None`` (exploratory mode, no DBN profile for
+    this room/season) -- temperature reference cases are simply omitted,
+    never fabricated; every other channel's cases are unaffected.
     """
     cases: list[ReferenceCase] = []
 
@@ -118,7 +123,9 @@ def generate_reference_cases(control_regions, room_profile: RoomTemperatureProfi
                 )
             )
 
-    two_sided = {"temperature": room_profile.ranges, "humidity": control_regions.relative_humidity}
+    two_sided = {"humidity": control_regions.relative_humidity}
+    if room_profile is not None:
+        two_sided["temperature"] = room_profile.ranges
     for channel, ranges in two_sided.items():
         for label, value in _two_sided_test_points(ranges, offset):
             values = _baseline_values(control_regions, room_profile)

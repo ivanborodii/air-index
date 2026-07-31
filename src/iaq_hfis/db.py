@@ -46,7 +46,16 @@ logger = logging.getLogger(__name__)
 #: fault_detection_metrics gained a dataset_split column (calibration |
 #: validation); fault_detection_metrics gained tn/specificity; two new
 #: tables (fault_detection_event_metrics, fault_detection_confusion_matrix).
-SCHEMA_VERSION = 5
+#: Version 6: pipeline_runs gained a mode column (publication | exploratory)
+#: -- see profiles.select_room_season / TEMPERATURE_PROFILE_NOT_DEFINED.
+#: Version 7: new CRISP_CLASS_MAX baseline (genuinely hard/discontinuous,
+#: spec section 6.2) added alongside FUZZY_COMPONENT_MAX (renamed from
+#: CRISP-MAX), PROPOSED_HFIS, WEIGHTED_MEAN (renamed from WEIGHTED-MEAN);
+#: evaluation_stability_samples gained baseline_class_crisp_class_max /
+#: baseline_index_crisp_class_max columns.
+#: Version 8: new evaluation_multi_component_grid /
+#: evaluation_multi_component_grid_summary tables (spec section 7.2).
+SCHEMA_VERSION = 8
 
 #: Tables whose presence with a pre-isolation column set indicates a legacy
 #: (schema version 1) derived database.

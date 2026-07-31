@@ -1,8 +1,8 @@
-# Audit: is PROPOSED-HFIS accidentally equivalent to CRISP-MAX?
+# Audit: is PROPOSED_HFIS accidentally equivalent to FUZZY_COMPONENT_MAX?
 
 Scope: a source-level and empirical audit of whether the manuscript's proposed
-Mamdani fuzzy inference system (PROPOSED-HFIS) is, by implementation accident,
-computing the same thing as the hard-max baseline (CRISP-MAX) rather than a
+Mamdani fuzzy inference system (PROPOSED_HFIS) is, by implementation accident,
+computing the same thing as the hard-max baseline (FUZZY_COMPONENT_MAX) rather than a
 genuinely distinct fuzzy method. Triggered by a final-validation review request;
 not a response to a reported bug.
 
@@ -26,32 +26,41 @@ not a response to a reported bug.
   then the 2nd-level A/V/M -> index rules), with 401-point centroid
   defuzzification over the real output membership curves. No shortcut to a
   scalar max anywhere in `MamdaniEngine`.
-- **CRISP-MAX** (`src/iaq_hfis/baselines.py`): `max(component_crisp_scores.values())`
+- **FUZZY_COMPONENT_MAX** (`src/iaq_hfis/baselines.py`): `max(component_crisp_scores.values())`
   — a genuinely different, much simpler computation (no rule firing, no
   centroid). The two methods are architecturally distinct.
 
-**Conclusion of the source review: PROPOSED-HFIS is a real Mamdani system,
-not CRISP-MAX with extra steps.** No change to either method's logic is
+**Conclusion of the source review: PROPOSED_HFIS is a real Mamdani system,
+not FUZZY_COMPONENT_MAX with extra steps.** No change to either method's logic is
 warranted or was made by this audit.
 
 ## 2. Independent multi-component synthetic check
 
 To test whether the two methods nonetheless converge numerically in
-practice, a standalone script (not part of the pipeline; see conversation
-record) fed the *real* rule base, membership functions and `MamdaniEngine`
-a dense grid of independent component crisp scores `(A, V, M) in {0, 2.5,
-..., 100}^3` (68,921 points) and compared `infer_index(...).index_value`
-against `max(A, V, M)`:
+practice, a standalone script (not part of the pipeline at the time; see
+conversation record) fed the *real* rule base, membership functions and
+`MamdaniEngine` a dense grid of independent component crisp scores
+`(A, V, M) in {0, 2.5, ..., 100}^3` (68,921 points) and compared
+`infer_index(...).index_value` against `max(A, V, M)`. **This script has
+since been converted into a first-class, tested, CLI-integrated evaluation
+module** -- `src/iaq_hfis/evaluation/multi_component_grid.py`, run
+automatically by every `iaq_hfis evaluate` invocation, persisted in
+`evaluation_multi_component_grid`/`evaluation_multi_component_grid_summary`,
+and exported as `multi_component_grid.csv`/`_summary.csv`. It additionally
+compares against CRISP_CLASS_MAX and WEIGHTED_MEAN, not just
+FUZZY_COMPONENT_MAX. The numbers below are from the original one-off run;
+see a specific run's own `multi_component_grid_summary.csv` for the
+reproducible, current numbers.
 
 | metric | value |
 |---|---|
-| exact numeric matches (HFIS == CRISP-MAX, 1e-9 tol) | 5.71% of points |
-| mean \|HFIS - CRISP-MAX\| | 5.74 index points |
-| median \|HFIS - CRISP-MAX\| | 5.06 |
-| p95 \|HFIS - CRISP-MAX\| | 12.44 |
-| max \|HFIS - CRISP-MAX\| | 12.69 |
+| exact numeric matches (HFIS == FUZZY_COMPONENT_MAX, 1e-9 tol) | 5.71% of points |
+| mean \|HFIS - FUZZY_COMPONENT_MAX\| | 5.74 index points |
+| median \|HFIS - FUZZY_COMPONENT_MAX\| | 5.06 |
+| p95 \|HFIS - FUZZY_COMPONENT_MAX\| | 12.44 |
+| max \|HFIS - FUZZY_COMPONENT_MAX\| | 12.69 |
 
-HFIS is **not** numerically equivalent to CRISP-MAX when more than one
+HFIS is **not** numerically equivalent to FUZZY_COMPONENT_MAX when more than one
 component carries a non-trivial score simultaneously — it systematically
 scores *higher* than the raw max in this regime, because multiple
 simultaneously-firing 2nd-level rules broaden the aggregated output curve
@@ -61,11 +70,11 @@ points); characterizing this more rigorously (Lipschitz ratio, area between
 curves, monotonicity) is carried out by the expanded continuity experiment,
 task tracked separately.
 
-## 3. Confirmed finding: the *existing* continuity experiment degenerates to CRISP-MAX
+## 3. Confirmed finding: the *existing* continuity experiment degenerates to FUZZY_COMPONENT_MAX
 
 Inspecting the already-generated `continuity_summary.csv` from a real
-pipeline run (`c4e93b4c83a641b1bc6c6fbeb1da6a98`) showed **PROPOSED-HFIS and
-CRISP-MAX numerically bit-identical on every single boundary** (same
+pipeline run (`c4e93b4c83a641b1bc6c6fbeb1da6a98`) showed **PROPOSED_HFIS and
+FUZZY_COMPONENT_MAX numerically bit-identical on every single boundary** (same
 `max_adjacent_jump`, `mean_adjacent_jump`, `total_variation`,
 `n_class_transitions`, transition positions, index range). This looked at
 first like the exact accidental-equivalence bug this audit was meant to
@@ -83,7 +92,7 @@ Favorable is the lowest severity rank, the worst-of consequent for every
 such rule is exactly `A`'s own class, at exactly `A`'s own degree. The
 resulting 2nd-level class-activation vector is therefore **identical** to
 `A`'s own component-level class-activation vector, so the 2nd-level centroid
-reproduces `A`'s own `crisp_score` bit-for-bit. Meanwhile `CRISP-MAX =
+reproduces `A`'s own `crisp_score` bit-for-bit. Meanwhile `FUZZY_COMPONENT_MAX =
 max(A, V, M)` also reduces to `A`'s crisp_score exactly, since V and M are
 pinned near 0. Both methods collapse to "pass through the one swept
 component's own score unchanged" — an intrinsic property of testing one
@@ -93,7 +102,7 @@ carries signal).
 
 **This is a genuine weakness of the current continuity experiment's design
 (single-channel-perturbed, others held favorable), not a bug in
-PROPOSED-HFIS or CRISP-MAX.** No change was made to either method. The fix —
+PROPOSED_HFIS or FUZZY_COMPONENT_MAX.** No change was made to either method. The fix —
 already scoped as a separate task — is to repeat every boundary sweep under
 multiple "other components" contexts (favorable / acceptable / degraded),
 which is a strictly additive change to the *experiment*, not the methods
@@ -105,7 +114,7 @@ The continuity experiment was subsequently expanded exactly as described
 above: every boundary is now swept under three "other components" contexts
 (favorable/acceptable/degraded), with every non-swept channel held at a
 fixed representative value for that context. Re-running it against real
-pipeline data still shows **PROPOSED-HFIS and CRISP-MAX numerically tied on
+pipeline data still shows **PROPOSED_HFIS and FUZZY_COMPONENT_MAX numerically tied on
 all 99 (boundary, context) pairs tested** (`mean_area_between_curves_vs_crisp_max
 ≈ 1.8e-14`, floating-point noise). Inspecting the raw per-point curves (e.g.
 `co2_breakpoint1`, context=`degraded`) confirms why: both methods are
@@ -137,15 +146,15 @@ rather than being silently omitted.
 
 ## 4. Verdict
 
-- PROPOSED-HFIS is implemented as a genuine Mamdani inference system and is
+- PROPOSED_HFIS is implemented as a genuine Mamdani inference system and is
   **not** an accidental hard-max in general (section 2).
 - Neither the original single-context continuity experiment (section 3) nor
   its favorable/acceptable/degraded-context expansion (section 3B) is
-  actually capable of detecting HFIS/CRISP-MAX divergence, because both
+  actually capable of detecting HFIS/FUZZY_COMPONENT_MAX divergence, because both
   perturb only one channel at a time within a narrow sweep while every
   other channel sits at a fixed value -- so one channel trivially dominates
   the whole sweep in both methods identically, regardless of context. A
-  "PROPOSED-HFIS is smoother than CRISP-MAX at manuscript boundaries" claim
+  "PROPOSED_HFIS is smoother than FUZZY_COMPONENT_MAX at manuscript boundaries" claim
   is **not supported** by either version of this experiment; it remains
   untested by boundary-sweep methodology, not disproven. What section 2's
   independent multi-component grid check *does* establish is that the two

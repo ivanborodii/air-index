@@ -1,0 +1,5 @@
+varied_parameter,value,n_eligible,n_evaluated,n_unavailable,n_valid_comparisons,n_samples,n_status_transitions,n_class_transitions,n_agreement,class_agreement_with_reference,mean_abs_index_diff,median_abs_index_diff,p95_abs_index_diff,max_abs_index_diff
+window_minutes,5.0,20,20,0,17,20,0,0,20,1.0,0.10586266833660563,0.0,0.6203785672637637,1.2619129476159294
+window_minutes,15.0,20,20,0,17,20,0,0,20,1.0,0.0,0.0,0.0,0.0
+window_minutes,30.0,20,20,0,17,20,0,0,20,1.0,0.46742949741883905,0.0,1.7849127641330704,7.167270997092125
+window_minutes,60.0,20,20,0,17,20,0,1,19,0.95,1.2171030784130727,0.0,5.016429230228503,18.145152519550457

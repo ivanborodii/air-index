@@ -21,15 +21,15 @@ FULL_EVALUATION = {
     "evaluation_run_id": "eval123",
     "pipeline_run_id": "abc123",
     "n_computed_ts_evaluated": 3,
-    "agreement": [{"method_a": "CRISP-MAX", "method_b": "PROPOSED-HFIS", "n": 3, "n_excluded": 0, "percent_agreement": 1.0, "cohens_kappa": 1.0}],
-    "masking": [{"method": "WEIGHTED-MEAN", "severity_threshold": "Critical", "n_critical_events": 2, "n_masked": 1, "masking_rate": 0.5}],
-    "reference_cases": {"PROPOSED-HFIS": {"n": 42, "n_excluded": 0, "macro_f1": 0.9, "cohens_kappa": 0.87}},
+    "agreement": [{"method_a": "FUZZY_COMPONENT_MAX", "method_b": "PROPOSED_HFIS", "n": 3, "n_excluded": 0, "percent_agreement": 1.0, "cohens_kappa": 1.0}],
+    "masking": [{"method": "WEIGHTED_MEAN", "severity_threshold": "Critical", "n_critical_events": 2, "n_masked": 1, "masking_rate": 0.5}],
+    "reference_cases": {"PROPOSED_HFIS": {"n": 42, "n_excluded": 0, "macro_f1": 0.9, "cohens_kappa": 0.87}},
     "stability": {
         "n_samples": 5,
         "n_trials_per_sample": 30,
         "seed": 42,
         "by_method": {
-            "PROPOSED-HFIS": {
+            "PROPOSED_HFIS": {
                 "n_trials_total": 150, "n_class_changes": 15, "class_change_rate": 0.1, "class_change_rate_ci95": [0.05, 0.15],
                 "mean_abs_index_change": 1.2, "median_abs_index_change": 1.0, "p95_abs_index_change": 2.5, "max_abs_index_change": 3.0,
                 "n_comparable_for_direction": 150, "n_moved_better": 5, "n_moved_worse": 10,

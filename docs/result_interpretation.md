@@ -10,10 +10,21 @@ section each piece implements).
 
 ## Start here: is this result trustworthy?
 
-1. Check `publication_readiness.ready` in `run_summary.json` (or the
-   "Publication Readiness" section of `run_summary.md`) -- `False` means a
-   blocking issue exists (pipeline/evaluation status, or no evaluation run
-   at all). This is a lightweight, always-computable signal.
+1. Check `readiness.artifact_readiness.ready` AND `readiness.manuscript_readiness.ready`
+   in `run_summary.json` (or the "Artifact and Manuscript Readiness"
+   section of `run_summary.md` / the standalone `manuscript_readiness.md`)
+   -- these are two DIFFERENT questions, never conflate them.
+   `artifact_readiness=false` means the computational artifacts themselves
+   are incomplete/inconsistent (pipeline/evaluation status, failed
+   validation, or failed tests). `manuscript_readiness=false` means the
+   result cannot be described as the manuscript's complete proposed method
+   -- check `manuscript_readiness.blocking_issues` and `unsupported_claims`
+   (e.g. a provisional/missing temperature profile, or `mode=exploratory`).
+   A run can have `artifact_readiness=true` and `manuscript_readiness=false`
+   at the same time -- that is not a contradiction, it means the
+   computation is internally sound but this specific result cannot be
+   claimed as the manuscript's full method (see
+   `publication_claims_matrix.md` for the per-claim breakdown).
 2. Run `iaq_hfis validate-artifacts --pipeline-run-id <id>` (or read the
    tracked `research_results/final/artifact_validation.json`/`.md`) --
    this is the **authoritative** combined check: every CSV, the narrative,
@@ -73,7 +84,7 @@ them is the single most likely way to overclaim:
 non-cherry-picked verdict across every (boundary, context) pair actually
 tested (favorable/acceptable/degraded). **Read the `conclusion` string
 directly rather than assuming an outcome.** On the real reference run, this
-experiment finds PROPOSED-HFIS and CRISP-MAX numerically tied across every
+experiment finds PROPOSED_HFIS and FUZZY_COMPONENT_MAX numerically tied across every
 pair tested -- not because the methods are equivalent (an independent
 synthetic multi-component check in `docs/hfis_vs_crispmax_audit.md` shows
 real divergence once more than one channel carries signal), but because
@@ -87,8 +98,13 @@ specific run being cited.
 `provisional_parameters_used` (top level of `run_summary.json`) is the
 single authoritative list -- every artifact (`run_summary.md`,
 `run_narrative.md`, `article_results_summary.md`, `parameter_provenance.csv`,
-`publication_readiness`) is required to report the identical list
-(enforced by `validate-artifacts`). "Provisional" means: not given
+`readiness`) is required to report the identical list (enforced by
+`validate-artifacts`). Note the provenance taxonomy has finer-grained
+categories than a single PROVISIONAL flag -- LITERATURE_INFORMED,
+AUTHOR_DEFINED_PROVISIONAL, and CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT
+are all collectively "provisional-like" for disclosure purposes (see
+`iaq_hfis.provenance.PROVISIONAL_LIKE_STATUSES`) even though they carry
+more justification than a bare guess. "Provisional" means: not given
 numerically in the manuscript, and not yet confirmed against an external
 standard or extended real-data validation. It does **not** mean untested --
 `provisional_parameter_assessment.md` documents, per parameter, whether it
@@ -118,7 +134,7 @@ Limitations section for the authoritative, per-run statement)
   numbers as "accuracy."
 - Do not claim empirical validation of a PROVISIONAL parameter from a
   synthetic benchmark's calibration result alone.
-- Do not claim HFIS is smoother than CRISP-MAX without checking
+- Do not claim HFIS is smoother than FUZZY_COMPONENT_MAX without checking
   `smoothness_comparison.conclusion` for the run in question.
 - Do not use outdoor CO as a substitute for indoor CO2, or WHO 24-hour PM
   reference points as a compliance assessment for a 15-minute index --

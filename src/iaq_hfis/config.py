@@ -32,6 +32,36 @@ class ConfigError(Exception):
     """
 
 
+class TemperatureProfileNotDefinedError(ConfigError):
+    """Raised by :func:`iaq_hfis.profiles.select_room_season` when the
+    requested (room, season) has no DBN-supported temperature control
+    region. Carries structured fields (not just a message) so callers can
+    decide programmatically whether a run is manuscript-eligible, per the
+    strict-selection rule: no fallback to another room, no fallback to
+    another season, no interpolation, no reuse of a different room's
+    profile, no outdoor-temperature substitution, no hidden default.
+    """
+
+    def __init__(self, requested_room: str, requested_season: str, available_profiles: list[tuple[str, str]]):
+        self.requested_room = requested_room
+        self.requested_season = requested_season
+        self.available_profiles = available_profiles
+        self.dbn_source = "DBN V.2.5-67:2013, mandatory Appendix D, Table D.4"
+        message = (
+            "TEMPERATURE_PROFILE_NOT_DEFINED\n"
+            f"  requested room:   {requested_room}\n"
+            f"  requested season: {requested_season}\n"
+            f"  available profiles: {available_profiles}\n"
+            f"  standard: {self.dbn_source}\n"
+            "  No standards-based temperature control region is defined for this "
+            "room/season combination, and this system never falls back to another "
+            "room, another season, interpolation, or outdoor temperature as a "
+            "substitute. A full three-component (A/V/M/I) manuscript result cannot "
+            "be produced for this room/season until a DBN-supported profile is added."
+        )
+        super().__init__(message)
+
+
 # ---------------------------------------------------------------------------
 # config/iaq_hfis.yaml
 # ---------------------------------------------------------------------------
@@ -181,6 +211,21 @@ class MembershipConfig(BaseModel):
     dominant_component_tie_tolerance: float = Field(ge=0, default=1.0)
 
 
+class DeploymentConfig(BaseModel):
+    """Explicit, author-attested evidence for the physical deployment room.
+    Never inferred from sensor values or from wanting a different DBN
+    profile to exist -- room_type_evidence documents *why* the room is
+    classified this way, so no one can quietly reclassify a standalone
+    kitchen as a kitchen-dining space just to unblock a warm-period result.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    room_type: str
+    room_type_evidence: str
+    season_source: Literal["timestamp"] = "timestamp"
+
+
 class ProfileSelectionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -271,7 +316,7 @@ class ControlRegions(BaseModel):
 
 class EvaluationConfig(BaseModel):
     """Parameters for the manuscript's comparative-evaluation protocol
-    (CRISP-MAX / WEIGHTED-MEAN baselines, stability, sensitivity, masking).
+    (FUZZY_COMPONENT_MAX / WEIGHTED_MEAN baselines, stability, sensitivity, masking).
     ``sensitivity_window_minutes`` and ``sensitivity_coverage_thresholds``
     are given explicitly in the manuscript, not provisional; the rest are.
     """
@@ -293,6 +338,13 @@ class EvaluationConfig(BaseModel):
     # (points per +/-1 declared-uncertainty span around each control-region boundary).
     # Kept modest: this experiment re-runs on every 'iaq_hfis evaluate' call, not just once.
     continuity_grid_points: int = Field(ge=5, default=21)
+    # AUTHOR_DEFINED: resolution per axis for the independent multi-component (A, V, M) grid
+    # experiment. Kept modest by default (11^3 = 1,331 combinations, matching
+    # continuity_grid_points' own "re-runs on every evaluate call" rationale above) --
+    # the manuscript-validation task spec's own worked example (41 -> 68,921 combinations)
+    # is used explicitly for the final manuscript regeneration via
+    # 'iaq_hfis evaluate --multi-component-grid-points 41', not as the routine default.
+    multi_component_grid_points_per_axis: int = Field(ge=2, default=11)
 
 
 class Settings(BaseModel):
@@ -306,6 +358,7 @@ class Settings(BaseModel):
     schema_mapping: SchemaMappingConfig
     device_status_state_map: dict[str, str]
     membership: MembershipConfig
+    deployment: DeploymentConfig
     profile_selection: ProfileSelectionConfig
     control_regions: ControlRegions
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)

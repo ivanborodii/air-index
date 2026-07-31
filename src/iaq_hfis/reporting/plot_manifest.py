@@ -36,16 +36,16 @@ PLOTS: list[PlotSpec] = [
         plot_type="line",
         x="computed_ts",
         y=["index_value"],
-        description="PROPOSED-HFIS index value over the computed range. Shade/annotate the 25/50/75 class boundaries.",
+        description="PROPOSED_HFIS index value over the computed range. Shade/annotate the 25/50/75 class boundaries.",
     ),
     PlotSpec(
         id="method_comparison",
-        title="PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN",
+        title="PROPOSED_HFIS vs FUZZY_COMPONENT_MAX vs CRISP_CLASS_MAX vs WEIGHTED_MEAN",
         source_csv=exports.METHOD_COMPARISON,
         plot_type="line",
         x="computed_ts",
-        y=["proposed_index_value", "crisp_max_index_value", "weighted_mean_index_value"],
-        description="Three index series over the same computed_ts range -- shows where methods diverge.",
+        y=["proposed_index_value", "crisp_max_index_value", "crisp_class_max_index_value", "weighted_mean_index_value"],
+        description="Four index series over the same computed_ts range -- shows where methods diverge.",
     ),
     PlotSpec(
         id="component_scores",
@@ -114,7 +114,7 @@ PLOTS: list[PlotSpec] = [
     ),
     PlotSpec(
         id="masking_rate",
-        title="Masking Rate: CRISP-MAX vs WEIGHTED-MEAN",
+        title="Masking Rate: FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN",
         source_csv=exports.MASKING_SUMMARY,
         plot_type="bar",
         x="method",
@@ -132,7 +132,7 @@ PLOTS: list[PlotSpec] = [
     ),
     PlotSpec(
         id="continuity_curves",
-        title="HFIS vs CRISP-MAX: Index Value Across a Boundary Grid (favorable context)",
+        title="HFIS vs FUZZY_COMPONENT_MAX: Index Value Across a Boundary Grid (favorable context)",
         source_csv=exports.CONTINUITY_GRID,
         plot_type="line",
         x="input_value",
@@ -161,6 +161,16 @@ PLOTS: list[PlotSpec] = [
         y=["precision", "recall", "f1"],
         filter_equals={"dataset_split": "validation"},
         description="Row-level labeled precision/recall/F1 for each data-quality reason code, validation split only (disjoint from calibration -- no parameter was tuned against these numbers), from the deterministic fault-injection benchmark (not unlabeled real data).",
+    ),
+    PlotSpec(
+        id="multi_component_grid_summary",
+        title="Multi-Component Grid: Mean Absolute Score Difference by Method Pair",
+        source_csv=exports.MULTI_COMPONENT_GRID_SUMMARY,
+        plot_type="bar",
+        x="method_a",
+        y=["mean_abs_diff", "p95_abs_diff"],
+        group_by="method_b",
+        description="Mean and p95 |method_a - method_b| across the independent (A, V, M) grid (default 41^3 = 68,921 combinations) -- the aggregate score-difference distribution between every pair of methods, not just at boundaries.",
     ),
 ]
 

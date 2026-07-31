@@ -80,7 +80,9 @@ def test_sensor_specs_and_room_profiles_load():
     assert "co2" in specs.channels
     profiles = load_room_profiles(CONFIG_DIR / "room_profiles.yaml")
     kitchen_cold = profiles.find("kitchen", "cold_period")
-    kitchen_warm = profiles.find("kitchen", "warm_period")
     assert kitchen_cold is not None and kitchen_cold.provisional is False  # real manuscript/DBN profile
-    assert kitchen_warm is not None and kitchen_warm.provisional is False  # author decision: kitchen follows general residential requirements in warm_period
+    # DBN Table D.4 has no room-specific value for a standalone kitchen in the warm
+    # period (literal dash in the table) -- this profile must not exist, and must
+    # never silently reuse general_residential/warm_period's numbers.
+    assert profiles.find("kitchen", "warm_period") is None
     assert profiles.find("general_residential", "cold_period") is None  # still genuinely missing

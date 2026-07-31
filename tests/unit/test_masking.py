@@ -1,10 +1,10 @@
-from iaq_hfis.baselines import BaselineResult, crisp_max, weighted_mean
+from iaq_hfis.baselines import BaselineResult, fuzzy_component_max, weighted_mean
 from iaq_hfis.evaluation.masking import evaluate_masking
 
 
 def _critical_and_favorable_scenario() -> dict[str, float]:
     # One component deep in Critical (>=75), two deeply Favorable -- the
-    # textbook masking setup: WEIGHTED-MEAN dilutes this to well below Critical.
+    # textbook masking setup: WEIGHTED_MEAN dilutes this to well below Critical.
     return {"A": 10.0, "V": 10.0, "M": 95.0}
 
 
@@ -26,7 +26,7 @@ def test_crisp_max_masking_rate_is_always_zero_structurally():
         {"A": 10.0, "V": 10.0, "M": 95.0},
         {"A": 80.0, "V": 76.0, "M": 12.0},
     ]
-    cm_results = [crisp_max(s) for s in scenarios]
+    cm_results = [fuzzy_component_max(s) for s in scenarios]
     result = evaluate_masking(scenarios, cm_results, severity_threshold="Critical")
     assert result.n_critical_events == len(scenarios)
     assert result.n_masked == 0

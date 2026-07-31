@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from iaq_hfis.config import ConfigError, ProfileSelectionConfig, RoomProfilesConfig, RoomTemperatureProfile
+from iaq_hfis.config import ConfigError, ProfileSelectionConfig, RoomProfilesConfig, RoomTemperatureProfile, TemperatureProfileNotDefinedError
 
 
 def select_season(at: datetime, season_month_ranges: dict[str, list[int]]) -> str:
@@ -33,8 +33,5 @@ def select_room_season(
     profile = room_profiles.find(room, season)
     if profile is None:
         available = [(p.room, p.season) for p in room_profiles.profiles]
-        raise ConfigError(
-            f"no room profile configured for (room='{room}', season='{season}'); "
-            f"available profiles: {available}"
-        )
+        raise TemperatureProfileNotDefinedError(room, season, available)
     return profile

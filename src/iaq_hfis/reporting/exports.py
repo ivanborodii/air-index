@@ -51,6 +51,8 @@ REFERENCE_CASE_SUMMARY = "reference_case_consistency.csv"
 OUTDOOR_CONTEXT_TIMESERIES = "outdoor_context_timeseries.csv"
 CONTINUITY_GRID = "continuity_grid.csv"
 CONTINUITY_SUMMARY = "continuity_summary.csv"
+MULTI_COMPONENT_GRID = "multi_component_grid.csv"
+MULTI_COMPONENT_GRID_SUMMARY = "multi_component_grid_summary.csv"
 FAULT_INJECTION_EVENTS = "fault_injection_events.csv"
 FAULT_DETECTION_PREDICTIONS = "fault_detection_predictions.csv"
 FAULT_DETECTION_METRICS = "fault_detection_metrics.csv"
@@ -90,7 +92,7 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("computed_ts", "datetime", "UTC timestamp", "Instant the index was computed for (end of the rolling window)."),
         ColumnSpec("window_minutes", "int", "minutes", "Aggregation window size used for this row."),
         ColumnSpec("completeness_status", "str", "-", "OK | PARTIAL | FAILED."),
-        ColumnSpec("index_value", "float", "0-100", "Defuzzified PROPOSED-HFIS index value; null if FAILED."),
+        ColumnSpec("index_value", "float", "0-100", "Defuzzified PROPOSED_HFIS index value; null if FAILED."),
         ColumnSpec("index_class", "str", "-", "Favorable | Acceptable | Degraded | Critical; null if FAILED."),
         ColumnSpec("dominant_component", "str", "-", "Single, deterministically-chosen dominant adverse component (A/V/M) from the priority hierarchy; null if FAILED or no rule fired."),
         ColumnSpec("co_dominant_components", "str", "-", "Semicolon-joined component(s) tied for dominance (includes dominant_component); length 1 unless a documented tie survived every step."),
@@ -114,14 +116,16 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("season", "str", "-", "Season profile used (cold_period | warm_period)."),
     ],
     METHOD_COMPARISON: [
-        ColumnSpec("computed_ts", "datetime", "UTC timestamp", "Instant compared across all three methods."),
-        ColumnSpec("proposed_status", "str", "-", "PROPOSED-HFIS completeness status."),
-        ColumnSpec("proposed_index_value", "float", "0-100", "PROPOSED-HFIS index value."),
-        ColumnSpec("proposed_index_class", "str", "-", "PROPOSED-HFIS index class."),
-        ColumnSpec("crisp_max_index_value", "float", "0-100", "CRISP-MAX baseline index value."),
-        ColumnSpec("crisp_max_index_class", "str", "-", "CRISP-MAX baseline index class."),
-        ColumnSpec("weighted_mean_index_value", "float", "0-100", "WEIGHTED-MEAN baseline index value."),
-        ColumnSpec("weighted_mean_index_class", "str", "-", "WEIGHTED-MEAN baseline index class."),
+        ColumnSpec("computed_ts", "datetime", "UTC timestamp", "Instant compared across all four methods."),
+        ColumnSpec("proposed_status", "str", "-", "PROPOSED_HFIS completeness status."),
+        ColumnSpec("proposed_index_value", "float", "0-100", "PROPOSED_HFIS index value."),
+        ColumnSpec("proposed_index_class", "str", "-", "PROPOSED_HFIS index class."),
+        ColumnSpec("crisp_max_index_value", "float", "0-100", "FUZZY_COMPONENT_MAX baseline index value."),
+        ColumnSpec("crisp_max_index_class", "str", "-", "FUZZY_COMPONENT_MAX baseline index class."),
+        ColumnSpec("crisp_class_max_index_value", "float", "0-100", "CRISP_CLASS_MAX baseline index value (genuinely hard/discontinuous)."),
+        ColumnSpec("crisp_class_max_index_class", "str", "-", "CRISP_CLASS_MAX baseline index class."),
+        ColumnSpec("weighted_mean_index_value", "float", "0-100", "WEIGHTED_MEAN baseline index value."),
+        ColumnSpec("weighted_mean_index_class", "str", "-", "WEIGHTED_MEAN baseline index class."),
     ],
     DATA_QUALITY_SUMMARY: [
         ColumnSpec("computed_ts", "datetime", "UTC timestamp", "Window this coverage figure applies to."),
@@ -142,16 +146,18 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("computed_ts", "datetime", "UTC timestamp", "The sampled instant."),
         ColumnSpec("selection_reason", "str", "-", "boundary_adjacent | random_comparison."),
         ColumnSpec("boundary_channel", "str", "-", "Channel whose boundary this sample is nearest to (boundary_adjacent samples only)."),
-        ColumnSpec("baseline_class_hfis", "str", "-", "Unperturbed PROPOSED-HFIS class at this sample."),
-        ColumnSpec("baseline_index_hfis", "float", "0-100", "Unperturbed PROPOSED-HFIS index value."),
-        ColumnSpec("baseline_class_crisp_max", "str", "-", "Unperturbed CRISP-MAX class."),
-        ColumnSpec("baseline_index_crisp_max", "float", "0-100", "Unperturbed CRISP-MAX index value."),
-        ColumnSpec("baseline_class_weighted_mean", "str", "-", "Unperturbed WEIGHTED-MEAN class."),
-        ColumnSpec("baseline_index_weighted_mean", "float", "0-100", "Unperturbed WEIGHTED-MEAN index value."),
+        ColumnSpec("baseline_class_hfis", "str", "-", "Unperturbed PROPOSED_HFIS class at this sample."),
+        ColumnSpec("baseline_index_hfis", "float", "0-100", "Unperturbed PROPOSED_HFIS index value."),
+        ColumnSpec("baseline_class_crisp_max", "str", "-", "Unperturbed FUZZY_COMPONENT_MAX class."),
+        ColumnSpec("baseline_index_crisp_max", "float", "0-100", "Unperturbed FUZZY_COMPONENT_MAX index value."),
+        ColumnSpec("baseline_class_crisp_class_max", "str", "-", "Unperturbed CRISP_CLASS_MAX class."),
+        ColumnSpec("baseline_index_crisp_class_max", "float", "0-100", "Unperturbed CRISP_CLASS_MAX index value."),
+        ColumnSpec("baseline_class_weighted_mean", "str", "-", "Unperturbed WEIGHTED_MEAN class."),
+        ColumnSpec("baseline_index_weighted_mean", "float", "0-100", "Unperturbed WEIGHTED_MEAN index value."),
     ],
     STABILITY_TRIALS: [
         ColumnSpec("sample_id", "str", "-", "Which sampled computed_ts this trial belongs to."),
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("trial_index", "int", "-", "0-based perturbation trial number within this sample/method."),
         ColumnSpec("trial_class", "str", "-", "Index class recomputed after perturbing every available channel within its declared uncertainty."),
         ColumnSpec("trial_index_value", "float", "0-100", "Index value for this trial."),
@@ -160,24 +166,24 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
     ],
     STABILITY_BY_POINT: [
         ColumnSpec("sample_id", "str", "-", "Sampled computed_ts identifier."),
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("selection_reason", "str", "-", "boundary_adjacent | random_comparison."),
         ColumnSpec("boundary_channel", "str", "-", "Channel whose boundary this point is nearest to (boundary_adjacent only)."),
         ColumnSpec("original_class", "str", "-", "This method's own unperturbed (baseline) class at this point."),
         *_STABILITY_METRIC_COLUMNS,
     ],
     STABILITY_SUMMARY: [
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         *_STABILITY_METRIC_COLUMNS,
     ],
     STABILITY_SUMMARY_BY_VARIABLE: [
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("selection_reason", "str", "-", "boundary_adjacent | random_comparison."),
         ColumnSpec("boundary_channel", "str", "-", "Channel whose boundary these points are nearest to (null for random_comparison)."),
         *_STABILITY_METRIC_COLUMNS,
     ],
     STABILITY_SUMMARY_BY_ORIGINAL_CLASS: [
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("original_class", "str", "-", "This method's own unperturbed (baseline) class -- does stability depend on where a point started?"),
         *_STABILITY_METRIC_COLUMNS,
     ],
@@ -240,14 +246,14 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("max_abs_index_diff", "float", "index points", "Maximum absolute index difference from the reference."),
     ],
     MASKING_SUMMARY: [
-        ColumnSpec("method", "str", "-", "CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("severity_threshold", "str", "-", "Severity a component must reach to count as 'hidden' if the baseline doesn't also reach it."),
         ColumnSpec("n_critical_events", "int", "count", "Computed_ts where at least one component reached severity_threshold."),
         ColumnSpec("n_masked", "int", "count", "Of those, how many the baseline's aggregated class did not also reach."),
         ColumnSpec("masking_rate", "float", "0-1", "n_masked / n_critical_events; null if n_critical_events is 0 (nothing to mask, not a fabricated 0)."),
     ],
     REFERENCE_CASE_SUMMARY: [
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("n", "int", "count", "Synthetic, pre-labeled boundary-adjacent reference cases scored."),
         ColumnSpec("n_excluded", "int", "count", "Cases excluded for lack of a predicted class (e.g. FAILED)."),
         ColumnSpec("macro_f1", "float", "0-1", "Unweighted mean per-class F1 against the predefined synthetic labels -- consistency, NOT empirical accuracy."),
@@ -269,7 +275,7 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("boundary_value", "float", "channel units", "The control-region breakpoint this grid straddles."),
         ColumnSpec("grid_index", "int", "-", "0-based position within the dense input grid."),
         ColumnSpec("input_value", "float", "channel units", "The perturbed channel's value at this grid point."),
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("index_value", "float", "0-100", "Index value at this grid point."),
         ColumnSpec("index_class", "str", "-", "Index class at this grid point."),
     ],
@@ -277,7 +283,7 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("boundary_id", "str", "-", "Identifier for the control-region boundary under test."),
         ColumnSpec("channel", "str", "-", "pm2_5 | pm10 | co2 | temperature | humidity."),
         ColumnSpec("context", "str", "-", "favorable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."),
-        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN."),
+        ColumnSpec("method", "str", "-", "PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN."),
         ColumnSpec("max_adjacent_jump", "float", "index points", "Largest index-value change between adjacent grid points."),
         ColumnSpec("mean_adjacent_jump", "float", "index points", "Mean index-value change between adjacent grid points."),
         ColumnSpec("median_adjacent_jump", "float", "index points", "Median index-value change between adjacent grid points."),
@@ -289,7 +295,32 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("index_range", "float", "index points", "max(index_value) - min(index_value) across the grid."),
         ColumnSpec("monotonicity_violations", "int", "count", "Adjacent-point decreases for a monotonic (higher-is-worse) pollutant channel."),
         ColumnSpec("masked_by_favorable", "bool", "-", "Whether a favorable component prevented the adverse channel from dominating the aggregated result."),
-        ColumnSpec("area_between_curves_vs_crisp_max", "float", "index points x channel units", "Trapezoidal integral of |PROPOSED-HFIS - CRISP-MAX| over the swept input; only populated for method=PROPOSED-HFIS."),
+        ColumnSpec("area_between_curves_vs_crisp_max", "float", "index points x channel units", "Trapezoidal integral of |PROPOSED_HFIS - FUZZY_COMPONENT_MAX| over the swept input; only populated for method=PROPOSED_HFIS."),
+    ],
+    MULTI_COMPONENT_GRID: [
+        ColumnSpec("a", "float", "0-100", "Aerosol (A) component crisp score at this grid point."),
+        ColumnSpec("v", "float", "0-100", "Ventilation (V) component crisp score at this grid point."),
+        ColumnSpec("m", "float", "0-100", "Microclimate (M) component crisp score at this grid point."),
+        ColumnSpec("hfis_index_value", "float", "0-100", "PROPOSED_HFIS index value for this (A, V, M) triple."),
+        ColumnSpec("hfis_index_class", "str", "-", "PROPOSED_HFIS index class."),
+        ColumnSpec("fuzzy_component_max_index_value", "float", "0-100", "FUZZY_COMPONENT_MAX index value."),
+        ColumnSpec("fuzzy_component_max_index_class", "str", "-", "FUZZY_COMPONENT_MAX index class."),
+        ColumnSpec("crisp_class_max_index_value", "float", "0-100", "CRISP_CLASS_MAX index value."),
+        ColumnSpec("crisp_class_max_index_class", "str", "-", "CRISP_CLASS_MAX index class."),
+        ColumnSpec("weighted_mean_index_value", "float", "0-100", "WEIGHTED_MEAN index value."),
+        ColumnSpec("weighted_mean_index_class", "str", "-", "WEIGHTED_MEAN index class."),
+    ],
+    MULTI_COMPONENT_GRID_SUMMARY: [
+        ColumnSpec("method_a", "str", "-", "First method of this pairwise comparison."),
+        ColumnSpec("method_b", "str", "-", "Second method of this pairwise comparison."),
+        ColumnSpec("n_points", "int", "count", "Grid points where both methods produced a defined index value."),
+        ColumnSpec("mean_abs_diff", "float", "index points", "Mean |method_a - method_b| across the grid."),
+        ColumnSpec("median_abs_diff", "float", "index points", "Median |method_a - method_b|."),
+        ColumnSpec("p95_abs_diff", "float", "index points", "95th percentile |method_a - method_b|."),
+        ColumnSpec("max_abs_diff", "float", "index points", "Maximum |method_a - method_b| observed."),
+        ColumnSpec("mean_signed_diff", "float", "index points", "Mean(method_a - method_b); sign shows which method scores systematically higher."),
+        ColumnSpec("class_agreement_rate", "float", "0-1", "Fraction of grid points where both methods gave the same index class."),
+        ColumnSpec("n_class_disagreements", "int", "count", "Grid points where the two methods' classes differed."),
     ],
     FAULT_INJECTION_EVENTS: [
         ColumnSpec("scenario_id", "str", "-", "Synthetic scenario identifier."),
@@ -410,17 +441,21 @@ def export_method_comparison(con: duckdb.DuckDBPyConnection, out_dir: Path, pipe
             p.index_class AS proposed_index_class,
             cm.index_value AS crisp_max_index_value,
             cm.index_class AS crisp_max_index_class,
+            ccm.index_value AS crisp_class_max_index_value,
+            ccm.index_class AS crisp_class_max_index_class,
             wm.index_value AS weighted_mean_index_value,
             wm.index_class AS weighted_mean_index_class
         FROM iaq_index_results p
         LEFT JOIN baseline_results cm ON cm.pipeline_run_id = p.pipeline_run_id AND cm.computed_ts = p.computed_ts
-            AND cm.window_minutes = p.window_minutes AND cm.method = 'CRISP-MAX' AND cm.evaluation_run_id = ?
+            AND cm.window_minutes = p.window_minutes AND cm.method = 'FUZZY_COMPONENT_MAX' AND cm.evaluation_run_id = ?
+        LEFT JOIN baseline_results ccm ON ccm.pipeline_run_id = p.pipeline_run_id AND ccm.computed_ts = p.computed_ts
+            AND ccm.window_minutes = p.window_minutes AND ccm.method = 'CRISP_CLASS_MAX' AND ccm.evaluation_run_id = ?
         LEFT JOIN baseline_results wm ON wm.pipeline_run_id = p.pipeline_run_id AND wm.computed_ts = p.computed_ts
-            AND wm.window_minutes = p.window_minutes AND wm.method = 'WEIGHTED-MEAN' AND wm.evaluation_run_id = ?
+            AND wm.window_minutes = p.window_minutes AND wm.method = 'WEIGHTED_MEAN' AND wm.evaluation_run_id = ?
         WHERE p.pipeline_run_id = ? AND p.window_minutes = ? AND p.computed_ts > ? AND p.computed_ts <= ?
         ORDER BY p.computed_ts
         """,
-        [evaluation_run_id, evaluation_run_id, pipeline_run_id, window_minutes, from_ts, to_ts],
+        [evaluation_run_id, evaluation_run_id, evaluation_run_id, pipeline_run_id, window_minutes, from_ts, to_ts],
     ).df()
     return _write(df, COLUMNS[METHOD_COMPARISON], out_dir, METHOD_COMPARISON)
 
@@ -447,7 +482,8 @@ def export_reason_code_frequency(con: duckdb.DuckDBPyConnection, out_dir: Path, 
 def export_stability_samples(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
         "SELECT sample_id, computed_ts, selection_reason, boundary_channel, baseline_class_hfis, baseline_index_hfis, "
-        "baseline_class_crisp_max, baseline_index_crisp_max, baseline_class_weighted_mean, baseline_index_weighted_mean "
+        "baseline_class_crisp_max, baseline_index_crisp_max, baseline_class_crisp_class_max, baseline_index_crisp_class_max, "
+        "baseline_class_weighted_mean, baseline_index_weighted_mean "
         "FROM evaluation_stability_samples WHERE evaluation_run_id = ? ORDER BY computed_ts",
         [evaluation_run_id],
     ).df()
@@ -609,6 +645,30 @@ def export_continuity_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, eva
     return _write(df, COLUMNS[CONTINUITY_SUMMARY], out_dir, CONTINUITY_SUMMARY)
 
 
+def export_multi_component_grid(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
+    df = con.execute(
+        "SELECT a, v, m, hfis_index_value, hfis_index_class, fuzzy_component_max_index_value, fuzzy_component_max_index_class, "
+        "crisp_class_max_index_value, crisp_class_max_index_class, weighted_mean_index_value, weighted_mean_index_class "
+        "FROM evaluation_multi_component_grid WHERE evaluation_run_id = ? ORDER BY a, v, m",
+        [evaluation_run_id],
+    ).df()
+    if df.empty:
+        return None
+    return _write(df, COLUMNS[MULTI_COMPONENT_GRID], out_dir, MULTI_COMPONENT_GRID)
+
+
+def export_multi_component_grid_summary(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
+    df = con.execute(
+        "SELECT method_a, method_b, n_points, mean_abs_diff, median_abs_diff, p95_abs_diff, max_abs_diff, "
+        "mean_signed_diff, class_agreement_rate, n_class_disagreements "
+        "FROM evaluation_multi_component_grid_summary WHERE evaluation_run_id = ? ORDER BY method_a, method_b",
+        [evaluation_run_id],
+    ).df()
+    if df.empty:
+        return None
+    return _write(df, COLUMNS[MULTI_COMPONENT_GRID_SUMMARY], out_dir, MULTI_COMPONENT_GRID_SUMMARY)
+
+
 def export_fault_injection_events(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
         "SELECT scenario_id, dataset_split, channel, fault_type, injected_at_index, duration_samples, description "
@@ -704,6 +764,7 @@ def export_all(
             STABILITY_SUMMARY_BY_VARIABLE, STABILITY_SUMMARY_BY_ORIGINAL_CLASS,
             SENSITIVITY_WINDOW_BY_POINT, SENSITIVITY_WINDOW_SUMMARY, SENSITIVITY_COVERAGE_BY_POINT, SENSITIVITY_COVERAGE_SUMMARY,
             MASKING_SUMMARY, REFERENCE_CASE_SUMMARY, CONTINUITY_GRID, CONTINUITY_SUMMARY,
+            MULTI_COMPONENT_GRID, MULTI_COMPONENT_GRID_SUMMARY,
             FAULT_INJECTION_EVENTS, FAULT_DETECTION_PREDICTIONS, FAULT_DETECTION_METRICS,
             FAULT_DETECTION_EVENT_METRICS, FAULT_DETECTION_CONFUSION_MATRIX, HAMPEL_CALIBRATION,
         ):
@@ -727,6 +788,8 @@ def export_all(
             REFERENCE_CASE_SUMMARY: export_reference_case_summary(con, out_dir, evaluation_run_id),
             CONTINUITY_GRID: export_continuity_grid(con, out_dir, evaluation_run_id),
             CONTINUITY_SUMMARY: export_continuity_summary(con, out_dir, evaluation_run_id),
+            MULTI_COMPONENT_GRID: export_multi_component_grid(con, out_dir, evaluation_run_id),
+            MULTI_COMPONENT_GRID_SUMMARY: export_multi_component_grid_summary(con, out_dir, evaluation_run_id),
             FAULT_INJECTION_EVENTS: export_fault_injection_events(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_PREDICTIONS: export_fault_detection_predictions(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_METRICS: export_fault_detection_metrics(con, out_dir, evaluation_run_id),

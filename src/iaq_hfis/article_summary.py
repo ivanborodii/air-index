@@ -54,7 +54,7 @@ def build_article_metrics(summary: dict) -> dict:
         "status_proportions": ev.get("status_proportions"),
         "reason_code_frequency": ev.get("reason_code_frequency"),
         "performance": summary.get("performance"),
-        "publication_readiness": summary.get("publication_readiness"),
+        "readiness": summary.get("readiness"),
         "dominant_component_frequency": summary.get("dominant_component_frequency"),
     }
 
@@ -119,10 +119,10 @@ def build_article_results_summary(summary: dict) -> str:
         lines.append("Not available.")
     lines.append("")
 
-    lines += ["## 7. HFIS vs CRISP-MAX numerical continuity", ""]
+    lines += ["## 7. HFIS vs FUZZY_COMPONENT_MAX numerical continuity", ""]
     continuity = ev.get("continuity") if ev else None
     if continuity and continuity.get("by_boundary_method"):
-        for method in ("PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"):
+        for method in ("PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "WEIGHTED_MEAN"):
             rows = [r for r in continuity["by_boundary_method"] if r["method"] == method and r["max_adjacent_jump"] is not None]
             if rows:
                 mean_jump = sum(r["max_adjacent_jump"] for r in rows) / len(rows)
@@ -205,8 +205,8 @@ def build_article_results_summary(summary: dict) -> str:
     lines.append("")
 
     lines += ["## 13. Provisional parameters and limitations", ""]
-    pr = summary.get("publication_readiness") or {}
-    provisional = pr.get("provisional_parameters_used") or summary.get("provisional_parameters_used") or []
+    readiness = summary.get("readiness") or {}
+    provisional = readiness.get("provisional_parameters_used") or summary.get("provisional_parameters_used") or []
     if provisional:
         lines.append(f"{len(provisional)} provisional parameter(s) engaged this run (see `parameter_provenance.csv` for status/source of each):")
         for p in provisional:
@@ -216,7 +216,7 @@ def build_article_results_summary(summary: dict) -> str:
     lines.append("")
     lines.append(
         "See `run_narrative.md`'s dedicated **Limitations** and **Forbidden overclaims** sections for the full "
-        "discussion, including the PROPOSED-HFIS vs CRISP-MAX equivalence finding (if applicable to this run) and "
+        "discussion, including the PROPOSED_HFIS vs FUZZY_COMPONENT_MAX equivalence finding (if applicable to this run) and "
         "what claims this run's data does and does not support."
     )
     lines.append("")

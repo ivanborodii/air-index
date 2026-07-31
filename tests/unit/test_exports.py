@@ -83,7 +83,7 @@ def test_export_stability_trials_has_expected_rows(writer, tmp_path):
         con.execute(
             "INSERT INTO evaluation_stability_trials (evaluation_run_id, pipeline_run_id, sample_id, method, trial_index, trial_class, trial_index_value, changed_from_baseline, abs_index_change) "
             "VALUES (?,?,?,?,?,?,?,?,?)",
-            [EVALUATION_RUN_ID, PIPELINE_RUN_ID, "sample-1", "PROPOSED-HFIS", i, tc, 10.0 if tc == "Favorable" else 26.0, tc != "Favorable", 0.0 if tc == "Favorable" else 16.0],
+            [EVALUATION_RUN_ID, PIPELINE_RUN_ID, "sample-1", "PROPOSED_HFIS", i, tc, 10.0 if tc == "Favorable" else 26.0, tc != "Favorable", 0.0 if tc == "Favorable" else 16.0],
         )
     path = exports.export_stability_trials(con, tmp_path, EVALUATION_RUN_ID)
     df = pd.read_csv(path)

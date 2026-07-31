@@ -12,21 +12,47 @@ another artifact disagrees.
 **Single source of truth**: :func:`engaged_provisional_paths` is the ONLY
 place that decides which parameters count as "engaged" for a run. Every
 artifact that reports a provisional-parameter list or count (run_summary.json
-top-level field, run_summary.md, run_narrative.md, publication_readiness,
+top-level field, run_summary.md, run_narrative.md, readiness,
 article_results_summary.md, parameter_provenance.csv, latest_run.json) must
 derive from this same function's output -- never recompute independently.
 See ``iaq_hfis.validation``'s cross-artifact check for the regression test.
 
 ``status`` is one of:
-    MANUSCRIPT_DEFINED    -- numeric value given directly in the manuscript
-    STANDARD_BASED        -- from a cited external standard (e.g. DBN B.2.5-67:2013)
-    SENSOR_SPECIFICATION  -- taken directly from a datasheet-declared uncertainty
-    DERIVED                -- computed at runtime from other provenanced values
-                              (e.g. the sum of two sensor_specification values)
-    AUTHOR_DEFINED         -- a deliberate, documented author choice (not from
-                              the manuscript or a standard, but not a guess either)
-    PROVISIONAL            -- not given numerically anywhere cited; needs
-                              confirmation or sensitivity analysis
+    MANUSCRIPT_DEFINED                    -- numeric value given directly in the manuscript
+    STANDARD_BASED                        -- from a cited external standard (e.g. DBN B.2.5-67:2013)
+    DATASHEET_BASED                       -- taken directly from a manufacturer datasheet-declared
+                                              uncertainty/range (formerly named SENSOR_SPECIFICATION)
+    LITERATURE_INFORMED                   -- grounded in a cited paper's own worked example, but that
+                                              paper does not present it as a general recommendation and
+                                              it has not been independently confirmed for this deployment
+                                              (never call this "calibrated" -- see CALIBRATED_ON_SYNTHETIC_
+                                              CALIBRATION_SPLIT below for what that actually requires)
+    DERIVED                               -- computed at runtime from other provenanced values
+                                              (e.g. the sum of two datasheet-based values)
+    DERIVED_FROM_SYSTEM_CADENCE           -- computed from a real, observable system cadence (e.g. a
+                                              cron schedule), not an independently-guessed number
+    CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT -- selected via a documented grid search scored on the
+                                              synthetic fault-injection calibration split; explicitly NOT
+                                              equivalent to validation on manually labelled real faults
+    AUTHOR_DEFINED                        -- a deliberate, documented author choice that is a design/
+                                              engineering decision (e.g. a runtime-bounding sample size),
+                                              not a scientific claim requiring confirmation
+    AUTHOR_DEFINED_PROVISIONAL            -- a deliberate, documented author choice for a genuine
+                                              scientific parameter, with a real (if informal) derivation
+                                              rationale, but not given in the manuscript and not yet
+                                              confirmed -- needs sensitivity-analysis coverage
+    PROVISIONAL                           -- not given numerically anywhere cited and with no derivation
+                                              rationale beyond "a plausible round number was chosen";
+                                              needs confirmation or sensitivity analysis
+
+PROVISIONAL, AUTHOR_DEFINED_PROVISIONAL, LITERATURE_INFORMED, and
+CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT are collectively
+:data:`PROVISIONAL_LIKE_STATUSES` -- every one of them is unconfirmed for
+this deployment/manuscript and must be disclosed as an engaged provisional
+parameter and (where scientifically material) covered by sensitivity
+analysis. Only literal ``"PROVISIONAL"`` used to gate this; that was too
+narrow once the taxonomy grew finer-grained categories that are still, in
+substance, unconfirmed.
 """
 
 from __future__ import annotations
@@ -36,7 +62,17 @@ from dataclasses import asdict, dataclass
 from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings
 from iaq_hfis.schema import dual_channel_tolerance
 
-STATUS_VALUES = {"MANUSCRIPT_DEFINED", "STANDARD_BASED", "SENSOR_SPECIFICATION", "DERIVED", "AUTHOR_DEFINED", "PROVISIONAL"}
+STATUS_VALUES = {
+    "MANUSCRIPT_DEFINED", "STANDARD_BASED", "DATASHEET_BASED", "LITERATURE_INFORMED",
+    "DERIVED", "DERIVED_FROM_SYSTEM_CADENCE", "CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT",
+    "AUTHOR_DEFINED", "AUTHOR_DEFINED_PROVISIONAL", "PROVISIONAL",
+}
+
+#: See module docstring -- every status that means "unconfirmed for this
+#: deployment/manuscript", not just the literal PROVISIONAL string.
+PROVISIONAL_LIKE_STATUSES = frozenset(
+    {"PROVISIONAL", "AUTHOR_DEFINED_PROVISIONAL", "LITERATURE_INFORMED", "CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT"}
+)
 
 
 @dataclass(frozen=True)
@@ -94,20 +130,23 @@ def collect_parameter_provenance(settings: Settings, sensor_specs: SensorSpecs, 
         "Manuscript-specified primary operational window.", pipeline_stage="aggregation", manuscript_reference="Materials and Methods: rolling window")
     add("cadence.recompute_interval_minutes", settings.cadence.recompute_interval_minutes, "minutes", "MANUSCRIPT_DEFINED",
         "Manuscript-specified recompute grid.", pipeline_stage="aggregation", manuscript_reference="Materials and Methods: recompute cadence")
-    add("cadence.slot_match_tolerance_seconds", settings.cadence.slot_match_tolerance_seconds, "seconds", "PROVISIONAL",
+    add("cadence.slot_match_tolerance_seconds", settings.cadence.slot_match_tolerance_seconds, "seconds", "AUTHOR_DEFINED_PROVISIONAL",
         "Half the sensor sample cadence: computed_ts has an arbitrary phase offset from the sensor's own ~30s cadence, "
         "so a tighter tolerance would systematically miss real readings that were never dropped.", pipeline_stage="validation")
     add("coverage.min_ratio", settings.coverage.min_ratio, None, "MANUSCRIPT_DEFINED",
         "Manuscript-specified coverage threshold rho_i(t) >= 0.80.", pipeline_stage="completeness",
         manuscript_reference="Materials and Methods: coverage ratio", sensitivity_coverage="swept directly by the sensitivity experiment (coverage_threshold)")
 
-    add("hampel.window_size", settings.hampel.window_size, "samples", "PROVISIONAL",
+    add("hampel.window_size", settings.hampel.window_size, "samples", "LITERATURE_INFORMED",
         "Pearson, Neuvo, Astola, Gabbouj, \"Generalized Hampel Filters\" (2016) -- the manuscript's own cited source's "
         "illustrative-example parameters (K=5 -> 11-point window); the paper states this as a worked example, not a "
-        "general recommendation.", pipeline_stage="validation", manuscript_reference="Cited: Pearson et al. 2016, Hampel filter")
-    add("hampel.mad_multiplier", settings.hampel.mad_multiplier, None, "PROVISIONAL",
-        "Same source as hampel.window_size (t=1 in the cited paper's example).", pipeline_stage="validation",
+        "general recommendation, and it has not been independently calibrated for this deployment -- see "
+        "parameter_selection.json for the separate (diagnostic-only) synthetic calibration-split grid search, which "
+        "does NOT replace this literature-informed choice.", pipeline_stage="validation",
         manuscript_reference="Cited: Pearson et al. 2016, Hampel filter")
+    add("hampel.mad_multiplier", settings.hampel.mad_multiplier, None, "LITERATURE_INFORMED",
+        "Same source as hampel.window_size (t=1 in the cited paper's example); see parameter_selection.json.",
+        pipeline_stage="validation", manuscript_reference="Cited: Pearson et al. 2016, Hampel filter")
 
     add("confirmation.persistence_min_consecutive_samples", settings.confirmation.persistence_min_consecutive_samples, "samples", "PROVISIONAL",
         "Not given numerically in the manuscript.", pipeline_stage="validation")
@@ -126,16 +165,17 @@ def collect_parameter_provenance(settings: Settings, sensor_specs: SensorSpecs, 
             "Sum of the primary and secondary sensor's own declared_uncertainty from sensor_specs.yaml "
             "(schema.dual_channel_tolerance) -- not an independently configured value.",
             source_file="src/iaq_hfis/schema.py", source_key_path="dual_channel_tolerance()", pipeline_stage="validation")
-    add("confirmation.outdoor_context_max_age_minutes", settings.confirmation.outdoor_context_max_age_minutes, "minutes", "AUTHOR_DEFINED",
+    add("confirmation.outdoor_context_max_age_minutes", settings.confirmation.outdoor_context_max_age_minutes, "minutes", "DERIVED_FROM_SYSTEM_CADENCE",
         "2x the real outdoor weather fetch cadence (air-monitor/scripts/fetch_weather.py runs hourly via cron) -- "
-        "tolerates one missed/delayed fetch cycle before flagging staleness.", pipeline_stage="validation")
+        "tolerates one missed/delayed fetch cycle before flagging staleness, tied to the observable fetch schedule "
+        "rather than an independently-guessed number.", pipeline_stage="validation")
 
     add("profile_selection.season_month_ranges", settings.profile_selection.season_month_ranges, "months", "PROVISIONAL",
         "Season cutover months not given in the manuscript.", pipeline_stage="profile_selection")
 
     for channel in ("pm2_5", "pm10", "co2"):
         region = getattr(settings.control_regions, channel)
-        add(f"control_regions.{channel}.transition_widths", region.transition_widths, "channel units", "SENSOR_SPECIFICATION",
+        add(f"control_regions.{channel}.transition_widths", region.transition_widths, "channel units", "DATASHEET_BASED",
             f"Matches sensor_specs.yaml's declared_uncertainty for {channel} (datasheet-sourced).",
             source_file="config/sensor_specs.yaml", pipeline_stage="membership_construction")
         add(f"control_regions.{channel}.breakpoints", region.breakpoints, "channel units", "STANDARD_BASED",
@@ -201,11 +241,15 @@ def collect_parameter_provenance(settings: Settings, sensor_specs: SensorSpecs, 
         None, "AUTHOR_DEFINED", "Not derived from the manuscript; a fixed, documented synthetic benchmark separate from real-data analysis.",
         source_file="src/iaq_hfis/evaluation/fault_injection.py", pipeline_stage="evaluation_fault_injection")
     add("evaluation.hampel_calibration_grid", "window_size in {7,11,15}, mad_multiplier in {1.0,2.0,3.0}", None, "AUTHOR_DEFINED",
-        "Diagnostic-only candidate grid for the fault-injection Hampel calibration; the configured hampel.window_size/mad_multiplier are never auto-changed from this grid alone.",
+        "Describes the diagnostic-only candidate grid itself (an evaluation-harness design choice), scored on the "
+        "synthetic calibration split (see parameter_selection.json) -- not a configuration value that shapes computed "
+        "results: the configured hampel.window_size/mad_multiplier are never auto-changed from this grid. No parameter "
+        "in this system is currently CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT -- Hampel stays LITERATURE_INFORMED "
+        "specifically because synthetic calibration does not equal validation on manually labelled real faults.",
         source_file="src/iaq_hfis/evaluation/fault_injection.py", pipeline_stage="evaluation_fault_injection")
     add("fuzzy_engine.partial_mode_inference_rule",
         "PARTIAL-mode index rules are regenerated directly from the available components (same worst-of consequent), not the full 3-input rule base with the missing component filtered out",
-        None, "PROVISIONAL", "The manuscript does not specify PARTIAL-mode inference mechanics; see fuzzy_engine.infer_index docstring for why naive filtering of the full rule base would be unsound.",
+        None, "AUTHOR_DEFINED_PROVISIONAL", "The manuscript does not specify PARTIAL-mode inference mechanics; see fuzzy_engine.infer_index docstring for why naive filtering of the full rule base would be unsound (a real design rationale, not an arbitrary guess) -- still needs sensitivity coverage since it is not manuscript-confirmed.",
         source_file="src/iaq_hfis/fuzzy_engine.py", source_key_path="infer_index()", pipeline_stage="fuzzy_inference")
 
     return rows
@@ -222,12 +266,12 @@ def engaged_provisional_paths(rows: list[ParameterProvenance], provisional_profi
     This is the ONE function every artifact must call (directly or via
     :func:`mark_engagement`) to determine the engaged list -- never
     recomputed independently, which is exactly how run_summary.md/
-    run_narrative.md and publication_readiness previously disagreed.
+    run_narrative.md and readiness previously disagreed.
     """
     engaged_events = set(provisional_profile_events)
     paths = []
     for row in rows:
-        if row.status != "PROVISIONAL":
+        if row.status not in PROVISIONAL_LIKE_STATUSES:
             continue
         if row.path.startswith("room_profiles."):
             profile_key = row.path.removeprefix("room_profiles.").rsplit(".", 1)[0]
@@ -259,7 +303,7 @@ def apply_known_engagement(rows: list[ParameterProvenance], engaged_paths: list[
     engaged_set = set(engaged_paths)
     result = []
     for row in rows:
-        engaged = True if row.status != "PROVISIONAL" else row.path in engaged_set
+        engaged = True if row.status not in PROVISIONAL_LIKE_STATUSES else row.path in engaged_set
         result.append(
             ParameterProvenance(
                 row.path, row.effective_value, row.unit, row.status, row.source_file, row.source_key_path,
@@ -269,13 +313,32 @@ def apply_known_engagement(rows: list[ParameterProvenance], engaged_paths: list[
     return result
 
 
-def assess_publication_readiness(summary: dict, provenance: list[ParameterProvenance]) -> dict:
-    """A lightweight, always-computable readiness signal based on the
-    pipeline/evaluation status and provenance -- NOT a substitute for
-    ``iaq_hfis validate-artifacts`` (a separate, artifact-level cross-check
-    that requires the report's CSVs/plots to already exist; run it after
-    ``iaq_hfis report`` and see ``artifact_validation`` in the tracked
-    publication snapshot for the authoritative combined result).
+def assess_readiness(
+    summary: dict,
+    provenance: list[ParameterProvenance],
+    artifact_validation: dict | None = None,
+    tests_executed: dict | None = None,
+) -> dict:
+    """Splits readiness into two separate, non-conflatable signals (spec
+    section 12):
+
+    - **artifact_readiness**: the computational artifacts are internally
+      complete and consistent (pipeline succeeded, evaluation ran,
+      ``iaq_hfis validate-artifacts`` and the test suite -- once known --
+      both pass). Says nothing about whether the result is eligible to be
+      described as the manuscript's complete proposed method.
+    - **manuscript_readiness**: may be True only when artifact_readiness is
+      True AND the room/season temperature profile is directly DBN-
+      supported (not provisional, not exploratory-mode) AND a full A/V/M/I
+      (completeness_status=OK) result actually exists this run. This is
+      what gates promotion into ``research_results/final``.
+
+    ``artifact_validation``/``tests_executed`` are ``None`` at ``report``
+    time (those checks run later); pass the real dicts once known (at
+    ``finalize`` time) to fold them into both readiness signals -- callers
+    must overwrite ``summary["readiness"]`` with the re-evaluated result
+    rather than mutating the report-time dict in place, so the two never
+    drift apart.
 
     ``provisional_parameters_used`` here is always taken verbatim from
     ``summary["provisional_parameters_used"]`` (the single authoritative
@@ -283,29 +346,119 @@ def assess_publication_readiness(summary: dict, provenance: list[ParameterProven
     independently, so this can never drift from run_summary.md/
     run_narrative.md, which read the same top-level field.
     """
-    blocking: list[str] = []
-    warnings: list[str] = []
+    artifact_blocking: list[str] = []
+    artifact_warnings: list[str] = []
 
     if summary.get("status") != "success":
-        blocking.append(f"pipeline run status is '{summary.get('status')}', not 'success'")
+        artifact_blocking.append(f"pipeline run status is '{summary.get('status')}', not 'success'")
     if summary.get("evaluation") is None:
-        blocking.append("no evaluation has been run for this pipeline run -- run 'iaq_hfis evaluate' first")
+        artifact_blocking.append("no evaluation has been run for this pipeline run -- run 'iaq_hfis evaluate' first")
+    if artifact_validation is not None and not artifact_validation.get("ok"):
+        artifact_blocking.append(f"iaq_hfis validate-artifacts failed ({artifact_validation.get('n_violations')} violation(s))")
+    if tests_executed is not None and not tests_executed.get("ok"):
+        artifact_blocking.append(f"test suite failed ({tests_executed.get('failed')} failed, {tests_executed.get('errors')} error(s))")
 
     engaged_provisional = sorted(summary.get("provisional_parameters_used") or [])
     if engaged_provisional:
-        warnings.append(f"{len(engaged_provisional)} provisional parameter(s) engaged this run -- disclosed in provisional_parameters_used, not resolved")
+        artifact_warnings.append(f"{len(engaged_provisional)} provisional parameter(s) engaged this run -- disclosed in provisional_parameters_used, not resolved")
 
     sensitivity_covered = sorted({p.path for p in provenance if p.sensitivity_coverage})
     uncovered_provisional = [p for p in engaged_provisional if p not in sensitivity_covered]
     if uncovered_provisional:
-        warnings.append(f"{len(uncovered_provisional)} engaged provisional parameter(s) have no sensitivity-analysis coverage: {', '.join(uncovered_provisional)}")
+        artifact_warnings.append(f"{len(uncovered_provisional)} engaged provisional parameter(s) have no sensitivity-analysis coverage: {', '.join(uncovered_provisional)}")
+
+    # --- manuscript readiness: artifact readiness is a strict prerequisite, plus the
+    # manuscript-specific criteria from spec section 12. ---
+    manuscript_blocking: list[str] = list(artifact_blocking)
+    manuscript_warnings: list[str] = list(artifact_warnings)
+    unsupported_claims: list[str] = []
+
+    mode = summary.get("mode", "publication")
+    if mode != "publication":
+        manuscript_blocking.append(f"pipeline run mode='{mode}' -- only mode='publication' runs are manuscript-eligible (exploratory runs never fabricate the microclimate component)")
+        unsupported_claims.append("Full three-component (A/V/M/I) proposed-method result")
+
+    provisional_room_profiles = [p for p in engaged_provisional if p.startswith("room_profiles.")]
+    if provisional_room_profiles:
+        manuscript_blocking.append(f"room/season temperature profile is provisional, not directly DBN-supported: {provisional_room_profiles}")
+        if "Full three-component (A/V/M/I) proposed-method result" not in unsupported_claims:
+            unsupported_claims.append("Full three-component (A/V/M/I) proposed-method result")
+        unsupported_claims.append("The microclimate component is standards-based for the deployed room/season")
+
+    completeness = summary.get("completeness_summary") or {}
+    if not completeness.get("OK"):
+        manuscript_blocking.append("no OK-completeness computed_ts exist in this run -- a full A/V/M/I result was never produced")
+        if "Full three-component (A/V/M/I) proposed-method result" not in unsupported_claims:
+            unsupported_claims.append("Full three-component (A/V/M/I) proposed-method result")
+
+    manuscript_ready = len(manuscript_blocking) == 0
+
+    # De-duplicated, order-preserving: every issue that blocks manuscript readiness,
+    # surfaced as a single flat list for quick scanning (spec section 12: scientific_blockers).
+    scientific_blockers = list(dict.fromkeys(manuscript_blocking))
 
     return {
-        "ready": len(blocking) == 0,
-        "blocking_issues": blocking,
-        "warnings": warnings,
+        "artifact_readiness": {
+            "ready": len(artifact_blocking) == 0,
+            "blocking_issues": artifact_blocking,
+            "warnings": artifact_warnings,
+        },
+        "manuscript_readiness": {
+            "ready": manuscript_ready,
+            "blocking_issues": manuscript_blocking,
+            "unsupported_claims": unsupported_claims,
+            "warnings": manuscript_warnings,
+        },
+        "scientific_blockers": scientific_blockers,
+        "unsupported_claims": unsupported_claims,
         "provisional_parameters_used": engaged_provisional,
         "parameters_covered_by_sensitivity_analysis": sensitivity_covered,
-        "tests_executed": None,
-        "artifact_validation": None,
+        "tests_executed": tests_executed,
+        "artifact_validation": artifact_validation,
+    }
+
+
+def fold_late_artifact_checks(readiness: dict, artifact_validation: dict, tests_executed: dict | None) -> dict:
+    """Re-evaluates an already-built :func:`assess_readiness` result once
+    ``iaq_hfis validate-artifacts`` and the test suite have actually run
+    (both unknown at ``report`` time). Never mutates ``readiness`` in
+    place -- returns a fresh dict, so callers must overwrite
+    ``summary["readiness"]`` rather than assume the report-time object
+    updated itself.
+    """
+    artifact_blocking = list(readiness["artifact_readiness"]["blocking_issues"])
+    if not artifact_validation.get("ok"):
+        artifact_blocking.append(f"iaq_hfis validate-artifacts failed ({artifact_validation.get('n_violations')} violation(s))")
+    if tests_executed is not None and not tests_executed.get("ok"):
+        artifact_blocking.append(f"test suite failed ({tests_executed.get('failed')} failed, {tests_executed.get('errors')} error(s))")
+
+    # manuscript_readiness inherits every artifact-level issue plus whatever manuscript-specific
+    # issues assess_readiness already found (e.g. provisional temperature profile) -- mirrors
+    # assess_readiness's own "manuscript_blocking = list(artifact_blocking) + manuscript-specific" construction.
+    manuscript_only = [
+        b for b in readiness["manuscript_readiness"]["blocking_issues"]
+        if b not in readiness["artifact_readiness"]["blocking_issues"]
+    ]
+    manuscript_blocking = artifact_blocking + manuscript_only
+
+    scientific_blockers = list(dict.fromkeys(manuscript_blocking))
+
+    return {
+        "artifact_readiness": {
+            "ready": len(artifact_blocking) == 0,
+            "blocking_issues": artifact_blocking,
+            "warnings": readiness["artifact_readiness"]["warnings"],
+        },
+        "manuscript_readiness": {
+            "ready": len(manuscript_blocking) == 0,
+            "blocking_issues": manuscript_blocking,
+            "unsupported_claims": readiness["manuscript_readiness"]["unsupported_claims"],
+            "warnings": readiness["manuscript_readiness"]["warnings"],
+        },
+        "scientific_blockers": scientific_blockers,
+        "unsupported_claims": readiness["unsupported_claims"],
+        "provisional_parameters_used": readiness["provisional_parameters_used"],
+        "parameters_covered_by_sensitivity_analysis": readiness["parameters_covered_by_sensitivity_analysis"],
+        "tests_executed": tests_executed,
+        "artifact_validation": artifact_validation,
     }

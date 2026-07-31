@@ -209,8 +209,10 @@ def _calibration_dataset_for(path: str) -> str:
 
 
 def build_provisional_parameter_assessment_markdown(provenance: list[ParameterProvenance], summary: dict) -> str:
+    from iaq_hfis.provenance import PROVISIONAL_LIKE_STATUSES
+
     engaged_paths = set(summary.get("provisional_parameters_used") or [])
-    provisional_rows = sorted((p for p in provenance if p.status == "PROVISIONAL"), key=lambda p: p.path)
+    provisional_rows = sorted((p for p in provenance if p.status in PROVISIONAL_LIKE_STATUSES), key=lambda p: p.path)
 
     lines: list[str] = [
         "# Provisional Parameter Assessment",
@@ -219,12 +221,14 @@ def build_provisional_parameter_assessment_markdown(provenance: list[ParameterPr
         "Regenerate rather than hand-edit if anything here looks stale.",
         "",
         "**Two hard rules enforced throughout:** a synthetic benchmark's calibration result is scoped to that "
-        "benchmark and is never claimed to make a parameter universally valid; no parameter is promoted from "
-        "PROVISIONAL to STANDARD_BASED in this report -- that only happens in `iaq_hfis.provenance`'s own "
-        "catalog, with a cited source, never here.",
+        "benchmark and is never claimed to make a parameter universally valid, and a parameter grounded in a "
+        "literature example is never described as \"calibrated\" merely because of that citation; no parameter is "
+        "promoted to STANDARD_BASED in this report -- that only happens in `iaq_hfis.provenance`'s own catalog, "
+        "with a cited source, never here.",
         "",
-        f"{len(provisional_rows)} PROVISIONAL parameter(s) in the current configuration; "
-        f"{len(engaged_paths)} engaged (actually applied) this run.",
+        f"{len(provisional_rows)} parameter(s) with a provisional-like status "
+        "(PROVISIONAL, AUTHOR_DEFINED_PROVISIONAL, LITERATURE_INFORMED, or CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT) "
+        f"in the current configuration; {len(engaged_paths)} engaged (actually applied) this run.",
         "",
     ]
 
@@ -234,11 +238,12 @@ def build_provisional_parameter_assessment_markdown(provenance: list[ParameterPr
         lines += [
             f"## `{row.path}`",
             "",
+            f"- **Status**: `{row.status}`",
             f"- **Current value**: `{row.effective_value}`{f' {row.unit}' if row.unit else ''}",
             f"- **Engaged this run**: {'yes' if engaged else 'no -- config-level default not exercised by this run’s data'}",
             f"- **Why provisional**: {row.scientific_rationale}",
             f"- **Where used**: pipeline stage `{row.pipeline_stage}`; source `{row.source_file}` (`{row.source_key_path}`)",
-            f"- **Calibrated**: {'yes' if _is_calibrated(row.path) else 'no'}",
+            f"- **Diagnostic calibration grid exists**: {'yes -- see parameter_selection.json (diagnostic only; the configured value is NOT selected from this grid, see below)' if _is_calibrated(row.path) else 'no'}",
             f"- **Calibration/validation dataset**: {_calibration_dataset_for(row.path)}",
             f"- **Sensitivity result**: {_sensitivity_result_for(row.path, summary)}",
             f"- **Do conclusions depend strongly on it?**: {meta.depends_strongly}",

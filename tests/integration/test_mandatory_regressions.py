@@ -325,7 +325,7 @@ def test_validate_artifacts_writes_json_and_md_reports(full_run, tmp_path):
 def test_final_snapshot_embeds_test_report_when_given(full_run, tmp_path):
     """Mandatory regression test: build_final_snapshot must write
     test_report.json/.md into the snapshot when a test_report_summary is
-    given, and fold its pass/fail counts into publication_readiness --
+    given, and fold its pass/fail counts into readiness --
     per the "do not proceed to publishing if any required test fails"
     requirement, the snapshot must carry visible evidence of whether tests
     passed."""
@@ -349,7 +349,7 @@ def test_final_snapshot_embeds_test_report_when_given(full_run, tmp_path):
 
     summary_path = final_dir / "run_summary.json"
     summary = json.loads(summary_path.read_text())
-    tests_executed = summary["publication_readiness"]["tests_executed"]
+    tests_executed = summary["readiness"]["tests_executed"]
     assert tests_executed["ok"] is True
     assert tests_executed["total"] == 42
     assert tests_executed["passed"] == 42
