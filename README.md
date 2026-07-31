@@ -624,6 +624,18 @@ python -m iaq_hfis.cli validate-artifacts --pipeline-run-id <id>
 #    required if it predates the run-isolated schema (LegacySchemaError)
 python -m iaq_hfis.cli rebuild-db --confirm
 
+# 7. Run the full test suite (required before finalize; refuses if ok=false)
+python -m iaq_hfis.cli test-report
+
+# 8. Build the tracked publication snapshot -- requires artifact_readiness,
+#    the same git commit that computed the run, and a clean working tree.
+#    Refuses if pipeline_run_id was computed with --mode exploratory.
+python -m iaq_hfis.cli finalize --pipeline-run-id <id> --test-report-json test_report.json
+
+# 8b. For an exploratory-mode run: writes research_results/exploratory/ instead
+#     (never research_results/final/ -- the microclimate component was omitted)
+python -m iaq_hfis.cli finalize --pipeline-run-id <id> --exploratory
+
 # All of 1-4 at once, over the last 24 hours:
 scripts/run_iaq_hfis.sh 1440
 
