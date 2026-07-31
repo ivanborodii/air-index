@@ -2,7 +2,7 @@
 
 # iaq_hfis Run Narrative
 
-Run `d641f7012e02464393800d46ad580cf3` computed the hierarchical fuzzy indoor air quality index over 2026-07-15T00:00:00+00:00 to 2026-07-29T00:00:00+00:00, using a 15-minute rolling window, recomputed at each aligned timestamp (4032 timestamps processed).
+Run `49f2df39757245408465d4f274393e86` computed the hierarchical fuzzy indoor air quality index over 2026-07-15T00:00:00+00:00 to 2026-07-29T00:00:00+00:00, using a 15-minute rolling window, recomputed at each aligned timestamp (4032 timestamps processed).
 
 Provisional parameters engaged this run (16): cadence.slot_match_tolerance_seconds; confirmation.gradual_drift_magnitude_multiplier; confirmation.gradual_drift_min_consecutive_steps; confirmation.persistence_min_consecutive_samples; confirmation.pm_cross_channel_tolerance_pct; confirmation.stuck_value_min_repeats; control_regions.output.transition_widths; control_regions.relative_humidity.transition_width; evaluation.masking_severity_threshold; evaluation.stability_n_trials; evaluation.stability_seed; fuzzy_engine.partial_mode_inference_rule; hampel.mad_multiplier; hampel.window_size; membership.output_transition_width; profile_selection.season_month_ranges. Results depending on these should be treated as preliminary until the author confirms the underlying values.
 
@@ -11,7 +11,7 @@ Of 4032 computed timestamps, 0 were OK (all three components available with suff
 Dominant-component frequency across OK/PARTIAL computed timestamps: A: 3625 (93.6%), V: 248 (6.4%).
 
 ## Method comparison
-Evaluation run `e58bc785357740de93be45654a7098bb` (the selected evaluation for this pipeline run):
+Evaluation run `1ff631777e9c4f3a90351ebdc4b3a6cc` (the selected evaluation for this pipeline run):
 - CRISP_CLASS_MAX and FUZZY_COMPONENT_MAX agreed on 100.0% of 4032 compared timestamps (unlabeled agreement, Cohen's kappa=0.999).
 - CRISP_CLASS_MAX and PROPOSED_HFIS agreed on 100.0% of 3873 compared timestamps (unlabeled agreement, Cohen's kappa=0.999).
 - CRISP_CLASS_MAX and WEIGHTED_MEAN agreed on 92.6% of 4032 compared timestamps (unlabeled agreement, Cohen's kappa=0.552).

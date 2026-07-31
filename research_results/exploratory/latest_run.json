@@ -1,6 +1,6 @@
 {
-  "pipeline_run_id": "d641f7012e02464393800d46ad580cf3",
-  "evaluation_run_id": "e58bc785357740de93be45654a7098bb",
+  "pipeline_run_id": "49f2df39757245408465d4f274393e86",
+  "evaluation_run_id": "1ff631777e9c4f3a90351ebdc4b3a6cc",
   "source_time_range": [
     "2026-07-15T00:00:00+00:00",
     "2026-07-29T00:00:00+00:00"
@@ -8,8 +8,8 @@
   "window_minutes": 15,
   "coverage_min_ratio": 0.8,
   "config_hash": "f5cde8425c2d994845d2d10d9545c8b79fa9f0ac4b92ba2cf78801aeee3e3909",
-  "git_commit": "1655f36cb9a6e9a0fe451650107cf3e2dfd6e92b",
-  "result_generation_timestamp_utc": "2026-07-31T09:02:38.304851+00:00",
+  "git_commit": "64e5448d3e42b5074d1275b8723ae40ee0a09fc5",
+  "result_generation_timestamp_utc": "2026-07-31T12:34:30.783221+00:00",
   "readiness": {
     "artifact_readiness": {
       "ready": false,
@@ -67,7 +67,13 @@
       "evaluation.sensitivity_coverage_thresholds",
       "evaluation.sensitivity_window_minutes"
     ],
-    "tests_executed": null,
+    "tests_executed": {
+      "ok": true,
+      "total": 384,
+      "passed": 384,
+      "failed": 0,
+      "skipped": 0
+    },
     "artifact_validation": {
       "ok": false,
       "n_checks_passed": 54,

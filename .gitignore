@@ -25,3 +25,8 @@ run_sps.py
 
 # local Claude Code settings
 .claude/
+
+# scratch copy from 'iaq_hfis test-report'; the canonical copy is embedded by
+# 'iaq_hfis finalize' into research_results/{exploratory,final}/test_report.*
+/test_report.json
+/test_report.md

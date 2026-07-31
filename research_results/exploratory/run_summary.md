@@ -1,19 +1,19 @@
 # iaq_hfis Run Summary
 
-Pipeline run ID: `d641f7012e02464393800d46ad580cf3`
+Pipeline run ID: `49f2df39757245408465d4f274393e86`
 
 ## Run Metadata
 
 - Status: **success**
-- Started: 2026-07-31T06:46:33.195094+00:00
-- Finished: 2026-07-31T08:45:19.314745+00:00
+- Started: 2026-07-31T09:58:47.440716+00:00
+- Finished: 2026-07-31T11:51:23.643268+00:00
 - Computed range: 2026-07-15T00:00:00+00:00 to 2026-07-29T00:00:00+00:00
 - Window: 15 minutes
 - Timestamps processed: 4032
 - Snapshot retries: 0
 - Config hash: `f5cde8425c2d994845d2d10d9545c8b79fa9f0ac4b92ba2cf78801aeee3e3909`
 - Engine version: 0.1.0
-- Selected evaluation run ID: e58bc785357740de93be45654a7098bb
+- Selected evaluation run ID: 1ff631777e9c4f3a90351ebdc4b3a6cc
 
 ## Environment
 
@@ -23,8 +23,8 @@ Pipeline run ID: `d641f7012e02464393800d46ad580cf3`
 - platform: Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41
 - processor: aarch64
 - cpu_count: 4
-- git_commit: 1655f36cb9a6e9a0fe451650107cf3e2dfd6e92b
-- git_tree_dirty: True
+- git_commit: 64e5448d3e42b5074d1275b8723ae40ee0a09fc5
+- git_tree_dirty: False
 - rule_generation_version: worst-of-max-severity-v1
 
 ## Completeness Summary

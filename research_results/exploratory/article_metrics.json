@@ -1,8 +1,8 @@
 {
-  "pipeline_run_id": "d641f7012e02464393800d46ad580cf3",
-  "evaluation_run_id": "e58bc785357740de93be45654a7098bb",
+  "pipeline_run_id": "49f2df39757245408465d4f274393e86",
+  "evaluation_run_id": "1ff631777e9c4f3a90351ebdc4b3a6cc",
   "config_hash": "f5cde8425c2d994845d2d10d9545c8b79fa9f0ac4b92ba2cf78801aeee3e3909",
-  "git_commit": "1655f36cb9a6e9a0fe451650107cf3e2dfd6e92b",
+  "git_commit": "64e5448d3e42b5074d1275b8723ae40ee0a09fc5",
   "study_period": [
     "2026-07-15T00:00:00+00:00",
     "2026-07-29T00:00:00+00:00"
@@ -7131,13 +7131,13 @@
     "platform": "Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41",
     "processor": "aarch64",
     "cpu_count": 4,
-    "total_runtime_seconds": 7126.119651,
-    "peak_memory_mb": 397.53125,
+    "total_runtime_seconds": 6756.202552,
+    "peak_memory_mb": 426.015625,
     "per_timestamp_latency_ms": {
-      "mean": 1761.0597518488205,
-      "median": 1578.3973769284785,
-      "p95": 2598.8903962774193,
-      "max": 43009.77752218023
+      "mean": 1669.6478437306494,
+      "median": 1558.7621109998508,
+      "p95": 2560.0540952000065,
+      "max": 5092.973965000056
     },
     "source_raw_row_count": 40319,
     "derived_row_counts": {

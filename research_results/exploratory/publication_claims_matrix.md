@@ -61,8 +61,8 @@
 - **Status**: **SUPPORTED**
 - **Required evidence**: Per-timestamp latency and peak memory measured on the actual RPi5 deployment hardware.
 - **Artifact**: `run_summary.json:performance`
-- **Metric**: `per_timestamp_latency_ms.mean, peak_memory_mb` = `1761.0597518488205 ms`
-- **Limitation**: Measured on Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41: mean per-timestamp latency 1761.1 ms, peak memory 397.53125 MB.
+- **Metric**: `per_timestamp_latency_ms.mean, peak_memory_mb` = `1669.6478437306494 ms`
+- **Limitation**: Measured on Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41: mean per-timestamp latency 1669.6 ms, peak memory 426.015625 MB.
 - **Recommended wording**: Measured runtime and peak memory on the deployment Raspberry Pi 5 stay well within the 5-minute recompute interval.
 
 ## `claim_08`: Outdoor data improve confirmation/explanation without directly entering the index.

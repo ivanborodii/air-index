@@ -2,15 +2,15 @@
 
 > Factual, validated-metrics-only summary for manual adaptation into the
 > manuscript's Results/Discussion. Every number here is copied directly from
-> `run_summary_d641f7012e02464393800d46ad580cf3.json` -- no claim beyond what the
+> `run_summary_49f2df39757245408465d4f274393e86.json` -- no claim beyond what the
 > numbers themselves support. This is not manuscript prose.
 
 ## 1. Dataset and experiment period
 
 - Period: 2026-07-15T00:00:00+00:00 to 2026-07-29T00:00:00+00:00
 - Window: 15 minutes; recompute grid per config
-- pipeline_run_id: `d641f7012e02464393800d46ad580cf3`; evaluation_run_id: `e58bc785357740de93be45654a7098bb`
-- config_hash: `f5cde8425c2d994845d2d10d9545c8b79fa9f0ac4b92ba2cf78801aeee3e3909`; git commit: `1655f36cb9a6e9a0fe451650107cf3e2dfd6e92b`
+- pipeline_run_id: `49f2df39757245408465d4f274393e86`; evaluation_run_id: `1ff631777e9c4f3a90351ebdc4b3a6cc`
+- config_hash: `f5cde8425c2d994845d2d10d9545c8b79fa9f0ac4b92ba2cf78801aeee3e3909`; git commit: `64e5448d3e42b5074d1275b8723ae40ee0a09fc5`
 
 ## 2. Expected and processed calculation timestamps
 
@@ -97,9 +97,9 @@ Event-level (each injected fault matched at most once, one-to-one):
 ## 12. Execution-time and resource results
 
 - Platform: Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41 (aarch64, 4 CPUs)
-- Total pipeline runtime: 7126.1 s for 4032 timestamps
-- Per-timestamp latency: mean=1761.1 ms, median=1578.4 ms, p95=2598.9 ms, max=43009.8 ms
-- Peak memory: 397.5 MB
+- Total pipeline runtime: 6756.2 s for 4032 timestamps
+- Per-timestamp latency: mean=1669.6 ms, median=1558.8 ms, p95=2560.1 ms, max=5093.0 ms
+- Peak memory: 426.0 MB
 - Source raw row count: 40319
 
 ## 13. Provisional parameters and limitations
