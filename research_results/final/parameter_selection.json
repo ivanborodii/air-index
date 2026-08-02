@@ -1,0 +1,40 @@
+{
+  "parameter_group": "hampel_filter",
+  "candidate_grid": {
+    "window_size": [
+      7,
+      11,
+      15
+    ],
+    "mad_multiplier": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "n_combinations": 9
+  },
+  "calibration_objective": {
+    "description": "Balances 3 concerns, averaged: single_spike recall (catching real spikes), genuine-event preservation rate (not discarding genuine sustained events), and 1 - single_spike false-positive rate (not over-labeling ordinary points near a real transition). See iaq_hfis.evaluation.fault_injection._objective.",
+    "dataset_split_used_for_search": "calibration"
+  },
+  "selected_parameters": {
+    "window_size": 11,
+    "mad_multiplier": 1.0,
+    "status": "LITERATURE_INFORMED"
+  },
+  "selection_rationale": "The configured values are NOT selected from this calibration grid. They are retained from the manuscript's cited source (Pearson, Neuvo, Astola, Gabbouj, \"Generalized Hampel Filters\", 2016, Sec. 2 / Figs. 3-5 worked example: K=5 -> 11-point window, t=1) regardless of this grid's outcome. A change would only be adopted after separate empirical verification against real live-data deployment, never from synthetic-benchmark evidence alone -- see iaq_hfis.provenance.STATUS_VALUES: LITERATURE_INFORMED is deliberately distinct from CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT for exactly this reason.",
+  "frozen_effective_config_hash": "133162d56aa30bc8022c2be07a32d7436fb03c2010e92432070bbe8b34d3dc31",
+  "best_calibration_split_result": {
+    "window_size": 7,
+    "mad_multiplier": 2.0,
+    "objective_score": 1.0
+  },
+  "validation_split_metrics_for_configured_value": {
+    "window_size": 11,
+    "mad_multiplier": 1.0,
+    "fault_recall": 1.0,
+    "genuine_event_preservation_rate": 1.0,
+    "objective_score": 0.8987341772151899
+  },
+  "synthetic_calibration_disclaimer": "Synthetic calibration does not equal validation on manually labelled real faults. This grid search is scored entirely on deterministic synthetic fault-injection scenarios (see docs/fault_injection_audit.md); it has not been checked against any manually labelled real-world fault event. Treat validation_split_metrics_for_configured_value below as a synthetic-benchmark cross-check only, not a real-world accuracy claim."
+}
