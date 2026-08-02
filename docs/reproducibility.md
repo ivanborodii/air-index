@@ -44,8 +44,8 @@ disqualifies the result from being published.
 
 ## Publication vs. exploratory mode
 
-`iaq_hfis run --mode publication` (default, strict): a missing DBN
-temperature profile for any computed_ts aborts the entire run --
+`iaq_hfis run --mode publication` (default, strict): a missing DBN- or
+DSTU-supported temperature profile for any computed_ts aborts the entire run --
 `TEMPERATURE_PROFILE_NOT_DEFINED` propagates uncaught, since a full A/V/M/I
 manuscript result must never be produced with a substituted or omitted
 microclimate component.
