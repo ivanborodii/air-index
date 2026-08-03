@@ -52,51 +52,16 @@ profiles:
       critical_low_max: 22.0
       critical_high_min: 27.0
       transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
-  - room: kitchen
-    season: warm_period
-    # CONFIRMED via substitute-standard justification (2026-07-31), per the
-    # manuscript's own stated fallback rule: DBN B.2.5-67:2013 Table Д.4's
-    # standalone-kitchen row has a literal dash ("--") in the cooling/warm
-    # column (see below) -- no DBN value exists -- so this profile is instead
-    # sourced to ДСТУ Б EN 15251:2011 (IDT adoption of EN 15251:2007, the
-    # same EN framework DBN B.2.5-67's own table is built from), Таблиця
-    # А.2 / Table A.2 "Examples of recommended design values of the indoor
-    # temperature for design of buildings and HVAC systems", row "Житлові
-    # приміщення: спальні, вітальні, кухні тощо" (residential: bedrooms,
-    # living rooms, KITCHEN etc -- kitchen named explicitly), sedentary
-    # ~1.2 met, ~1.0/~0.5 clo (heating/cooling). Verified directly against
-    # the standard PDF (mathcentre.com.ua-hosted copy), p.35:
-    #   Category I:   21.0 (heating min) / 25.5 (cooling max)
-    #   Category II:  20.0 / 26.0
-    #   Category III: 18.0 / 27.0
-    # Category I/II/III are nested (I subset of II subset of III), mapped
-    # the same way DBN's Підвищені оптимальні/Оптимальні/Допустимі tiers
-    # are mapped elsewhere in this file: I=favorable, out to II=acceptable
-    # edge, out to III=degraded edge, beyond III=critical. NOTE Table A.3 of
-    # the same standard (hourly energy-calculation ranges, a different
-    # purpose) groups kitchen with storage/halls instead and has NO cooling
-    # value for that grouping either -- independently corroborating DBN's
-    # own gap rather than filling it; Table A.2 (design/comfort bands, the
-    # correct structural analogue to DBN Table Д.4) is the one used here.
-    provisional: false
-    ranges:
-      favorable: [21.0, 25.5]        # Category I
-      acceptable_low: [20.0, 21.0]
-      acceptable_high: [25.5, 26.0]  # outer edge = Category II
-      degraded_low: [18.0, 20.0]
-      degraded_high: [26.0, 27.0]    # outer edge = Category III
-      critical_low_max: 18.0
-      critical_high_min: 27.0
-      transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
-# NOTE: DBN B.2.5-67:2013 Table Д.4's standalone-kitchen row ("інші об'єми:
-# кухня, гардеробна, комора тощо") has a literal dash ("--") in the
-# cooling/warm-period column -- DBN itself defines no room-specific value for
-# a standalone kitchen in the warm period. The real deployment is a confirmed
-# standalone/enclosed kitchen (see README.md "Deployment"), not a
-# kitchen-dining/general-residential space, so the general_residential/
-# warm_period row above must NOT be reused for it -- that would misrepresent
-# which DBN row governs the result. Per the manuscript's own stated fallback
-# rule, the kitchen/warm_period profile above is instead sourced to ДСТУ Б EN
-# 15251:2011 Table A.2 (see that profile's own comment for the full
-# citation) -- never a silent fallback, never DBN-row substitution, never
-# fabrication. See docs/manuscript_method_mapping.md and README.md §10.
+# NOTE: there is deliberately no kitchen/warm_period profile here. Table Д.4's
+# standalone-kitchen row ("інші об'єми: кухня, гардеробна, комора тощо") has a
+# literal dash ("--") in the cooling/warm-period column -- DBN B.2.5-67:2013
+# defines no room-specific temperature range for a standalone kitchen in the
+# warm period. The real deployment is a confirmed standalone/enclosed kitchen
+# (see README.md "Deployment"), not a kitchen-dining/general-residential
+# space, so the general_residential/warm_period row above must NOT be reused
+# for it -- that would misrepresent which DBN row governs the result. A
+# warm-period run for this deployment must fail with
+# TEMPERATURE_PROFILE_NOT_DEFINED (see profiles.select_room_season) rather
+# than silently substituting a different room's numbers. See
+# docs/manuscript_method_mapping.md for the two scientifically valid ways to
+# unblock a warm-period result.

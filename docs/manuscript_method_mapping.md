@@ -137,7 +137,7 @@ exported as `multi_component_grid.csv`/`multi_component_grid_summary.csv`.
 
 - `src/iaq_hfis/profiles.py:select_room_season` raises a structured
   `TemperatureProfileNotDefinedError` (`TEMPERATURE_PROFILE_NOT_DEFINED`)
-  when no DBN- or DSTU-supported profile exists for the requested room/season --
+  when no DBN-supported profile exists for the requested room/season --
   never a silent fallback to another room, season, interpolation, or
   outdoor temperature.
 - `mode=publication` (default, strict): this error aborts the entire

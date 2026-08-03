@@ -46,10 +46,7 @@ class TemperatureProfileNotDefinedError(ConfigError):
         self.requested_room = requested_room
         self.requested_season = requested_season
         self.available_profiles = available_profiles
-        self.dbn_source = (
-            "DBN V.2.5-67:2013, mandatory Appendix D, Table D.4 (or, where explicitly "
-            "cited in room_profiles.yaml, a substitute standard such as DSTU B EN 15251:2011, Table A.2)"
-        )
+        self.dbn_source = "DBN V.2.5-67:2013, mandatory Appendix D, Table D.4"
         message = (
             "TEMPERATURE_PROFILE_NOT_DEFINED\n"
             f"  requested room:   {requested_room}\n"
