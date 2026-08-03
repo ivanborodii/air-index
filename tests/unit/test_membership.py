@@ -40,26 +40,26 @@ def test_all_monotonic_memberships_in_unit_interval(x):
 def test_adjacent_monotonic_classes_cross_at_boundary():
     shapes = build_monotonic_classes([15, 25, 50], [2.0, 2.0, 2.0])
     degrees = evaluate_memberships(15.0, shapes)
-    assert degrees["Favorable"] == pytest.approx(0.5)
+    assert degrees["Favourable"] == pytest.approx(0.5)
     assert degrees["Acceptable"] == pytest.approx(0.5)
 
 
 def test_monotonic_channel_is_right_shoulder_only():
     shapes = build_monotonic_classes([15, 25, 50], [2.0, 2.0, 2.0])
-    # increasing x never increases Favorable's degree, never decreases Critical's
+    # increasing x never increases Favourable's degree, never decreases Critical's
     xs = [0, 5, 14, 15, 16, 30, 60, 100]
-    favorable = [evaluate_memberships(x, shapes)["Favorable"] for x in xs]
+    favourable = [evaluate_memberships(x, shapes)["Favourable"] for x in xs]
     critical = [evaluate_memberships(x, shapes)["Critical"] for x in xs]
-    assert all(a >= b for a, b in zip(favorable, favorable[1:]))
+    assert all(a >= b for a, b in zip(favourable, favourable[1:]))
     assert all(a <= b for a, b in zip(critical, critical[1:]))
 
 
 def test_two_sided_penalizes_both_low_and_high(room_profiles):
     profile = room_profiles.find("kitchen", "cold_period")
     shapes = build_two_sided_classes(profile.ranges, profile.ranges.transition_width)
-    favorable_mid = evaluate_memberships(19.5, shapes)["Favorable"]
-    too_cold = evaluate_memberships(10.0, shapes)["Favorable"]
-    too_hot = evaluate_memberships(30.0, shapes)["Favorable"]
+    favorable_mid = evaluate_memberships(19.5, shapes)["Favourable"]
+    too_cold = evaluate_memberships(10.0, shapes)["Favourable"]
+    too_hot = evaluate_memberships(30.0, shapes)["Favourable"]
     assert favorable_mid == 1.0
     assert too_cold == 0.0
     assert too_hot == 0.0
@@ -79,7 +79,7 @@ def test_all_two_sided_memberships_in_unit_interval(x, room_profiles):
 def test_two_sided_adjacent_classes_cross_at_shared_boundary(room_profiles):
     profile = room_profiles.find("kitchen", "cold_period")
     shapes = build_two_sided_classes(profile.ranges, profile.ranges.transition_width)
-    boundary = profile.ranges.favorable[0]  # 18.0, shared edge between Acceptable-low and Favorable
+    boundary = profile.ranges.favourable[0]  # 18.0, shared edge between Acceptable-low and Favourable
     degrees = evaluate_memberships(boundary, shapes)
-    assert degrees["Favorable"] == pytest.approx(0.5)
+    assert degrees["Favourable"] == pytest.approx(0.5)
     assert degrees["Acceptable"] == pytest.approx(0.5)

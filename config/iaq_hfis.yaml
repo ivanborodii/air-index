@@ -159,7 +159,7 @@ control_regions:
     # accuracy at this deployment's typical ~800ppm indoor range).
     transition_widths: [70.0, 70.0, 70.0]
   relative_humidity:   # DBN B.2.5-67:2013, %
-    favorable: [30.0, 50.0]
+    favourable: [30.0, 50.0]
     acceptable_low: [25.0, 30.0]
     acceptable_high: [50.0, 60.0]
     degraded_low: [20.0, 25.0]
@@ -175,7 +175,7 @@ evaluation:
   stability_seed: 42               # PROVISIONAL: manuscript requires a fixed seed, gives no value
   stability_n_trials: 30           # PROVISIONAL
   sensitivity_window_minutes: [5, 15, 30, 60]           # manuscript-specified, not provisional
-  sensitivity_coverage_thresholds: [0.70, 0.80, 0.90]   # manuscript-specified, not provisional
+  sensitivity_coverage_thresholds: [0.70, 0.80, 0.90]   # only 0.80 is manuscript-specified; 0.70/0.90 are repository evaluation choices (author_defined), not manuscript values
   masking_severity_threshold: Critical   # PROVISIONAL: which severity counts as "hidden" by aggregation
 
 engine_version: "0.1.0"

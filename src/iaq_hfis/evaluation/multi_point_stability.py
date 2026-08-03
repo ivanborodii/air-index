@@ -80,11 +80,11 @@ def boundary_targets(control_regions, room_profile) -> dict[str, list[float]]:
         "pm2_5": list(control_regions.pm2_5.breakpoints),
         "pm10": list(control_regions.pm10.breakpoints),
         "co2": list(control_regions.co2.breakpoints),
-        "humidity": [rh.critical_low_max, rh.acceptable_low[1], rh.favorable[0], rh.favorable[1], rh.acceptable_high[0], rh.critical_high_min],
+        "humidity": [rh.critical_low_max, rh.acceptable_low[1], rh.favourable[0], rh.favourable[1], rh.acceptable_high[0], rh.critical_high_min],
     }
     if room_profile is not None:
         temp = room_profile.ranges
-        targets["temperature"] = [temp.critical_low_max, temp.acceptable_low[1], temp.favorable[0], temp.favorable[1], temp.acceptable_high[0], temp.critical_high_min]
+        targets["temperature"] = [temp.critical_low_max, temp.acceptable_low[1], temp.favourable[0], temp.favourable[1], temp.acceptable_high[0], temp.critical_high_min]
     return targets
 
 

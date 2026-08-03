@@ -4,16 +4,16 @@ baselines directly, by sweeping a dense input grid across every manuscript
 control-region boundary.
 
 Each boundary is swept under THREE separate "other components" contexts --
-``favorable``, ``acceptable``, ``degraded`` -- not just a single
-deeply-favorable baseline. This matters: when every other channel is pinned
-fully Favorable, the 2nd-level Mamdani engine's class-activation vector
+``favourable``, ``acceptable``, ``degraded`` -- not just a single
+deeply-favourable baseline. This matters: when every other channel is pinned
+fully Favourable, the 2nd-level Mamdani engine's class-activation vector
 becomes mathematically identical to the swept channel's own component-level
-class-activation vector (worst-of consequent + Favorable's minimal severity
+class-activation vector (worst-of consequent + Favourable's minimal severity
 rank), so PROPOSED_HFIS and FUZZY_COMPONENT_MAX are *provably* forced to coincide in
 that one regime -- see docs/hfis_vs_crispmax_audit.md section 3 for the
 proof. Testing only that regime would make any "HFIS is smoother" claim
 untestable, not merely weak. The acceptable/degraded contexts exercise the
-genuine multi-input rule interaction the favorable-only sweep cannot reach.
+genuine multi-input rule interaction the favourable-only sweep cannot reach.
 
 Every ``room_profiles.yaml`` room/season combination is swept for
 temperature boundaries (not just the run's representative profile), so
@@ -26,7 +26,7 @@ p95 adjacent-point index jump, total variation, a local Lipschitz ratio
 discrete-grid analogue of a Lipschitz constant), class-transition
 count/positions, index range, monotonicity violations (for monotonic
 pollutant channels, a decrease as the input worsens), and whether a
-favorable component masked the adverse channel's own severity in the
+favourable component masked the adverse channel's own severity in the
 aggregated result. PROPOSED_HFIS rows additionally report the area between
 its own curve and FUZZY_COMPONENT_MAX's curve (trapezoidal integral of
 |HFIS(x) - FUZZY_COMPONENT_MAX(x)| over the swept input) -- a single number
@@ -49,7 +49,7 @@ from iaq_hfis.schema import channel_uncertainty
 
 METHODS = ["PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN"]
 MONOTONIC_CHANNELS = {"pm2_5", "pm10", "co2"}
-CONTEXTS = ["favorable", "acceptable", "degraded"]
+CONTEXTS = ["favourable", "acceptable", "degraded"]
 
 
 @dataclass(frozen=True)
@@ -96,7 +96,7 @@ class ContinuitySummaryRow:
 
 def _monotonic_context_value(breakpoints: list[float], context: str) -> float:
     b0, b1, b2 = breakpoints
-    if context == "favorable":
+    if context == "favourable":
         return b0 / 2.0
     if context == "acceptable":
         return (b0 + b1) / 2.0
@@ -109,8 +109,8 @@ def _two_sided_context_value(ranges, context: str) -> float:
     but fixed and documented choice -- the low/high bands are symmetric in
     how the worst-of rule base treats them, so either side exercises the
     same rule-interaction behavior)."""
-    if context == "favorable":
-        lo, hi = ranges.favorable
+    if context == "favourable":
+        lo, hi = ranges.favourable
     elif context == "acceptable":
         lo, hi = ranges.acceptable_high
     else:
@@ -145,8 +145,8 @@ def _two_sided_boundaries(channel: str, ranges, boundary_suffix: str, room: str 
     edges = {
         "critical_low": ranges.critical_low_max,
         "acceptable_low_edge": ranges.acceptable_low[1],
-        "favorable_low_edge": ranges.favorable[0],
-        "favorable_high_edge": ranges.favorable[1],
+        "favorable_low_edge": ranges.favourable[0],
+        "favorable_high_edge": ranges.favourable[1],
         "acceptable_high_edge": ranges.acceptable_high[0],
         "critical_high": ranges.critical_high_min,
     }
@@ -262,12 +262,12 @@ def summarize_boundary(boundary: ContinuityBoundary, context: str, points: list[
         if boundary.channel in MONOTONIC_CHANNELS:
             monotonicity_violations = sum(1 for a, b in zip(values, values[1:]) if a is not None and b is not None and b < a - 1e-9)
 
-        # "masked by favorable": at the boundary's own crossing point, the adverse channel is
-        # the only non-favorable input by construction only in the favorable context; kept as a
+        # "masked by favourable": at the boundary's own crossing point, the adverse channel is
+        # the only non-favourable input by construction only in the favourable context; kept as a
         # per-context diagnostic (still meaningful under acceptable/degraded contexts: does the
-        # aggregated class stay more favorable than the swept channel's own crossing would imply?).
+        # aggregated class stay more favourable than the swept channel's own crossing would imply?).
         crossing_idx = min(range(len(inputs)), key=lambda i: abs(inputs[i] - boundary.boundary_value))
-        masked = classes[crossing_idx] is not None and classes[crossing_idx] == "Favorable" and boundary.boundary_value > 0
+        masked = classes[crossing_idx] is not None and classes[crossing_idx] == "Favourable" and boundary.boundary_value > 0
 
         area = None
         if method == "PROPOSED_HFIS":

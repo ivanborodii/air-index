@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 #: rows must never be silently reinterpreted as version 2 rows -- see
 #: LegacySchemaError below and iaq_hfis.cli's rebuild-db command.
 #: Version 3: evaluation_continuity_grid/evaluation_continuity_summary gained
-#: a `context` column (favorable/acceptable/degraded) and new summary metrics
+#: a `context` column (favourable/acceptable/degraded) and new summary metrics
 #: (median/p95 adjacent jump, local_lipschitz_ratio, area_between_curves_vs_crisp_max).
 #: Version 4: iaq_index_results.dominant_component changed from VARCHAR[] to a
 #: single VARCHAR (the deterministic priority-hierarchy result), plus new

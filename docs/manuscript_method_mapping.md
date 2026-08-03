@@ -36,7 +36,7 @@ parameter, with its status: `MANUSCRIPT_DEFINED`, `STANDARD_BASED`,
 
 - PM2.5/PM10/CO2: monotonic (right-shoulder) classes built from 3
   breakpoints each. `src/iaq_hfis/membership.py:build_monotonic_classes`.
-- Temperature/RH: two-sided classes (favorable band, both-direction
+- Temperature/RH: two-sided classes (favourable band, both-direction
   degradation). `build_two_sided_classes`. Temperature is room/season
   dependent (`config/room_profiles.yaml`); RH is not.
 - Config: `config/iaq_hfis.yaml:control_regions`, `config/room_profiles.yaml`.
@@ -62,8 +62,8 @@ parameter, with its status: `MANUSCRIPT_DEFINED`, `STANDARD_BASED`,
   cannot reuse the full 3-input rule base with the missing input filtered out).
 - Defuzzification: centroid over a 401-point discretized output universe
   [0, 100]. `MamdaniEngine._centroid`.
-- Output classes: Favorable [0,25) / Acceptable [25,50) / Degraded [50,75) /
-  Critical [75,100], boundary values map to the less-favorable class.
+- Output classes: Favourable [0,25) / Acceptable [25,50) / Degraded [50,75) /
+  Critical [75,100], boundary values map to the less-favourable class.
   `fuzzy_engine.classify_output`.
 - **Dominant adverse component**: the available component with the highest
   adverse crisp score, tie-tolerant (`membership.dominant_component_tie_tolerance`,
@@ -166,5 +166,5 @@ sensitivity, masking, reference-case, and fault-injection methodology.
 - `control_regions.output.breakpoints` = [25, 50, 75] (method-defined output scale)
 - Two-level Mamdani inference with min antecedent activation, max
   aggregation, centroid defuzzification (fixed structurally, not a config value)
-- No compensation of an adverse component by favorable ones (structural:
+- No compensation of an adverse component by favourable ones (structural:
   worst-of rule consequents throughout)

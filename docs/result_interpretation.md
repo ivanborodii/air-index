@@ -82,7 +82,7 @@ them is the single most likely way to overclaim:
 
 `evaluation.continuity.smoothness_comparison` gives an aggregate,
 non-cherry-picked verdict across every (boundary, context) pair actually
-tested (favorable/acceptable/degraded). **Read the `conclusion` string
+tested (favourable/acceptable/degraded). **Read the `conclusion` string
 directly rather than assuming an outcome.** On the real reference run, this
 experiment finds PROPOSED_HFIS and FUZZY_COMPONENT_MAX numerically tied across every
 pair tested -- not because the methods are equivalent (an independent

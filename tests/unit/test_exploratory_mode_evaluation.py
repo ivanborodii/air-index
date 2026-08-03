@@ -46,7 +46,7 @@ def test_boundary_targets_with_profile_includes_temperature(base_settings, room_
 
 
 def test_context_values_with_no_profile_omits_temperature(base_settings):
-    values = _context_values(base_settings.control_regions, None, "favorable")
+    values = _context_values(base_settings.control_regions, None, "favourable")
     assert "temperature" not in values
     assert "humidity" in values
 
@@ -55,7 +55,7 @@ def test_sweep_boundary_with_no_fallback_profile_never_crashes_on_non_temperatur
     ctx = build_runtime_context(base_settings, sensor_specs, room_profiles, RAW_COLUMNS)
     boundaries = enumerate_boundaries(base_settings.control_regions, room_profiles)
     pm25_boundary = next(b for b in boundaries if b.channel == "pm2_5")
-    points = sweep_boundary(ctx, base_settings.control_regions, room_profiles, None, pm25_boundary, "favorable", 5)
+    points = sweep_boundary(ctx, base_settings.control_regions, room_profiles, None, pm25_boundary, "favourable", 5)
     assert points
     assert all(p.method in ("PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN") for p in points)
     # Never fabricates M: PROPOSED_HFIS rows here come from a 2-component (A, V) inference.
@@ -69,7 +69,7 @@ def test_sweep_boundary_temperature_boundary_unaffected_by_missing_fallback(base
     ctx = build_runtime_context(base_settings, sensor_specs, room_profiles, RAW_COLUMNS)
     boundaries = enumerate_boundaries(base_settings.control_regions, room_profiles)
     temp_boundary = next(b for b in boundaries if b.channel == "temperature" and b.room == "kitchen" and b.season == "cold_period")
-    points_with_fallback = sweep_boundary(ctx, base_settings.control_regions, room_profiles, None, temp_boundary, "favorable", 5)
+    points_with_fallback = sweep_boundary(ctx, base_settings.control_regions, room_profiles, None, temp_boundary, "favourable", 5)
     profile = room_profiles.find("kitchen", "cold_period")
-    points_with_real_fallback = sweep_boundary(ctx, base_settings.control_regions, room_profiles, profile, temp_boundary, "favorable", 5)
+    points_with_real_fallback = sweep_boundary(ctx, base_settings.control_regions, room_profiles, profile, temp_boundary, "favourable", 5)
     assert [p.index_value for p in points_with_fallback] == [p.index_value for p in points_with_real_fallback]

@@ -45,7 +45,7 @@ def test_render_plot_bar_succeeds(tmp_path):
 
 def test_render_plot_histogram_succeeds(tmp_path):
     csv_path = tmp_path / "hist.csv"
-    pd.DataFrame({"trial_class": ["Favorable", "Favorable", "Acceptable"]}).to_csv(csv_path, index=False)
+    pd.DataFrame({"trial_class": ["Favourable", "Favourable", "Acceptable"]}).to_csv(csv_path, index=False)
     spec = {"id": "hist_test", "title": "Hist Test", "source_csv": "hist.csv", "plot_type": "histogram", "x": "trial_class", "y": [], "group_by": None}
     result = render_plot(spec, tmp_path, tmp_path)
     assert result is not None and result.is_file()

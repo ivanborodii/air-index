@@ -104,7 +104,7 @@
         },
         "continuity": {
           "type": "object",
-          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids, favorable/acceptable/degraded contexts).",
+          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids, favourable/acceptable/degraded contexts).",
           "properties": {
             "n_boundaries": {"type": "integer"},
             "n_contexts": {"type": "integer"},

@@ -60,7 +60,7 @@ audit).
 humidity, pressure) every 30 seconds into a DuckDB database. `iaq_hfis` is
 a **separate, read-only consumer** of that data: it validates it, aggregates
 it into rolling windows, and computes a single 0–100 index describing how
-favorable the indoor air is, using a two-level Mamdani fuzzy-inference
+favourable the indoor air is, using a two-level Mamdani fuzzy-inference
 system. It also implements two simpler baseline methods for comparison
 (§20), a quantitative evaluation protocol (agreement, masking, stability,
 sensitivity, ground-truth scoring), and a full reporting layer (narrative,
@@ -81,7 +81,7 @@ strictly separate:
 
 | Concept | Values | Answers | Where |
 |---|---|---|---|
-| **Air-quality class** | Favorable / Acceptable / Degraded / Critical | "How good is the air, given the data we trust?" | `iaq_index_results.index_class`, `component_scores.membership_*` |
+| **Air-quality class** | Favourable / Acceptable / Degraded / Critical | "How good is the air, given the data we trust?" | `iaq_index_results.index_class`, `component_scores.membership_*` |
 | **Data-quality state** | VALID / SUSPECT / INVALID / MISSING | "Can we trust this specific reading?" | `observation_quality.stage2_state` |
 | **Completeness status** | OK / PARTIAL / FAILED | "Did we have enough trustworthy data to compute a class at all?" | `iaq_index_results.completeness_status` |
 
@@ -387,7 +387,7 @@ List of `{room, season, provisional, ranges}` entries. See §10.
 Exactly two temperature profiles are currently defined, both verified
 directly against **ДБН В.2.5-67:2013, Додаток Д, Таблиця Д.4** (p.100):
 
-| Room | Season | Source | Favorable band |
+| Room | Season | Source | Favourable band |
 |---|---|---|---|
 | `kitchen` | `cold_period` | DBN Table Д.4, "інші об'єми (кухня, гардеробна, комора тощо)", heating-period column | 18.0–21.0 °C |
 | `general_residential` | `warm_period` | DBN Table Д.4, "житлові об'єми (..., **кухня-їдальня**...)", cooling-period column | 23.5–25.5 °C |
@@ -485,7 +485,7 @@ clipped to the window bounds at the edges (`aggregation.py:time_weighted_mean`).
 
 Table 2 of the manuscript, exactly as configured in `control_regions`:
 
-| Channel | Favorable | Acceptable | Degraded | Critical | Source |
+| Channel | Favourable | Acceptable | Degraded | Critical | Source |
 |---|---|---|---|---|---|
 | PM2.5 (µg/m³) | ≤15 | 15–25 | 25–50 | >50 | WHO 2021 |
 | PM10 (µg/m³) | ≤45 | 45–75 | 75–100 | >100 | WHO 2021 |
@@ -500,10 +500,10 @@ Table 2 of the manuscript, exactly as configured in `control_regions`:
 Every class is a trapezoid `μ(x;a,b,c,d) = max(0, min((x-a)/(b-a), 1, (d-x)/(d-c)))`
 (`membership.py:trapezoid`), with `±math.inf` sentinels for pure shoulders
 (extreme classes on monotonic channels). Monotonic channels (PM2.5, PM10,
-CO2, output) get right-shoulder-only Favorable/Critical classes (higher
+CO2, output) get right-shoulder-only Favourable/Critical classes (higher
 never improves the class). Two-sided channels (T, RH) get Critical/Degraded/
 Acceptable as the union of a low-side and high-side band, and a single
-central Favorable band. Two adjacent classes sharing a numeric boundary
+central Favourable band. Two adjacent classes sharing a numeric boundary
 cross at exactly membership 0.5 there (verified by test).
 
 Transition (overlap) width must be ≥ the channel's `declared_uncertainty`
@@ -520,7 +520,7 @@ rules, `I ← (A, V, M)` = 64 rules — **96 total**. `V` is a single-input
 pass-through (no combination rules needed). This single choice provably
 gives three properties simultaneously: worsening any input never improves
 the consequent; any Critical input forces a Critical consequent; the
-consequent is Favorable only when every input is Favorable.
+consequent is Favourable only when every input is Favourable.
 
 ## 17. Mamdani min/max/centroid procedure
 
@@ -531,7 +531,7 @@ consequent is Favorable only when every input is Favorable.
    discretized at 401 points
 
 Output classification (`classify_output`) is closed on the *worse* side at
-the boundaries: `[0,25)` Favorable, `[25,50)` Acceptable, `[50,75)`
+the boundaries: `[0,25)` Favourable, `[25,50)` Acceptable, `[50,75)`
 Degraded, `[75,100]` Critical — per the manuscript's explicit statement
 about the output scale specifically (direct-input Table 2 boundaries keep
 their own literal ≤/> convention and only parameterize the continuous
@@ -674,7 +674,7 @@ pre-isolation databases are detected and rejected -- see §33 and
 | `evaluation_sensitivity` | (evaluation_run_id, sample_id, varied_parameter, value) | stratum, reference_*, completeness_status, index_value |
 | `evaluation_masking` | (evaluation_run_id, method, severity_threshold) | n_critical_events, n_masked, masking_rate |
 | `evaluation_reference_cases` | (evaluation_run_id, method) | n, macro_f1, cohens_kappa (consistency, not accuracy) |
-| `evaluation_continuity_grid` / `evaluation_continuity_summary` | grid point / (boundary, context, method) | context (favorable/acceptable/degraded); index_value; max/mean_adjacent_jump, local_lipschitz_ratio, area_between_curves_vs_crisp_max |
+| `evaluation_continuity_grid` / `evaluation_continuity_summary` | grid point / (boundary, context, method) | context (favourable/acceptable/degraded); index_value; max/mean_adjacent_jump, local_lipschitz_ratio, area_between_curves_vs_crisp_max |
 | `fault_injection_events` / `fault_detection_predictions` | event / sample | dataset_split (calibration/validation); fault_type; predicted_reason_codes |
 | `fault_detection_metrics` / `fault_detection_event_metrics` | (dataset_split, reason_code) | row-level tp/fp/fn/tn/specificity vs. event-level one-to-one-matched tp/fp/fn |
 | `fault_detection_confusion_matrix` | (dataset_split, true_label, predicted_label) | count |
@@ -729,7 +729,7 @@ written empty as if it were real data.
 | `masking_summary.csv` | one row per baseline method | Masking rate for FUZZY_COMPONENT_MAX and WEIGHTED_MEAN |
 | `reference_case_consistency.csv` | one row per method | macro-F1/kappa against the synthetic reference cases — consistency, NOT accuracy |
 | `outdoor_context_timeseries.csv` | one row per computed_ts | Outdoor PM/temperature context (never a direct index input) |
-| `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, context, method) | HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN numerical behavior across every control-region boundary, under favorable/acceptable/degraded "other components" contexts; see `docs/hfis_vs_crispmax_audit.md` |
+| `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, context, method) | HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN numerical behavior across every control-region boundary, under favourable/acceptable/degraded "other components" contexts; see `docs/hfis_vs_crispmax_audit.md` |
 | `fault_injection_events.csv` / `fault_detection_predictions.csv` | event / sample | The labeled synthetic fault-injection benchmark (separate from real, unlabeled data); dataset_split = calibration or validation |
 | `fault_detection_metrics.csv` / `fault_detection_event_metrics.csv` | (dataset_split, reason_code) | Row-level vs event-level (one-to-one matched) precision/recall/F1; validation split is the headline, publication-facing number |
 | `fault_detection_confusion_matrix.csv` | (dataset_split, true_label, predicted_label) | Full row-level confusion matrix, including "none" |
@@ -885,7 +885,7 @@ sampling is bounded separately by `stability_max_*`/
   generalization to other sensor batches/models is untested.
 - **The boundary continuity experiment cannot currently show whether HFIS
   is smoother than FUZZY_COMPONENT_MAX.** Perturbing one channel while holding every
-  other channel fixed (even under the favorable/acceptable/degraded
+  other channel fixed (even under the favourable/acceptable/degraded
   "other components" contexts) is a case the worst-of rule base is
   mathematically forced to make both methods agree on exactly, regardless
   of context — confirmed empirically on the tracked reference run. See
@@ -949,8 +949,8 @@ sampling is bounded separately by `stability_max_*`/
 
 ## 32. Worked example
 
-A real 15-minute window, PM2.5 near-favorable, CO2 favorable, temperature
-above the `general_residential/warm_period` favorable band:
+A real 15-minute window, PM2.5 near-favourable, CO2 favourable, temperature
+above the `general_residential/warm_period` favourable band:
 
 1. **Raw data**: 30 expected 30 s slots; 30 arrive within tolerance, all
    pass hard checks (numeric, in technical range, PM-ordered) → all
@@ -962,11 +962,11 @@ above the `general_residential/warm_period` favorable band:
 4. **Aggregation**: time-weighted means — PM2.5≈4.0 µg/m³, PM10≈5.0 µg/m³,
    CO2≈700 ppm, T≈26.6 °C, RH≈29 %.
 5. **Completeness**: all 3 components available, all coverage OK → **OK**.
-6. **Membership**: PM2.5=4.0 → Favorable≈1.0 (deep in the favorable
-   shoulder). CO2=700 → Favorable≈1.0. T=26.6 in the
-   general_residential/warm_period profile (favorable 23.5–25.5, degraded_high
+6. **Membership**: PM2.5=4.0 → Favourable≈1.0 (deep in the favourable
+   shoulder). CO2=700 → Favourable≈1.0. T=26.6 in the
+   general_residential/warm_period profile (favourable 23.5–25.5, degraded_high
    26.0–27.0) → Degraded≈0.87, Critical≈0.13 (see §15's crossing behavior).
-7. **Component inference**: A ≈ Favorable (crisp≈13). V ≈ Favorable
+7. **Component inference**: A ≈ Favourable (crisp≈13). V ≈ Favourable
    (crisp≈13). M: worst-of(T-class, RH-class) ≈ Degraded (crisp≈74.5).
 8. **Index inference**: worst-of(A,V,M) ⇒ Degraded-dominated rules fire
    strongest; centroid ≈ **65–67**, class **Degraded**,
@@ -974,7 +974,7 @@ above the `general_residential/warm_period` favorable band:
    `dominance_reason=unique_max_firing_rule`.
 9. **Baselines**: FUZZY_COMPONENT_MAX ≈ max(13,13,74.5) ≈ 74 (Degraded/Critical
    boundary). WEIGHTED_MEAN ≈ mean(13,13,74.5) ≈ 33 (Acceptable) — this is
-   the masking effect (§20): averaging with two deeply-favorable
+   the masking effect (§20): averaging with two deeply-favourable
    components dilutes the one unfavorable one well below where PROPOSED_HFIS
    and FUZZY_COMPONENT_MAX both land.
 

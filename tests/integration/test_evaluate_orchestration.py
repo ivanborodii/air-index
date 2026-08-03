@@ -197,7 +197,7 @@ def test_continuity_experiment_covers_every_boundary_and_method(evaluated_run, b
     n_profiles = len(room_profiles.profiles)
     assert continuity["n_boundaries"] == 3 + 3 + 3 + 6 + 6 * n_profiles  # pm2_5/pm10/co2 breakpoints + humidity edges + temperature edges PER room/season profile
     assert continuity["n_contexts"] == 3
-    assert set(continuity["contexts"]) == {"favorable", "acceptable", "degraded"}
+    assert set(continuity["contexts"]) == {"favourable", "acceptable", "degraded"}
     rows = continuity["by_boundary_method"]
     methods_present = {r["method"] for r in rows}
     assert methods_present == {"PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN"}

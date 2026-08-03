@@ -11,8 +11,8 @@ than needing to be checked rule-by-rule:
 - **One critical input forces Critical**: if any antecedent class is
   Critical (severity 3, the maximum), the max is 3 regardless of the other
   antecedents.
-- **All-favorable implies Favorable**: the max of an all-zero-severity
-  tuple is 0 (Favorable) only when every antecedent is Favorable.
+- **All-favourable implies Favourable**: the max of an all-zero-severity
+  tuple is 0 (Favourable) only when every antecedent is Favourable.
 
 ``V`` (ventilation, single input CO2) needs no combination rules — it is
 evaluated directly from CO2's own membership degrees in

@@ -12,7 +12,7 @@ these metrics).
 
 Each reference case perturbs exactly one direct-input channel to a point
 just below/above one of its configured breakpoints, holding every other
-channel at a deeply-favorable baseline. Because the fuzzy rule base is
+channel at a deeply-favourable baseline. Because the fuzzy rule base is
 worst-of (Phase 1, ``rules.py``), the expected final index class in this
 single-channel-perturbed construction is exactly the perturbed channel's own
 crisp class -- no combinatorial multi-channel case construction is needed.
@@ -25,8 +25,8 @@ from dataclasses import dataclass
 from iaq_hfis.config import ClassBoundaries, RoomTemperatureProfile, TwoSidedRanges
 from iaq_hfis.constants import CLASS_ORDER
 
-#: Deeply-favorable baseline values for channels NOT under test, chosen well
-#: inside their Favorable band regardless of room/season profile.
+#: Deeply-favourable baseline values for channels NOT under test, chosen well
+#: inside their Favourable band regardless of room/season profile.
 _FAVORABLE_BASELINE = {"pm2_5": 5.0, "pm10": 10.0, "co2": 600.0}
 
 
@@ -40,13 +40,13 @@ class ReferenceCase:
 
 def crisp_class_monotonic(value: float, boundaries: ClassBoundaries) -> str:
     """Table 2's own literal <=/> convention for a monotonic channel
-    (higher is never better) -- e.g. PM2.5 "<=15" Favorable, ">15-25"
+    (higher is never better) -- e.g. PM2.5 "<=15" Favourable, ">15-25"
     Acceptable. Used only for reference-case labeling; the pipeline itself
     never hard-classifies a direct input (only the continuous membership
     functions built from the same breakpoints)."""
     b0, b1, b2 = boundaries.breakpoints
     if value <= b0:
-        return "Favorable"
+        return "Favourable"
     if value <= b1:
         return "Acceptable"
     if value <= b2:
@@ -56,12 +56,12 @@ def crisp_class_monotonic(value: float, boundaries: ClassBoundaries) -> str:
 
 def crisp_class_two_sided(value: float, ranges: TwoSidedRanges) -> str:
     """Table 2's own convention for a two-sided channel (T/RH): half-open
-    bands where the shared boundary value belongs to the more favorable
+    bands where the shared boundary value belongs to the more favourable
     side, matching how the manuscript's ranges are written (e.g. RH
-    "25-<30" Acceptable, so 30 itself is Favorable)."""
-    if ranges.favorable[0] <= value <= ranges.favorable[1]:
-        return "Favorable"
-    if (ranges.acceptable_low[0] <= value < ranges.favorable[0]) or (ranges.favorable[1] < value <= ranges.acceptable_high[1]):
+    "25-<30" Acceptable, so 30 itself is Favourable)."""
+    if ranges.favourable[0] <= value <= ranges.favourable[1]:
+        return "Favourable"
+    if (ranges.acceptable_low[0] <= value < ranges.favourable[0]) or (ranges.favourable[1] < value <= ranges.acceptable_high[1]):
         return "Acceptable"
     if (ranges.degraded_low[0] <= value < ranges.acceptable_low[0]) or (ranges.acceptable_high[1] < value <= ranges.degraded_high[1]):
         return "Degraded"
@@ -80,8 +80,8 @@ def _two_sided_test_points(ranges: TwoSidedRanges, offset: float) -> list[tuple[
     edges = {
         "critical_low": ranges.critical_low_max,
         "acceptable_low_edge": ranges.acceptable_low[1],
-        "favorable_low_edge": ranges.favorable[0],
-        "favorable_high_edge": ranges.favorable[1],
+        "favorable_low_edge": ranges.favourable[0],
+        "favorable_high_edge": ranges.favourable[1],
         "acceptable_high_edge": ranges.acceptable_high[0],
         "critical_high": ranges.critical_high_min,
     }
@@ -95,8 +95,8 @@ def _two_sided_test_points(ranges: TwoSidedRanges, offset: float) -> list[tuple[
 def _baseline_values(control_regions, room_profile: RoomTemperatureProfile | None) -> dict[str, float]:
     values = dict(_FAVORABLE_BASELINE)
     if room_profile is not None:
-        values["temperature"] = sum(room_profile.ranges.favorable) / 2
-    values["humidity"] = sum(control_regions.relative_humidity.favorable) / 2
+        values["temperature"] = sum(room_profile.ranges.favourable) / 2
+    values["humidity"] = sum(control_regions.relative_humidity.favourable) / 2
     return values
 
 

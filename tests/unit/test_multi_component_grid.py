@@ -37,10 +37,10 @@ def test_all_four_corners_agree_on_class(base_settings, sensor_specs, room_profi
     ctx = _ctx(base_settings, sensor_specs, room_profiles)
     rows = run_multi_component_grid(ctx, 3)  # {0, 50, 100}
     all_favorable = next(r for r in rows if r.a == 0.0 and r.v == 0.0 and r.m == 0.0)
-    assert all_favorable.hfis_index_class == "Favorable"
-    assert all_favorable.fuzzy_component_max_index_class == "Favorable"
-    assert all_favorable.crisp_class_max_index_class == "Favorable"
-    assert all_favorable.weighted_mean_index_class == "Favorable"
+    assert all_favorable.hfis_index_class == "Favourable"
+    assert all_favorable.fuzzy_component_max_index_class == "Favourable"
+    assert all_favorable.crisp_class_max_index_class == "Favourable"
+    assert all_favorable.weighted_mean_index_class == "Favourable"
 
     all_critical = next(r for r in rows if r.a == 100.0 and r.v == 100.0 and r.m == 100.0)
     for cls in (
@@ -74,7 +74,7 @@ def test_summary_covers_all_six_pairs(base_settings, sensor_specs, room_profiles
 
 
 def test_weighted_mean_masking_rate_is_high_on_the_grid(base_settings, sensor_specs, room_profiles):
-    # One component pinned Critical with the other two Favorable should be
+    # One component pinned Critical with the other two Favourable should be
     # masked by WEIGHTED_MEAN's arithmetic mean far more often than not.
     ctx = _ctx(base_settings, sensor_specs, room_profiles)
     rows = run_multi_component_grid(ctx, 5)

@@ -3,7 +3,7 @@ from iaq_hfis.evaluation.masking import evaluate_masking
 
 
 def _critical_and_favorable_scenario() -> dict[str, float]:
-    # One component deep in Critical (>=75), two deeply Favorable -- the
+    # One component deep in Critical (>=75), two deeply Favourable -- the
     # textbook masking setup: WEIGHTED_MEAN dilutes this to well below Critical.
     return {"A": 10.0, "V": 10.0, "M": 95.0}
 

@@ -18,8 +18,8 @@ not a response to a reported bug.
   generation (16 rules for A, 16 for M, 64 for the 2nd-level index), each
   rule's consequent = the antecedent class with the highest severity rank
   ("worst-of"). This is a deliberate, documented manuscript-consistent
-  design (monotonicity, "one Critical input forces Critical", "all-favorable
-  implies Favorable" all follow from it) — not a shortcut that collapses the
+  design (monotonicity, "one Critical input forces Critical", "all-favourable
+  implies Favourable" all follow from it) — not a shortcut that collapses the
   rule table to a single input.
 - **Inference engine** (`src/iaq_hfis/fuzzy_engine.py`): genuine Mamdani
   min/max/centroid, evaluated at both hierarchy levels (component rules,
@@ -64,7 +64,7 @@ HFIS is **not** numerically equivalent to FUZZY_COMPONENT_MAX when more than one
 component carries a non-trivial score simultaneously — it systematically
 scores *higher* than the raw max in this regime, because multiple
 simultaneously-firing 2nd-level rules broaden the aggregated output curve
-before the centroid is taken. Class-level agreement (Favorable/Acceptable/
+before the centroid is taken. Class-level agreement (Favourable/Acceptable/
 Degraded/Critical) was 100% on a coarser sample of the same grid (1,331
 points); characterizing this more rigorously (Lipschitz ratio, area between
 curves, monotonicity) is carried out by the expanded continuity experiment,
@@ -82,13 +82,13 @@ catch — but tracing it to `src/iaq_hfis/evaluation/continuity.py` shows why,
 and it is not a bug in either method:
 
 `continuity.py`'s own docstring documents the design: each boundary sweep
-holds every *other* channel at a "deeply-favorable baseline... so the swept
+holds every *other* channel at a "deeply-favourable baseline... so the swept
 channel's own class dominates the worst-of aggregation." This is a
 mathematically special case. Proof sketch: when V and M are pinned fully in
-the Favorable class (membership degree 1 for Favorable, 0 for every other
+the Favourable class (membership degree 1 for Favourable, 0 for every other
 class), the only 2nd-level rules with nonzero firing strength are those with
-antecedents `(A=<A's active class>, V=Favorable, M=Favorable)`; because
-Favorable is the lowest severity rank, the worst-of consequent for every
+antecedents `(A=<A's active class>, V=Favourable, M=Favourable)`; because
+Favourable is the lowest severity rank, the worst-of consequent for every
 such rule is exactly `A`'s own class, at exactly `A`'s own degree. The
 resulting 2nd-level class-activation vector is therefore **identical** to
 `A`'s own component-level class-activation vector, so the 2nd-level centroid
@@ -101,10 +101,10 @@ general (section 2 above shows they are not, once more than one component
 carries signal).
 
 **This is a genuine weakness of the current continuity experiment's design
-(single-channel-perturbed, others held favorable), not a bug in
+(single-channel-perturbed, others held favourable), not a bug in
 PROPOSED_HFIS or FUZZY_COMPONENT_MAX.** No change was made to either method. The fix —
 already scoped as a separate task — is to repeat every boundary sweep under
-multiple "other components" contexts (favorable / acceptable / degraded),
+multiple "other components" contexts (favourable / acceptable / degraded),
 which is a strictly additive change to the *experiment*, not the methods
 under test.
 
@@ -112,7 +112,7 @@ under test.
 
 The continuity experiment was subsequently expanded exactly as described
 above: every boundary is now swept under three "other components" contexts
-(favorable/acceptable/degraded), with every non-swept channel held at a
+(favourable/acceptable/degraded), with every non-swept channel held at a
 fixed representative value for that context. Re-running it against real
 pipeline data still shows **PROPOSED_HFIS and FUZZY_COMPONENT_MAX numerically tied on
 all 99 (boundary, context) pairs tested** (`mean_area_between_curves_vs_crisp_max
@@ -149,7 +149,7 @@ rather than being silently omitted.
 - PROPOSED_HFIS is implemented as a genuine Mamdani inference system and is
   **not** an accidental hard-max in general (section 2).
 - Neither the original single-context continuity experiment (section 3) nor
-  its favorable/acceptable/degraded-context expansion (section 3B) is
+  its favourable/acceptable/degraded-context expansion (section 3B) is
   actually capable of detecting HFIS/FUZZY_COMPONENT_MAX divergence, because both
   perturb only one channel at a time within a narrow sweep while every
   other channel sits at a fixed value -- so one channel trivially dominates

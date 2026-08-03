@@ -42,7 +42,7 @@ from iaq_hfis.fuzzy_engine import classify_output
 #: iaq_hfis.constants.OUTPUT_BOUNDARIES = [25, 50, 75]. AUTHOR_DEFINED: the
 #: manuscript does not specify a numeric representative value for a crisp
 #: class baseline -- the midpoint is the natural, bias-free choice.
-CLASS_MIDPOINT: dict[str, float] = {"Favorable": 12.5, "Acceptable": 37.5, "Degraded": 62.5, "Critical": 87.5}
+CLASS_MIDPOINT: dict[str, float] = {"Favourable": 12.5, "Acceptable": 37.5, "Degraded": 62.5, "Critical": 87.5}
 
 
 @dataclass(frozen=True)
@@ -76,12 +76,12 @@ def weighted_mean(component_crisp_scores: dict[str, float]) -> BaselineResult:
 
 
 def _hard_classify_monotonic(value: float, breakpoints: list[float]) -> str:
-    """No membership overlap: a boundary value maps to the less-favorable
+    """No membership overlap: a boundary value maps to the less-favourable
     class, matching :func:`iaq_hfis.fuzzy_engine.classify_output`'s
     convention on the output scale."""
     b0, b1, b2 = breakpoints
     if value < b0:
-        return "Favorable"
+        return "Favourable"
     if value < b1:
         return "Acceptable"
     if value < b2:
@@ -92,10 +92,10 @@ def _hard_classify_monotonic(value: float, breakpoints: list[float]) -> str:
 def _hard_classify_two_sided(value: float, ranges: TwoSidedRanges) -> str:
     """No membership overlap, no transition band -- a genuine step function
     of ``value`` (temperature/humidity control regions are two-sided: both
-    low and high deviations from favorable are unfavorable)."""
-    if ranges.favorable[0] <= value <= ranges.favorable[1]:
-        return "Favorable"
-    if ranges.acceptable_low[0] <= value < ranges.favorable[0] or ranges.favorable[1] < value <= ranges.acceptable_high[1]:
+    low and high deviations from favourable are unfavorable)."""
+    if ranges.favourable[0] <= value <= ranges.favourable[1]:
+        return "Favourable"
+    if ranges.acceptable_low[0] <= value < ranges.favourable[0] or ranges.favourable[1] < value <= ranges.acceptable_high[1]:
         return "Acceptable"
     if ranges.degraded_low[0] <= value < ranges.acceptable_low[0] or ranges.acceptable_high[1] < value <= ranges.degraded_high[1]:
         return "Degraded"

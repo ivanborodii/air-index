@@ -76,14 +76,14 @@ def test_export_stability_trials_has_expected_rows(writer, tmp_path):
         "INSERT INTO evaluation_stability_samples (evaluation_run_id, pipeline_run_id, sample_id, computed_ts, selection_reason, boundary_channel, "
         "baseline_class_hfis, baseline_index_hfis, baseline_class_crisp_max, baseline_index_crisp_max, baseline_class_weighted_mean, baseline_index_weighted_mean) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-        [EVALUATION_RUN_ID, PIPELINE_RUN_ID, "sample-1", NOW, "boundary_adjacent", "pm2_5", "Favorable", 10.0, "Favorable", 10.0, "Favorable", 10.0],
+        [EVALUATION_RUN_ID, PIPELINE_RUN_ID, "sample-1", NOW, "boundary_adjacent", "pm2_5", "Favourable", 10.0, "Favourable", 10.0, "Favourable", 10.0],
     )
-    trial_classes = ["Favorable", "Favorable", "Acceptable"]
+    trial_classes = ["Favourable", "Favourable", "Acceptable"]
     for i, tc in enumerate(trial_classes):
         con.execute(
             "INSERT INTO evaluation_stability_trials (evaluation_run_id, pipeline_run_id, sample_id, method, trial_index, trial_class, trial_index_value, changed_from_baseline, abs_index_change) "
             "VALUES (?,?,?,?,?,?,?,?,?)",
-            [EVALUATION_RUN_ID, PIPELINE_RUN_ID, "sample-1", "PROPOSED_HFIS", i, tc, 10.0 if tc == "Favorable" else 26.0, tc != "Favorable", 0.0 if tc == "Favorable" else 16.0],
+            [EVALUATION_RUN_ID, PIPELINE_RUN_ID, "sample-1", "PROPOSED_HFIS", i, tc, 10.0 if tc == "Favourable" else 26.0, tc != "Favourable", 0.0 if tc == "Favourable" else 16.0],
         )
     path = exports.export_stability_trials(con, tmp_path, EVALUATION_RUN_ID)
     df = pd.read_csv(path)

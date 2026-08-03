@@ -50,4 +50,4 @@ def test_stability_deep_in_favorable_band_has_zero_class_change(base_settings, s
 
     result = run_stability_analysis(ctx, weighted_means, available, profile, seed=42, n_trials=30)
     assert result.class_change_rate == 0.0
-    assert result.baseline_class == "Favorable"
+    assert result.baseline_class == "Favourable"

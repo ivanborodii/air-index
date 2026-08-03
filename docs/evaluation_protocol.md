@@ -25,7 +25,7 @@ baseline's aggregated class does not. FUZZY_COMPONENT_MAX cannot mask by constru
 
 42 synthetic, deterministic, pre-labeled vectors: each perturbs exactly one
 direct-input channel to a point just below/above one of its configured
-breakpoints, holding every other channel deeply favorable. Because the rule
+breakpoints, holding every other channel deeply favourable. Because the rule
 base is worst-of, the expected class is exactly the perturbed channel's own
 crisp class. Macro-F1/Cohen's kappa here measure **consistency with a
 predefined synthetic label**, not real-world classification accuracy --
@@ -77,13 +77,13 @@ control-region boundary: 3 breakpoints each for PM2.5/PM10/CO2, 6 edges for
 humidity, and 6 edges **per room/season profile** for temperature (every
 profile in `room_profiles.yaml`, not just the run's representative one --
 "every seasonal temperature boundary"). Each boundary is swept under
-THREE "other components" contexts -- **favorable**, **acceptable**,
-**degraded** -- not a single favorable-only baseline. Per boundary/context/
+THREE "other components" contexts -- **favourable**, **acceptable**,
+**degraded** -- not a single favourable-only baseline. Per boundary/context/
 method: max/mean/median/p95 adjacent-point jump, total variation, a local
 Lipschitz ratio (max \|delta index\| / \|delta input\| between adjacent
 grid points -- the discrete-grid Lipschitz constant), class transitions
 (count + positions), index range, monotonicity violations (for pollutant
-channels), whether a favorable component masked the swept channel's own
+channels), whether a favourable component masked the swept channel's own
 severity, and (PROPOSED_HFIS rows only) the area between its own curve and
 FUZZY_COMPONENT_MAX's curve (trapezoidal integral of \|HFIS - FUZZY_COMPONENT_MAX\| over the
 sweep). `evaluation/continuity.py`.

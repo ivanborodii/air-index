@@ -355,9 +355,9 @@ def run_evaluation(
 
             # --- Boundary continuity experiment: PROPOSED_HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN,
             # dense deterministic grids around every control-region boundary, each swept under
-            # favorable/acceptable/degraded "other components" contexts (see
+            # favourable/acceptable/degraded "other components" contexts (see
             # iaq_hfis.evaluation.continuity module docstring and docs/hfis_vs_crispmax_audit.md
-            # for why a single favorable-only context cannot distinguish HFIS from FUZZY_COMPONENT_MAX). ---
+            # for why a single favourable-only context cannot distinguish HFIS from FUZZY_COMPONENT_MAX). ---
             continuity_points, continuity_summaries = run_continuity_experiment(
                 ctx, settings.control_regions, room_profiles, representative_profile, settings.evaluation.continuity_grid_points
             )

@@ -20,7 +20,7 @@ RUN_NARRATIVE_MD = "run_narrative.md"
 WARNING_BANNER = "> **This is a reproducible, software-generated draft. Review before inclusion in a publication.**"
 
 #: Required verbatim -- an explicit list of overclaims this narrative (and
-#: any prose built from it) must never make, regardless of how favorable a
+#: any prose built from it) must never make, regardless of how favourable a
 #: given run's numbers look.
 FORBIDDEN_OVERCLAIMS: list[str] = [
     "Do not report agreement (real, unlabeled data) or stability (self-consistency under perturbation) as accuracy.",
@@ -97,7 +97,7 @@ def _hfis_vs_crispmax_equivalence_note(ev: dict) -> list[str]:
             "which FUZZY_COMPONENT_MAX's raw max() never computes; (b) graded uncertainty representation -- simultaneous "
             "partial membership in more than one class per component, with no equivalent in a hard maximum; "
             "(c) extensibility -- a two-level rule base can express component-interaction logic (e.g. rules "
-            "conditioned on two components being simultaneously non-favorable) that a scalar max() cannot express "
+            "conditioned on two components being simultaneously non-favourable) that a scalar max() cannot express "
             "by construction, though the worst-of rule base actually configured here has not been extended to "
             "exercise that capability. An independent synthetic check (docs/hfis_vs_crispmax_audit.md section 2) "
             "shows the two methods DO diverge substantially (mean |difference| ~5.7 index points on a 0-100 scale) "

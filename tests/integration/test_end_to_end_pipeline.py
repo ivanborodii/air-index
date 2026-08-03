@@ -27,7 +27,7 @@ def _oscillate(base: float, amplitude: float, i: int) -> float:
 
 
 def _clean_rows(n: int = 30, computed_ts: datetime = COMPUTED_TS, **nullify) -> list[dict]:
-    """``n`` rows of otherwise-favorable, non-flat data ending at ``computed_ts``.
+    """``n`` rows of otherwise-favourable, non-flat data ending at ``computed_ts``.
     Pass e.g. ``mass_pm2_5=True`` to null out a field across every row
     (simulating a fully unavailable channel)."""
     window_start = computed_ts - timedelta(minutes=15)

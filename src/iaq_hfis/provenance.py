@@ -181,7 +181,7 @@ def collect_parameter_provenance(settings: Settings, sensor_specs: SensorSpecs, 
         add(f"control_regions.{channel}.breakpoints", region.breakpoints, "channel units", "STANDARD_BASED",
             "WHO 2021 24h air-quality reference points, used as operational control points (not a WHO compliance assessment).",
             pipeline_stage="membership_construction", manuscript_reference="Table 2: control regions")
-    add("control_regions.relative_humidity.breakpoints", "favorable/acceptable/degraded/critical bands", "%", "STANDARD_BASED",
+    add("control_regions.relative_humidity.breakpoints", "favourable/acceptable/degraded/critical bands", "%", "STANDARD_BASED",
         "DBN B.2.5-67:2013 (Ukrainian building-services standard), Додаток Д, Таблиця Д.5.",
         pipeline_stage="membership_construction", manuscript_reference="Table 2: control regions")
     add("control_regions.relative_humidity.transition_width", settings.control_regions.relative_humidity.transition_width, "%", "PROVISIONAL",
@@ -220,9 +220,11 @@ def collect_parameter_provenance(settings: Settings, sensor_specs: SensorSpecs, 
     add("evaluation.sensitivity_window_minutes", settings.evaluation.sensitivity_window_minutes, "minutes", "MANUSCRIPT_DEFINED",
         "Manuscript-specified sensitivity window set.", pipeline_stage="evaluation_sensitivity",
         manuscript_reference="Sensitivity protocol: window set", sensitivity_coverage="this parameter IS the sensitivity experiment's own swept axis")
-    add("evaluation.sensitivity_coverage_thresholds", settings.evaluation.sensitivity_coverage_thresholds, None, "MANUSCRIPT_DEFINED",
-        "Manuscript-specified coverage-threshold set.", pipeline_stage="evaluation_sensitivity",
-        manuscript_reference="Sensitivity protocol: coverage threshold set", sensitivity_coverage="this parameter IS the sensitivity experiment's own swept axis")
+    add("evaluation.sensitivity_coverage_thresholds", settings.evaluation.sensitivity_coverage_thresholds, None, "AUTHOR_DEFINED",
+        "The manuscript specifies 0.80 as the primary coverage threshold and states that alternative thresholds "
+        "are evaluated, but does not name them. The surrounding 0.70/0.90 sweep points are repository evaluation "
+        "choices, not manuscript-specified values.", pipeline_stage="evaluation_sensitivity",
+        manuscript_reference="Sensitivity protocol: coverage threshold set (0.80 only)", sensitivity_coverage="this parameter IS the sensitivity experiment's own swept axis")
     add("evaluation.sensitivity_max_samples_per_stratum", settings.evaluation.sensitivity_max_samples_per_stratum, "samples", "AUTHOR_DEFINED",
         "Bounds multi-point sensitivity runtime.", pipeline_stage="evaluation_sensitivity")
     add("evaluation.masking_severity_threshold", settings.evaluation.masking_severity_threshold, None, "PROVISIONAL",

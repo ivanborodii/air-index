@@ -25,7 +25,7 @@ class PlotSpec:
     y: list[str] = field(default_factory=list)
     group_by: str | None = None
     description: str = ""
-    filter_equals: dict[str, str] | None = None  # e.g. {"context": "favorable"} -- restrict to one slice before plotting
+    filter_equals: dict[str, str] | None = None  # e.g. {"context": "favourable"} -- restrict to one slice before plotting
 
 
 PLOTS: list[PlotSpec] = [
@@ -132,25 +132,25 @@ PLOTS: list[PlotSpec] = [
     ),
     PlotSpec(
         id="continuity_curves",
-        title="HFIS vs FUZZY_COMPONENT_MAX: Index Value Across a Boundary Grid (favorable context)",
+        title="HFIS vs FUZZY_COMPONENT_MAX: Index Value Across a Boundary Grid (favourable context)",
         source_csv=exports.CONTINUITY_GRID,
         plot_type="line",
         x="input_value",
         y=["index_value"],
         group_by="method",
-        filter_equals={"context": "favorable"},
-        description="Index value across a dense input grid straddling one control-region boundary, one line per method, restricted to the favorable other-components context for readability (see continuity_grid.csv for the acceptable/degraded contexts too); render one figure per boundary_id.",
+        filter_equals={"context": "favourable"},
+        description="Index value across a dense input grid straddling one control-region boundary, one line per method, restricted to the favourable other-components context for readability (see continuity_grid.csv for the acceptable/degraded contexts too); render one figure per boundary_id.",
     ),
     PlotSpec(
         id="continuity_summary",
-        title="Boundary Continuity: Maximum Adjacent Jump by Method (favorable context)",
+        title="Boundary Continuity: Maximum Adjacent Jump by Method (favourable context)",
         source_csv=exports.CONTINUITY_SUMMARY,
         plot_type="bar",
         x="boundary_id",
         y=["max_adjacent_jump"],
         group_by="method",
-        filter_equals={"context": "favorable"},
-        description="Largest single-step index change across each boundary's grid, grouped by method, restricted to the favorable other-components context for readability -- smaller is smoother.",
+        filter_equals={"context": "favourable"},
+        description="Largest single-step index change across each boundary's grid, grouped by method, restricted to the favourable other-components context for readability -- smaller is smoother.",
     ),
     PlotSpec(
         id="fault_detection_metrics",

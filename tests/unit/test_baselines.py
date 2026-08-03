@@ -30,7 +30,7 @@ def test_baselines_empty_components_give_none():
 
 
 def test_weighted_mean_dilutes_a_critical_component_below_crisp_max():
-    # Two favorable components (~13) alongside one critical component (~90) --
+    # Two favourable components (~13) alongside one critical component (~90) --
     # weighted-mean pulls the result well below crisp-max, the masking scenario.
     scores = {"A": 13.0, "V": 13.0, "M": 90.0}
     cm = fuzzy_component_max(scores)
@@ -45,7 +45,7 @@ def test_crisp_class_max_is_genuinely_discontinuous_at_a_boundary(base_settings,
 
     control_regions = base_settings.control_regions
     profile = profiles.select_room_season(room_profiles, datetime(2026, 1, 15, tzinfo=timezone.utc), base_settings.profile_selection)
-    co2_boundary = control_regions.co2.breakpoints[0]  # Favorable/Acceptable boundary
+    co2_boundary = control_regions.co2.breakpoints[0]  # Favourable/Acceptable boundary
     values_below = {"pm2_5": 1.0, "pm10": 1.0, "co2": co2_boundary - 0.01, "temperature": 19.5, "humidity": 40.0}
     values_at = {**values_below, "co2": co2_boundary}
 
@@ -53,7 +53,7 @@ def test_crisp_class_max_is_genuinely_discontinuous_at_a_boundary(base_settings,
     at = crisp_class_max(values_at, control_regions, profile.ranges)
 
     assert below.method == "CRISP_CLASS_MAX"
-    assert below.index_class == "Favorable"
+    assert below.index_class == "Favourable"
     assert at.index_class == "Acceptable"
     # A genuine step, not a smooth ramp: the two representative values differ
     # by a fixed jump regardless of how close the inputs are to the boundary.

@@ -36,7 +36,7 @@ class ReasonCode(str, Enum):
 class IaqClass(str, Enum):
     """The four linguistic classes shared by every direct input and the output index."""
 
-    FAVORABLE = "Favorable"
+    FAVORABLE = "Favourable"
     ACCEPTABLE = "Acceptable"
     DEGRADED = "Degraded"
     CRITICAL = "Critical"

@@ -263,11 +263,11 @@ class ClassBoundaries(BaseModel):
 
 class TwoSidedRanges(BaseModel):
     """Control region for a two-sided channel (temperature or RH): both low
-    and high deviations from the favorable band are unfavorable."""
+    and high deviations from the favourable band are unfavorable."""
 
     model_config = ConfigDict(extra="forbid")
 
-    favorable: tuple[float, float]
+    favourable: tuple[float, float]
     acceptable_low: tuple[float, float]
     acceptable_high: tuple[float, float]
     degraded_low: tuple[float, float]
@@ -284,8 +284,8 @@ class TwoSidedRanges(BaseModel):
             self.degraded_low[1],
             self.acceptable_low[0],
             self.acceptable_low[1],
-            self.favorable[0],
-            self.favorable[1],
+            self.favourable[0],
+            self.favourable[1],
             self.acceptable_high[0],
             self.acceptable_high[1],
             self.degraded_high[0],

@@ -29,8 +29,8 @@ def test_one_failed_one_classified_counts_as_a_transition():
             "value": [15, 15],
             "completeness_status": ["FAILED", "OK"],
             "reference_completeness_status": ["OK", "OK"],
-            "index_class": [None, "Favorable"],
-            "reference_index_class": ["Acceptable", "Favorable"],
+            "index_class": [None, "Favourable"],
+            "reference_index_class": ["Acceptable", "Favourable"],
             "index_value": [None, 10.0],
             "reference_index_value": [30.0, 10.0],
         }
@@ -47,7 +47,7 @@ def test_genuinely_different_classes_still_count():
             "completeness_status": ["OK"],
             "reference_completeness_status": ["OK"],
             "index_class": ["Critical"],
-            "reference_index_class": ["Favorable"],
+            "reference_index_class": ["Favourable"],
             "index_value": [90.0],
             "reference_index_value": [5.0],
         }

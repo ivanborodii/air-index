@@ -269,7 +269,7 @@ def compute_index_at(
                     membership_favorable, membership_acceptable, membership_degraded, membership_critical,
                     crisp_score, room, season)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                [pipeline_run_id, computed_ts, window_minutes, component, True, [], cd.get("Favorable"), cd.get("Acceptable"), cd.get("Degraded"), cd.get("Critical"), result.crisp_score, profile_room, profile_season],
+                [pipeline_run_id, computed_ts, window_minutes, component, True, [], cd.get("Favourable"), cd.get("Acceptable"), cd.get("Degraded"), cd.get("Critical"), result.crisp_score, profile_room, profile_season],
             )
         for component in COMPONENT_INPUTS:
             if not availability[component]:

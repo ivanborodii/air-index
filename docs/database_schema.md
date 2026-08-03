@@ -55,7 +55,7 @@ this file, never the raw/weather sources).
 
 | Table | Grain | Notes |
 |---|---|---|
-| `evaluation_continuity_grid` | `(evaluation_run_id, boundary_id, context, method, grid_index)` | One point of a dense input-grid sweep. `context` is favorable/acceptable/degraded -- the severity of the OTHER, non-swept channels (see `docs/hfis_vs_crispmax_audit.md` for why this matters). |
+| `evaluation_continuity_grid` | `(evaluation_run_id, boundary_id, context, method, grid_index)` | One point of a dense input-grid sweep. `context` is favourable/acceptable/degraded -- the severity of the OTHER, non-swept channels (see `docs/hfis_vs_crispmax_audit.md` for why this matters). |
 | `evaluation_continuity_summary` | `(evaluation_run_id, boundary_id, context, method)` | Recomputable directly from the grid table: max/mean/median/p95 adjacent jump, total variation, local Lipschitz ratio, class transitions, monotonicity violations, and (PROPOSED_HFIS rows only) area between its curve and FUZZY_COMPONENT_MAX's. `run_summary.json:evaluation.continuity` additionally reports `smoothness_comparison` (vs FUZZY_COMPONENT_MAX) and `smoothness_comparison_vs_crisp_class_max` (vs the genuinely hard baseline -- the more direct test of a "smoother than a crisp baseline" claim), both computed from this same table by `iaq_hfis.evaluation.continuity.summarize_continuity_smoothness[_vs_baseline]`. |
 
 ## Multi-component grid (independent A/V/M sweep, all 4 methods)

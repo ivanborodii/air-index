@@ -20,12 +20,12 @@ profiles:
     # CONFIRMED: Table Д.4 row "Житлові будівлі: інші об'єми (кухня,
     # гардеробна, комора тощо)" (standing/walking, ~1.5 met), heating-period
     # column: Підвищені оптимальні 19.5+/-1.5degC, Оптимальні 19.5+/-3.0degC,
-    # Допустимі 19.5+/-4.0degC. Mapped: Favorable=enhanced-optimal band,
+    # Допустимі 19.5+/-4.0degC. Mapped: Favourable=enhanced-optimal band,
     # Acceptable=out to optimal band edge, Degraded=out to permissible band
     # edge, Critical=beyond permissible.
     provisional: false
     ranges:
-      favorable: [18.0, 21.0]        # 19.5 +/- 1.5 (Підвищені оптимальні)
+      favourable: [18.0, 21.0]        # 19.5 +/- 1.5 (Підвищені оптимальні)
       acceptable_low: [16.5, 18.0]
       acceptable_high: [21.0, 22.5]  # outer edge = 19.5 +/- 3.0 (Оптимальні)
       degraded_low: [15.5, 16.5]
@@ -44,7 +44,7 @@ profiles:
     # below for that distinction).
     provisional: false
     ranges:
-      favorable: [23.5, 25.5]        # 24.5 +/- 1.0 (Підвищені оптимальні)
+      favourable: [23.5, 25.5]        # 24.5 +/- 1.0 (Підвищені оптимальні)
       acceptable_low: [23.0, 23.5]
       acceptable_high: [25.5, 26.0]  # outer edge = 24.5 +/- 1.5 (Оптимальні)
       degraded_low: [22.0, 23.0]

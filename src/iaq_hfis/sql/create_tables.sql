@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS evaluation_sensitivity (
     pipeline_run_id      VARCHAR     NOT NULL,
     sample_id            VARCHAR     NOT NULL,
     computed_ts          TIMESTAMPTZ NOT NULL,
-    stratum              VARCHAR     NOT NULL,   -- e.g. class=Favorable | boundary_adjacent | ordinary
+    stratum              VARCHAR     NOT NULL,   -- e.g. class=Favourable | boundary_adjacent | ordinary
     reference_completeness_status VARCHAR,
     reference_index_class VARCHAR,
     reference_index_value DOUBLE,
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS evaluation_continuity_grid (
     pipeline_run_id    VARCHAR     NOT NULL,
     boundary_id        VARCHAR     NOT NULL,
     channel            VARCHAR     NOT NULL,
-    context             VARCHAR     NOT NULL,   -- favorable | acceptable | degraded (severity of the OTHER, non-swept channels)
+    context             VARCHAR     NOT NULL,   -- favourable | acceptable | degraded (severity of the OTHER, non-swept channels)
     boundary_value     DOUBLE      NOT NULL,
     grid_index         INTEGER     NOT NULL,
     input_value        DOUBLE      NOT NULL,
@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS evaluation_continuity_summary (
     pipeline_run_id                    VARCHAR NOT NULL,
     boundary_id                        VARCHAR NOT NULL,
     channel                            VARCHAR NOT NULL,
-    context                            VARCHAR NOT NULL,   -- favorable | acceptable | degraded
+    context                            VARCHAR NOT NULL,   -- favourable | acceptable | degraded
     method                             VARCHAR NOT NULL,
     max_adjacent_jump                  DOUBLE,
     mean_adjacent_jump                 DOUBLE,

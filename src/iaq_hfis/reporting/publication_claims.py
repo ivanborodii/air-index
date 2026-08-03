@@ -89,7 +89,7 @@ def _claim_3_weighted_mean_can_mask(summary: dict) -> ClaimRow:
         "claim_03", "Weighted averaging can mask an adverse component.",
         "WEIGHTED_MEAN masking_rate > 0 for at least one critical-severity event.",
         "exports/masking_summary.csv", "masking_rate", f"{rate:.3f}" if rate is not None else "n/a", status, limitation,
-        "WEIGHTED_MEAN can classify a result as less severe than its most adverse component when other components are favorable, diluting the signal.",
+        "WEIGHTED_MEAN can classify a result as less severe than its most adverse component when other components are favourable, diluting the signal.",
     )
 
 
@@ -106,7 +106,7 @@ def _claim_4_hfis_preserves_adverse_priority(summary: dict) -> ClaimRow:
         "claim_04", "The proposed HFIS preserves adverse-component priority.",
         "A deterministic dominant-component attribution exists and is non-trivial across real computed_ts.",
         "exports/index_timeseries.csv", "dominant_component_frequency", str(freq), status, limitation,
-        "PROPOSED_HFIS's worst-of rule base structurally prevents a favorable component from suppressing a critical component's severity in the aggregated class.",
+        "PROPOSED_HFIS's worst-of rule base structurally prevents a favourable component from suppressing a critical component's severity in the aggregated class.",
     )
 
 
