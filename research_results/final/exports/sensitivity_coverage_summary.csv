@@ -1,4 +1,0 @@
-varied_parameter,value,n_eligible,n_evaluated,n_unavailable,n_valid_comparisons,n_samples,n_status_transitions,n_class_transitions,n_agreement,class_agreement_with_reference,mean_abs_index_diff,median_abs_index_diff,p95_abs_index_diff,max_abs_index_diff
-coverage_threshold,0.7,50,50,0,48,50,2,2,48,0.96,1.5648320895522385,0.0,0.0,75.11194029850745
-coverage_threshold,0.8,50,50,0,48,50,0,0,50,1.0,0.0,0.0,0.0,0.0
-coverage_threshold,0.9,50,50,0,46,50,2,2,48,0.96,0.0,0.0,0.0,0.0

@@ -4,20 +4,19 @@
 
 **`artifact_readiness`** means only that the computational artifacts (pipeline run, evaluation, `iaq_hfis validate-artifacts`, the test suite) are internally complete and consistent. It says nothing about whether this run's result is eligible to be described as the manuscript's complete proposed method -- that is `manuscript_readiness`, below, which may be `true` only when the temperature profile is directly DBN-supported, the run was executed in `mode=publication`, and a full A/V/M/I (`completeness_status=OK`) result actually exists.
 
-## Artifact readiness: READY
+## Artifact readiness: NOT READY
 
-- Warning: 16 provisional parameter(s) engaged this run -- disclosed in provisional_parameters_used, not resolved
-- Warning: 16 engaged provisional parameter(s) have no sensitivity-analysis coverage: cadence.slot_match_tolerance_seconds, confirmation.gradual_drift_magnitude_multiplier, confirmation.gradual_drift_min_consecutive_steps, confirmation.persistence_min_consecutive_samples, confirmation.pm_cross_channel_tolerance_pct, confirmation.stuck_value_min_repeats, control_regions.output.transition_widths, control_regions.relative_humidity.transition_width, evaluation.masking_severity_threshold, evaluation.stability_n_trials, evaluation.stability_seed, fuzzy_engine.partial_mode_inference_rule, hampel.mad_multiplier, hampel.window_size, membership.output_transition_width, profile_selection.season_month_ranges
+- Blocking: No pipeline run exists for this snapshot: mode='publication' aborts immediately at the first computed_ts (see manuscript_readiness blocker).
 
-## Manuscript readiness: READY
+## Manuscript readiness: NOT READY
 
-- Warning: 16 provisional parameter(s) engaged this run -- disclosed in provisional_parameters_used, not resolved
-- Warning: 16 engaged provisional parameter(s) have no sensitivity-analysis coverage: cadence.slot_match_tolerance_seconds, confirmation.gradual_drift_magnitude_multiplier, confirmation.gradual_drift_min_consecutive_steps, confirmation.persistence_min_consecutive_samples, confirmation.pm_cross_channel_tolerance_pct, confirmation.stuck_value_min_repeats, control_regions.output.transition_widths, control_regions.relative_humidity.transition_width, evaluation.masking_severity_threshold, evaluation.stability_n_trials, evaluation.stability_seed, fuzzy_engine.partial_mode_inference_rule, hampel.mad_multiplier, hampel.window_size, membership.output_transition_width, profile_selection.season_month_ranges
+- Blocking: TEMPERATURE_PROFILE_NOT_DEFINED: requested room='kitchen', season='warm_period'. No standards-based temperature control region is defined for this room/season combination (DBN V.2.5-67:2013, mandatory Appendix D, Table D.4 has a literal dash for the standalone-kitchen row's warm-period column). All raw data currently available for this deployment (2026-04-16 through present) falls entirely within the warm-period months (Apr-Sep); no cold-period data exists yet. The deployment is a confirmed standalone/enclosed kitchen (README.md 'Deployment'), not a kitchen-dining/general-residential space, so the general_residential/warm_period profile cannot be truthfully substituted. 'iaq_hfis run' (mode=publication, the default) correctly aborts with this exact error before any computation -- verified live on 2026-07-31.
 
 ## Unsupported claims
 
-None -- every manuscript claim this run could make is currently supported by its own artifacts.
+- Full three-component (A/V/M/I) proposed-method result
+- The microclimate component is standards-based for the deployed room/season
 
 ## Scientific blockers
 
-None.
+- TEMPERATURE_PROFILE_NOT_DEFINED: requested room='kitchen', season='warm_period'. No standards-based temperature control region is defined for this room/season combination (DBN V.2.5-67:2013, mandatory Appendix D, Table D.4 has a literal dash for the standalone-kitchen row's warm-period column). All raw data currently available for this deployment (2026-04-16 through present) falls entirely within the warm-period months (Apr-Sep); no cold-period data exists yet. The deployment is a confirmed standalone/enclosed kitchen (README.md 'Deployment'), not a kitchen-dining/general-residential space, so the general_residential/warm_period profile cannot be truthfully substituted. 'iaq_hfis run' (mode=publication, the default) correctly aborts with this exact error before any computation -- verified live on 2026-07-31.
