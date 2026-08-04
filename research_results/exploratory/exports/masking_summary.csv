@@ -1,4 +1,4 @@
 method,severity_threshold,n_critical_events,n_masked,masking_rate
-CRISP_CLASS_MAX,Critical,74,0,0.0
-FUZZY_COMPONENT_MAX,Critical,74,0,0.0
-WEIGHTED_MEAN,Critical,74,47,0.6351351351351351
+CRISP_CLASS_MAX,Critical,281,0,0.0
+FUZZY_COMPONENT_MAX,Critical,281,0,0.0
+WEIGHTED_MEAN,Critical,281,170,0.604982206405694

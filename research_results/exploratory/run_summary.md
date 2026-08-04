@@ -1,19 +1,19 @@
 # iaq_hfis Run Summary
 
-Pipeline run ID: `49f2df39757245408465d4f274393e86`
+Pipeline run ID: `5cadd5e4f1cb4a84ab62be376f5e9728`
 
 ## Run Metadata
 
 - Status: **success**
-- Started: 2026-07-31T09:58:47.440716+00:00
-- Finished: 2026-07-31T11:51:23.643268+00:00
-- Computed range: 2026-07-15T00:00:00+00:00 to 2026-07-29T00:00:00+00:00
+- Started: 2026-08-04T07:32:00.172287+00:00
+- Finished: 2026-08-04T14:25:42.870892+00:00
+- Computed range: 2026-06-18T00:00:00+00:00 to 2026-08-04T07:31:26+00:00
 - Window: 15 minutes
-- Timestamps processed: 4032
+- Timestamps processed: 13626
 - Snapshot retries: 0
-- Config hash: `f5cde8425c2d994845d2d10d9545c8b79fa9f0ac4b92ba2cf78801aeee3e3909`
+- Config hash: `d0a9f31ada5ffe122a5ecc472c54bd46de25992fc7298e84a624cd3378c2339c`
 - Engine version: 0.1.0
-- Selected evaluation run ID: 1ff631777e9c4f3a90351ebdc4b3a6cc
+- Selected evaluation run ID: 05f1c0bbf3d34bad99c5fdcd6157f4cc
 
 ## Environment
 
@@ -23,19 +23,19 @@ Pipeline run ID: `49f2df39757245408465d4f274393e86`
 - platform: Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41
 - processor: aarch64
 - cpu_count: 4
-- git_commit: 64e5448d3e42b5074d1275b8723ae40ee0a09fc5
+- git_commit: 9cce835a62065353640ccf3d9ca09973cfda6754
 - git_tree_dirty: False
 - rule_generation_version: worst-of-max-severity-v1
 
 ## Completeness Summary
 
 - OK: 0
-- PARTIAL: 3873
-- FAILED: 159
+- PARTIAL: 12564
+- FAILED: 1062
 
 Dominant-component frequency (OK/PARTIAL computed_ts only):
-- A: 3625
-- V: 248
+- A: 11508
+- V: 1056
 
 ## Provisional Parameters Used
 
@@ -69,18 +69,18 @@ Dominant-component frequency (OK/PARTIAL computed_ts only):
 
 ## Baseline Comparison (agreement, unlabeled real data)
 
-- CRISP_CLASS_MAX vs FUZZY_COMPONENT_MAX: 0.9998 agreement, Cohen's kappa=0.9988 (n=4032, excluded=0)
-- CRISP_CLASS_MAX vs PROPOSED_HFIS: 0.9997 agreement, Cohen's kappa=0.9987 (n=3873, excluded=159)
-- CRISP_CLASS_MAX vs WEIGHTED_MEAN: 0.9261 agreement, Cohen's kappa=0.5517 (n=4032, excluded=0)
-- FUZZY_COMPONENT_MAX vs PROPOSED_HFIS: 1 agreement, Cohen's kappa=1 (n=3873, excluded=159)
-- FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN: 0.9258 agreement, Cohen's kappa=0.5508 (n=4032, excluded=0)
-- PROPOSED_HFIS vs WEIGHTED_MEAN: 0.9228 agreement, Cohen's kappa=0.515 (n=3873, excluded=159)
+- CRISP_CLASS_MAX vs FUZZY_COMPONENT_MAX: 0.9993 agreement, Cohen's kappa=0.9978 (n=12944, excluded=682)
+- CRISP_CLASS_MAX vs PROPOSED_HFIS: 0.9993 agreement, Cohen's kappa=0.9977 (n=12564, excluded=1062)
+- CRISP_CLASS_MAX vs WEIGHTED_MEAN: 0.8569 agreement, Cohen's kappa=0.4086 (n=12944, excluded=682)
+- FUZZY_COMPONENT_MAX vs PROPOSED_HFIS: 1 agreement, Cohen's kappa=1 (n=12564, excluded=1062)
+- FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN: 0.8562 agreement, Cohen's kappa=0.4073 (n=12944, excluded=682)
+- PROPOSED_HFIS vs WEIGHTED_MEAN: 0.8519 agreement, Cohen's kappa=0.3838 (n=12564, excluded=1062)
 
 ## Masking
 
-- FUZZY_COMPONENT_MAX (>= Critical): rate=0 (0/74 events)
-- CRISP_CLASS_MAX (>= Critical): rate=0 (0/74 events)
-- WEIGHTED_MEAN (>= Critical): rate=0.6351 (47/74 events)
+- FUZZY_COMPONENT_MAX (>= Critical): rate=0 (0/281 events)
+- CRISP_CLASS_MAX (>= Critical): rate=0 (0/281 events)
+- WEIGHTED_MEAN (>= Critical): rate=0.605 (170/281 events)
 
 ## Reference-Case Consistency
 
@@ -95,28 +95,28 @@ Consistency with predefined synthetic boundary-adjacent labels -- NOT an empiric
 - Sample points: 30 (boundary-adjacent + random-comparison)
 - Seed: 42 (fixed, reproducible)
 - Trials per sample: 30
-- CRISP_CLASS_MAX: class_change_rate=0.1578 (95% CI [0.1354, 0.183]), mean|Δindex|=3.944, p95|Δindex|=25, max|Δindex|=25
-- FUZZY_COMPONENT_MAX: class_change_rate=0.15 (95% CI [0.1282, 0.1748]), mean|Δindex|=3.525, p95|Δindex|=16.22, max|Δindex|=25.02
-- PROPOSED_HFIS: class_change_rate=0.15 (95% CI [0.1282, 0.1748]), mean|Δindex|=3.523, p95|Δindex|=16.22, max|Δindex|=25.02
-- WEIGHTED_MEAN: class_change_rate=0.02556 (95% CI [0.01709, 0.03806]), mean|Δindex|=2.074, p95|Δindex|=8.914, max|Δindex|=21.68
+- CRISP_CLASS_MAX: class_change_rate=0.1311 (95% CI [0.1106, 0.1547]), mean|Δindex|=3.278, p95|Δindex|=25, max|Δindex|=25
+- FUZZY_COMPONENT_MAX: class_change_rate=0.1244 (95% CI [0.1045, 0.1476]), mean|Δindex|=2.947, p95|Δindex|=12.81, max|Δindex|=20.08
+- PROPOSED_HFIS: class_change_rate=0.1244 (95% CI [0.1045, 0.1476]), mean|Δindex|=2.958, p95|Δindex|=12.81, max|Δindex|=20.08
+- WEIGHTED_MEAN: class_change_rate=0.05667 (95% CI [0.04336, 0.07374]), mean|Δindex|=1.885, p95|Δindex|=7.649, max|Δindex|=15.35
 
 ## Sensitivity
 
 - Sample points: 20
 - Strata: completeness_PARTIAL, data_quality_event, outdoor_context_fresh, outdoor_context_stale
-  - coverage_threshold=0.7: class_agreement=1, mean|Δindex|=0, n=20
+  - coverage_threshold=0.7: class_agreement=0.95, mean|Δindex|=0, n=20
   - coverage_threshold=0.8: class_agreement=1, mean|Δindex|=0, n=20
   - coverage_threshold=0.9: class_agreement=1, mean|Δindex|=0, n=20
-  - window_minutes=5.0: class_agreement=1, mean|Δindex|=0.1059, n=20
+  - window_minutes=5.0: class_agreement=0.95, mean|Δindex|=1.603, n=20
   - window_minutes=15.0: class_agreement=1, mean|Δindex|=0, n=20
-  - window_minutes=30.0: class_agreement=1, mean|Δindex|=0.4674, n=20
-  - window_minutes=60.0: class_agreement=0.95, mean|Δindex|=1.217, n=20
+  - window_minutes=30.0: class_agreement=0.95, mean|Δindex|=0.379, n=20
+  - window_minutes=60.0: class_agreement=0.9, mean|Δindex|=1.719, n=20
 
 ## Fault / Reason-Code Frequency
 
-- Status proportions (n=4032): OK=0, PARTIAL=0.9606, FAILED=0.03943
-  - single_spike: 20990
-  - stuck_value: 4867
-  - out_of_range: 1943
-  - gradual_drift: 642
-  - data_loss: 10
+- Status proportions (n=13626): OK=0, PARTIAL=0.9221, FAILED=0.07794
+  - single_spike: 68795
+  - out_of_range: 32637
+  - stuck_value: 15779
+  - data_loss: 3008
+  - gradual_drift: 1733

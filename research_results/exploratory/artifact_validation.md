@@ -1,22 +1,18 @@
 # Artifact Validation Report
 
-pipeline_run_id: `49f2df39757245408465d4f274393e86`
+pipeline_run_id: `5cadd5e4f1cb4a84ab62be376f5e9728`
 
-**Result: FAILED** -- 54 passed, 1 violation(s)
-
-## Violations
-
-- working tree has uncommitted changes -- a final publication snapshot must be built from a clean, committed tree
+**Result: OK** -- 55 passed, 0 violation(s)
 
 ## Checks passed
 
 - run_summary.json validates against config/run_summary.schema.json
 - run_summary.json pipeline_run_id matches the requested pipeline_run_id
 - evaluation section's pipeline_run_id/evaluation_run_id match the summary's own identifiers
-- n_timestamps_processed (4032) == persisted iaq_index_results count (4032)
-- completeness_summary sums to n_timestamps_processed (4032)
+- n_timestamps_processed (13626) == persisted iaq_index_results count (13626)
+- completeness_summary sums to n_timestamps_processed (13626)
 - every FAILED row has a null index_value, null index_class, and no dominant_component
-- index_timeseries.csv row count (4032) == persisted iaq_index_results count (4032)
+- index_timeseries.csv row count (13626) == persisted iaq_index_results count (13626)
 - status counts agree between run_summary.json and index_timeseries.csv
 - run_summary.md contains the OK/PARTIAL/FAILED counts from run_summary.json
 - run_narrative.md contains the OK/PARTIAL/FAILED counts from run_summary.json
@@ -64,3 +60,4 @@ pipeline_run_id: `49f2df39757245408465d4f274393e86`
 - evaluation_runs.config_hash matches run_summary.json's pipeline config_hash (evaluate was run against the same config as run)
 - publication_claims_matrix.csv covers 9 claims, all with a valid status
 - current git commit matches the commit recorded when this run was computed (same-commit invariant holds)
+- working tree is clean (no uncommitted changes)

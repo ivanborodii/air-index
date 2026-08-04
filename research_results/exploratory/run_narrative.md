@@ -2,25 +2,25 @@
 
 # iaq_hfis Run Narrative
 
-Run `49f2df39757245408465d4f274393e86` computed the hierarchical fuzzy indoor air quality index over 2026-07-15T00:00:00+00:00 to 2026-07-29T00:00:00+00:00, using a 15-minute rolling window, recomputed at each aligned timestamp (4032 timestamps processed).
+Run `5cadd5e4f1cb4a84ab62be376f5e9728` computed the hierarchical fuzzy indoor air quality index over 2026-06-18T00:00:00+00:00 to 2026-08-04T07:31:26+00:00, using a 15-minute rolling window, recomputed at each aligned timestamp (13626 timestamps processed).
 
 Provisional parameters engaged this run (16): cadence.slot_match_tolerance_seconds; confirmation.gradual_drift_magnitude_multiplier; confirmation.gradual_drift_min_consecutive_steps; confirmation.persistence_min_consecutive_samples; confirmation.pm_cross_channel_tolerance_pct; confirmation.stuck_value_min_repeats; control_regions.output.transition_widths; control_regions.relative_humidity.transition_width; evaluation.masking_severity_threshold; evaluation.stability_n_trials; evaluation.stability_seed; fuzzy_engine.partial_mode_inference_rule; hampel.mad_multiplier; hampel.window_size; membership.output_transition_width; profile_selection.season_month_ranges. Results depending on these should be treated as preliminary until the author confirms the underlying values.
 
 ## Completeness
-Of 4032 computed timestamps, 0 were OK (all three components available with sufficient coverage), 3873 were PARTIAL (one component unavailable), and 159 were FAILED (index and class not formed).
-Dominant-component frequency across OK/PARTIAL computed timestamps: A: 3625 (93.6%), V: 248 (6.4%).
+Of 13626 computed timestamps, 0 were OK (all three components available with sufficient coverage), 12564 were PARTIAL (one component unavailable), and 1062 were FAILED (index and class not formed).
+Dominant-component frequency across OK/PARTIAL computed timestamps: A: 11508 (91.6%), V: 1056 (8.4%).
 
 ## Method comparison
-Evaluation run `1ff631777e9c4f3a90351ebdc4b3a6cc` (the selected evaluation for this pipeline run):
-- CRISP_CLASS_MAX and FUZZY_COMPONENT_MAX agreed on 100.0% of 4032 compared timestamps (unlabeled agreement, Cohen's kappa=0.999).
-- CRISP_CLASS_MAX and PROPOSED_HFIS agreed on 100.0% of 3873 compared timestamps (unlabeled agreement, Cohen's kappa=0.999).
-- CRISP_CLASS_MAX and WEIGHTED_MEAN agreed on 92.6% of 4032 compared timestamps (unlabeled agreement, Cohen's kappa=0.552).
-- FUZZY_COMPONENT_MAX and PROPOSED_HFIS agreed on 100.0% of 3873 compared timestamps (unlabeled agreement, Cohen's kappa=1.000).
-- FUZZY_COMPONENT_MAX and WEIGHTED_MEAN agreed on 92.6% of 4032 compared timestamps (unlabeled agreement, Cohen's kappa=0.551).
-- PROPOSED_HFIS and WEIGHTED_MEAN agreed on 92.3% of 3873 compared timestamps (unlabeled agreement, Cohen's kappa=0.515).
-- FUZZY_COMPONENT_MAX hid a component that individually reached Critical in 0.0% of 74 such events.
-- CRISP_CLASS_MAX hid a component that individually reached Critical in 0.0% of 74 such events.
-- WEIGHTED_MEAN hid a component that individually reached Critical in 63.5% of 74 such events.
+Evaluation run `05f1c0bbf3d34bad99c5fdcd6157f4cc` (the selected evaluation for this pipeline run):
+- CRISP_CLASS_MAX and FUZZY_COMPONENT_MAX agreed on 99.9% of 12944 compared timestamps (unlabeled agreement, Cohen's kappa=0.998).
+- CRISP_CLASS_MAX and PROPOSED_HFIS agreed on 99.9% of 12564 compared timestamps (unlabeled agreement, Cohen's kappa=0.998).
+- CRISP_CLASS_MAX and WEIGHTED_MEAN agreed on 85.7% of 12944 compared timestamps (unlabeled agreement, Cohen's kappa=0.409).
+- FUZZY_COMPONENT_MAX and PROPOSED_HFIS agreed on 100.0% of 12564 compared timestamps (unlabeled agreement, Cohen's kappa=1.000).
+- FUZZY_COMPONENT_MAX and WEIGHTED_MEAN agreed on 85.6% of 12944 compared timestamps (unlabeled agreement, Cohen's kappa=0.407).
+- PROPOSED_HFIS and WEIGHTED_MEAN agreed on 85.2% of 12564 compared timestamps (unlabeled agreement, Cohen's kappa=0.384).
+- FUZZY_COMPONENT_MAX hid a component that individually reached Critical in 0.0% of 281 such events.
+- CRISP_CLASS_MAX hid a component that individually reached Critical in 0.0% of 281 such events.
+- WEIGHTED_MEAN hid a component that individually reached Critical in 60.5% of 281 such events.
 - Against the synthetic, pre-labeled boundary-adjacent reference cases (n=30), PROPOSED_HFIS scored macro-F1=0.662, Cohen's kappa=0.550 (consistency, not empirical accuracy).
 - Against the synthetic, pre-labeled boundary-adjacent reference cases (n=30), FUZZY_COMPONENT_MAX scored macro-F1=0.662, Cohen's kappa=0.550 (consistency, not empirical accuracy).
 - Against the synthetic, pre-labeled boundary-adjacent reference cases (n=30), CRISP_CLASS_MAX scored macro-F1=0.748, Cohen's kappa=0.643 (consistency, not empirical accuracy).
@@ -28,14 +28,14 @@ Evaluation run `1ff631777e9c4f3a90351ebdc4b3a6cc` (the selected evaluation for t
 
 ## Stability and sensitivity
 Multi-point stability: 30 deterministically-sampled computed_ts (boundary-adjacent + random-comparison, seed=42), 30 perturbation trials each (every available channel perturbed within its declared sensor uncertainty).
-- CRISP_CLASS_MAX: class changed in 15.8% of 900 trials, 95% CI [13.5%, 18.3%] (moved to a strictly better class in 5.8% of trials, a strictly worse class in 10.0% -- these two sum to the class-change rate); mean absolute index change 3.94, p95 25.00.
-- FUZZY_COMPONENT_MAX: class changed in 15.0% of 900 trials, 95% CI [12.8%, 17.5%] (moved to a strictly better class in 7.0% of trials, a strictly worse class in 8.0% -- these two sum to the class-change rate); mean absolute index change 3.52, p95 16.22.
-- PROPOSED_HFIS: class changed in 15.0% of 900 trials, 95% CI [12.8%, 17.5%] (moved to a strictly better class in 7.0% of trials, a strictly worse class in 8.0% -- these two sum to the class-change rate); mean absolute index change 3.52, p95 16.22.
-- WEIGHTED_MEAN: class changed in 2.6% of 900 trials, 95% CI [1.7%, 3.8%] (moved to a strictly better class in 1.1% of trials, a strictly worse class in 1.4% -- these two sum to the class-change rate); mean absolute index change 2.07, p95 8.91.
+- CRISP_CLASS_MAX: class changed in 13.1% of 900 trials, 95% CI [11.1%, 15.5%] (moved to a strictly better class in 6.6% of trials, a strictly worse class in 6.6% -- these two sum to the class-change rate); mean absolute index change 3.28, p95 25.00.
+- FUZZY_COMPONENT_MAX: class changed in 12.4% of 900 trials, 95% CI [10.4%, 14.8%] (moved to a strictly better class in 7.9% of trials, a strictly worse class in 4.6% -- these two sum to the class-change rate); mean absolute index change 2.95, p95 12.81.
+- PROPOSED_HFIS: class changed in 12.4% of 900 trials, 95% CI [10.4%, 14.8%] (moved to a strictly better class in 7.9% of trials, a strictly worse class in 4.6% -- these two sum to the class-change rate); mean absolute index change 2.96, p95 12.81.
+- WEIGHTED_MEAN: class changed in 5.7% of 900 trials, 95% CI [4.3%, 7.4%] (moved to a strictly better class in 4.0% of trials, a strictly worse class in 1.7% -- these two sum to the class-change rate); mean absolute index change 1.89, p95 7.65.
 Multi-point sensitivity: 20 stratified sample points (strata: completeness_PARTIAL, data_quality_event, outdoor_context_fresh, outdoor_context_stale), swept across window durations and coverage thresholds (see sensitivity_window_summary.csv / sensitivity_coverage_summary.csv for per-value statistics).
 
 ## Boundary continuity
-Deterministic input grids (21 points each) around 27 control-region boundaries, each swept under 3 'other components' contexts (acceptable, degraded, favorable), comparing PROPOSED_HFIS, FUZZY_COMPONENT_MAX, and WEIGHTED_MEAN numerically (see continuity_grid.csv / continuity_summary.csv).
+Deterministic input grids (21 points each) around 27 control-region boundaries, each swept under 3 'other components' contexts (acceptable, degraded, favourable), comparing PROPOSED_HFIS, FUZZY_COMPONENT_MAX, and WEIGHTED_MEAN numerically (see continuity_grid.csv / continuity_summary.csv).
 - PROPOSED_HFIS: mean largest adjacent-point jump 1.41 index points across 81 boundary/context sweeps, 46 class transitions total.
 - FUZZY_COMPONENT_MAX: mean largest adjacent-point jump 1.41 index points across 81 boundary/context sweeps, 46 class transitions total.
 - WEIGHTED_MEAN: mean largest adjacent-point jump 0.63 index points across 81 boundary/context sweeps, 20 class transitions total.
@@ -61,7 +61,7 @@ Deterministic, pre-labeled synthetic scenarios (60 across co2, humidity, pm10, p
 
 PROPOSED_HFIS and FUZZY_COMPONENT_MAX agreed on 100.0% of compared timestamps this run (Cohen's kappa=1.000, real unlabeled data -- agreement, not accuracy).
 The boundary continuity experiment additionally found the two methods numerically tied on every one of 81 boundary/context pairs tested this run (see 'Boundary continuity' above and docs/hfis_vs_crispmax_audit.md) -- an intrinsic property of the single-channel-perturbation experimental design (see that section's own note), not independent evidence of general equivalence.
-**PROPOSED_HFIS and FUZZY_COMPONENT_MAX are effectively equivalent at the classification level on this run's measurements.** Stated explicitly, not minimized: where the two methods coincide numerically, PROPOSED_HFIS's remaining value is structural, not demonstrated as an empirical advantage by this run's results alone -- (a) continuous within-class severity via centroid defuzzification and the explicit per-component membership degrees (component_scores_timeseries.csv's membership_* columns), which FUZZY_COMPONENT_MAX's raw max() never computes; (b) graded uncertainty representation -- simultaneous partial membership in more than one class per component, with no equivalent in a hard maximum; (c) extensibility -- a two-level rule base can express component-interaction logic (e.g. rules conditioned on two components being simultaneously non-favorable) that a scalar max() cannot express by construction, though the worst-of rule base actually configured here has not been extended to exercise that capability. An independent synthetic check (docs/hfis_vs_crispmax_audit.md section 2) shows the two methods DO diverge substantially (mean |difference| ~5.7 index points on a 0-100 scale) once more than one component is simultaneously close to its most severe class -- a condition this dataset rarely presents (see 'Dominant-component frequency' above: one component typically dominates).
+**PROPOSED_HFIS and FUZZY_COMPONENT_MAX are effectively equivalent at the classification level on this run's measurements.** Stated explicitly, not minimized: where the two methods coincide numerically, PROPOSED_HFIS's remaining value is structural, not demonstrated as an empirical advantage by this run's results alone -- (a) continuous within-class severity via centroid defuzzification and the explicit per-component membership degrees (component_scores_timeseries.csv's membership_* columns), which FUZZY_COMPONENT_MAX's raw max() never computes; (b) graded uncertainty representation -- simultaneous partial membership in more than one class per component, with no equivalent in a hard maximum; (c) extensibility -- a two-level rule base can express component-interaction logic (e.g. rules conditioned on two components being simultaneously non-favourable) that a scalar max() cannot express by construction, though the worst-of rule base actually configured here has not been extended to exercise that capability. An independent synthetic check (docs/hfis_vs_crispmax_audit.md section 2) shows the two methods DO diverge substantially (mean |difference| ~5.7 index points on a 0-100 scale) once more than one component is simultaneously close to its most severe class -- a condition this dataset rarely presents (see 'Dominant-component frequency' above: one component typically dominates).
 
 - 16 provisional parameter(s) were engaged this run -- see 'Provisional parameters engaged' above and the generated provisional_parameter_assessment.md for what each one's status actually implies (whether calibrated, against what dataset, whether conclusions depend strongly on it).
 - The boundary continuity experiment and the fault-injection benchmark are both deterministic, synthetic constructions -- they show the inference method and the data-quality detection layer behave as designed on known, controlled inputs; they do not measure performance across the full range of conditions the actual live sensor deployment may encounter.

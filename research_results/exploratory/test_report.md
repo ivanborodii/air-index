@@ -7,12 +7,12 @@
 - Failed: 0
 - Errors: 0
 - Skipped: 0
-- Wall time: 2285.8s
+- Wall time: 2374.3s
 - Python version: 3.13.5
 - DuckDB version: 1.5.2
 - Platform: Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41
-- Git commit: 64e5448d3e42b5074d1275b8723ae40ee0a09fc5
-- Generated at (UTC): 2026-07-31T12:34:28.610993+00:00
+- Git commit: 9cce835a62065353640ccf3d9ca09973cfda6754
+- Generated at (UTC): 2026-08-04T15:14:44.563253+00:00
 
 ## Command
 

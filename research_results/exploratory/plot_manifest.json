@@ -147,7 +147,7 @@
   },
   {
     "id": "continuity_curves",
-    "title": "HFIS vs FUZZY_COMPONENT_MAX: Index Value Across a Boundary Grid (favorable context)",
+    "title": "HFIS vs FUZZY_COMPONENT_MAX: Index Value Across a Boundary Grid (favourable context)",
     "source_csv": "continuity_grid.csv",
     "plot_type": "line",
     "x": "input_value",
@@ -155,14 +155,14 @@
       "index_value"
     ],
     "group_by": "method",
-    "description": "Index value across a dense input grid straddling one control-region boundary, one line per method, restricted to the favorable other-components context for readability (see continuity_grid.csv for the acceptable/degraded contexts too); render one figure per boundary_id.",
+    "description": "Index value across a dense input grid straddling one control-region boundary, one line per method, restricted to the favourable other-components context for readability (see continuity_grid.csv for the acceptable/degraded contexts too); render one figure per boundary_id.",
     "filter_equals": {
-      "context": "favorable"
+      "context": "favourable"
     }
   },
   {
     "id": "continuity_summary",
-    "title": "Boundary Continuity: Maximum Adjacent Jump by Method (favorable context)",
+    "title": "Boundary Continuity: Maximum Adjacent Jump by Method (favourable context)",
     "source_csv": "continuity_summary.csv",
     "plot_type": "bar",
     "x": "boundary_id",
@@ -170,9 +170,9 @@
       "max_adjacent_jump"
     ],
     "group_by": "method",
-    "description": "Largest single-step index change across each boundary's grid, grouped by method, restricted to the favorable other-components context for readability -- smaller is smoother.",
+    "description": "Largest single-step index change across each boundary's grid, grouped by method, restricted to the favourable other-components context for readability -- smaller is smoother.",
     "filter_equals": {
-      "context": "favorable"
+      "context": "favourable"
     }
   },
   {

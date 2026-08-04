@@ -2,48 +2,48 @@
 
 > Factual, validated-metrics-only summary for manual adaptation into the
 > manuscript's Results/Discussion. Every number here is copied directly from
-> `run_summary_49f2df39757245408465d4f274393e86.json` -- no claim beyond what the
+> `run_summary_5cadd5e4f1cb4a84ab62be376f5e9728.json` -- no claim beyond what the
 > numbers themselves support. This is not manuscript prose.
 
 ## 1. Dataset and experiment period
 
-- Period: 2026-07-15T00:00:00+00:00 to 2026-07-29T00:00:00+00:00
+- Period: 2026-06-18T00:00:00+00:00 to 2026-08-04T07:31:26+00:00
 - Window: 15 minutes; recompute grid per config
-- pipeline_run_id: `49f2df39757245408465d4f274393e86`; evaluation_run_id: `1ff631777e9c4f3a90351ebdc4b3a6cc`
-- config_hash: `f5cde8425c2d994845d2d10d9545c8b79fa9f0ac4b92ba2cf78801aeee3e3909`; git commit: `64e5448d3e42b5074d1275b8723ae40ee0a09fc5`
+- pipeline_run_id: `5cadd5e4f1cb4a84ab62be376f5e9728`; evaluation_run_id: `05f1c0bbf3d34bad99c5fdcd6157f4cc`
+- config_hash: `d0a9f31ada5ffe122a5ecc472c54bd46de25992fc7298e84a624cd3378c2339c`; git commit: `9cce835a62065353640ccf3d9ca09973cfda6754`
 
 ## 2. Expected and processed calculation timestamps
 
-- Processed: 4032
+- Processed: 13626
 
 ## 3. OK / PARTIAL / FAILED counts and percentages
 
 - OK: 0 (0.0%)
-- PARTIAL: 3873 (96.1%)
-- FAILED: 159 (3.9%)
+- PARTIAL: 12564 (92.2%)
+- FAILED: 1062 (7.8%)
 
 ## 4. Air-quality class distribution (successfully formed indices)
 
 See `index_timeseries.csv` (completeness_status=OK rows, group by index_class) for the exact distribution.
 
 Dominant-component frequency (which of A/V/M won the priority-hierarchy tie-break, OK/PARTIAL computed_ts only):
-- A: 3625 (93.6%)
-- V: 248 (6.4%)
+- A: 11508 (91.6%)
+- V: 1056 (8.4%)
 
 ## 5. Inter-method agreement (unlabeled real data)
 
-- CRISP_CLASS_MAX vs FUZZY_COMPONENT_MAX: 100.0% agreement, Cohen's kappa=0.999 (n=4032). This is agreement, not accuracy.
-- CRISP_CLASS_MAX vs PROPOSED_HFIS: 100.0% agreement, Cohen's kappa=0.999 (n=3873). This is agreement, not accuracy.
-- CRISP_CLASS_MAX vs WEIGHTED_MEAN: 92.6% agreement, Cohen's kappa=0.552 (n=4032). This is agreement, not accuracy.
-- FUZZY_COMPONENT_MAX vs PROPOSED_HFIS: 100.0% agreement, Cohen's kappa=1.000 (n=3873). This is agreement, not accuracy.
-- FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN: 92.6% agreement, Cohen's kappa=0.551 (n=4032). This is agreement, not accuracy.
-- PROPOSED_HFIS vs WEIGHTED_MEAN: 92.3% agreement, Cohen's kappa=0.515 (n=3873). This is agreement, not accuracy.
+- CRISP_CLASS_MAX vs FUZZY_COMPONENT_MAX: 99.9% agreement, Cohen's kappa=0.998 (n=12944). This is agreement, not accuracy.
+- CRISP_CLASS_MAX vs PROPOSED_HFIS: 99.9% agreement, Cohen's kappa=0.998 (n=12564). This is agreement, not accuracy.
+- CRISP_CLASS_MAX vs WEIGHTED_MEAN: 85.7% agreement, Cohen's kappa=0.409 (n=12944). This is agreement, not accuracy.
+- FUZZY_COMPONENT_MAX vs PROPOSED_HFIS: 100.0% agreement, Cohen's kappa=1.000 (n=12564). This is agreement, not accuracy.
+- FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN: 85.6% agreement, Cohen's kappa=0.407 (n=12944). This is agreement, not accuracy.
+- PROPOSED_HFIS vs WEIGHTED_MEAN: 85.2% agreement, Cohen's kappa=0.384 (n=12564). This is agreement, not accuracy.
 
 ## 6. Adverse-component masking comparison
 
-- FUZZY_COMPONENT_MAX (>= Critical): masking_rate=0.0% (0/74 events).
-- CRISP_CLASS_MAX (>= Critical): masking_rate=0.0% (0/74 events).
-- WEIGHTED_MEAN (>= Critical): masking_rate=63.5% (47/74 events).
+- FUZZY_COMPONENT_MAX (>= Critical): masking_rate=0.0% (0/281 events).
+- CRISP_CLASS_MAX (>= Critical): masking_rate=0.0% (0/281 events).
+- WEIGHTED_MEAN (>= Critical): masking_rate=60.5% (170/281 events).
 
 ## 7. HFIS vs FUZZY_COMPONENT_MAX numerical continuity
 
@@ -55,10 +55,10 @@ Dominant-component frequency (which of A/V/M won the priority-hierarchy tie-brea
 ## 8. Multi-point stability results
 
 - 30 sampled points, 30 trials each, seed=42.
-  - CRISP_CLASS_MAX: class_change_rate=15.8% (moved better=5.8%, moved worse=10.0%), mean|Δindex|=3.94
-  - FUZZY_COMPONENT_MAX: class_change_rate=15.0% (moved better=7.0%, moved worse=8.0%), mean|Δindex|=3.52
-  - PROPOSED_HFIS: class_change_rate=15.0% (moved better=7.0%, moved worse=8.0%), mean|Δindex|=3.52
-  - WEIGHTED_MEAN: class_change_rate=2.6% (moved better=1.1%, moved worse=1.4%), mean|Δindex|=2.07
+  - CRISP_CLASS_MAX: class_change_rate=13.1% (moved better=6.6%, moved worse=6.6%), mean|Δindex|=3.28
+  - FUZZY_COMPONENT_MAX: class_change_rate=12.4% (moved better=7.9%, moved worse=4.6%), mean|Δindex|=2.95
+  - PROPOSED_HFIS: class_change_rate=12.4% (moved better=7.9%, moved worse=4.6%), mean|Δindex|=2.96
+  - WEIGHTED_MEAN: class_change_rate=5.7% (moved better=4.0%, moved worse=1.7%), mean|Δindex|=1.89
 - Breakdowns by boundary/channel (`stability_summary_by_variable.csv`) and by originating class (`stability_summary_by_original_class.csv`) are exported separately; not repeated here.
 
 ## 9. Multi-point sensitivity results
@@ -97,10 +97,10 @@ Event-level (each injected fault matched at most once, one-to-one):
 ## 12. Execution-time and resource results
 
 - Platform: Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41 (aarch64, 4 CPUs)
-- Total pipeline runtime: 6756.2 s for 4032 timestamps
-- Per-timestamp latency: mean=1669.6 ms, median=1558.8 ms, p95=2560.1 ms, max=5093.0 ms
-- Peak memory: 426.0 MB
-- Source raw row count: 40319
+- Total pipeline runtime: 24822.7 s for 13626 timestamps
+- Per-timestamp latency: mean=1820.5 ms, median=1716.0 ms, p95=2676.1 ms, max=8052.4 ms
+- Peak memory: 724.3 MB
+- Source raw row count: 135667
 
 ## 13. Provisional parameters and limitations
 

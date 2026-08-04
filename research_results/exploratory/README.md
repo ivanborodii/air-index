@@ -8,8 +8,8 @@ atomically (never hand-edited).
 
 **This is an exploratory-mode run.** The microclimate (M) component was structurally omitted because no DBN-supported temperature profile exists for this run's room/season -- see `manuscript_readiness.md` for the exact blocker. This directory therefore reports an A/V-only (aerosol + ventilation) analysis and must never be presented as the manuscript's complete proposed method. It is kept OUTSIDE `research_results/final/` for exactly this reason.
 
-- pipeline_run_id: `49f2df39757245408465d4f274393e86`
-- evaluation_run_id: `1ff631777e9c4f3a90351ebdc4b3a6cc`
+- pipeline_run_id: `5cadd5e4f1cb4a84ab62be376f5e9728`
+- evaluation_run_id: `05f1c0bbf3d34bad99c5fdcd6157f4cc`
 
 See `latest_run.json` for the full identity chain (config hash, git
 commit, generation timestamp, readiness status) and

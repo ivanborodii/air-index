@@ -3,7 +3,7 @@ index_timeseries.csv,computed_ts,datetime,UTC timestamp,Instant the index was co
 index_timeseries.csv,window_minutes,int,minutes,Aggregation window size used for this row.
 index_timeseries.csv,completeness_status,str,-,OK | PARTIAL | FAILED.
 index_timeseries.csv,index_value,float,0-100,Defuzzified PROPOSED_HFIS index value; null if FAILED.
-index_timeseries.csv,index_class,str,-,Favorable | Acceptable | Degraded | Critical; null if FAILED.
+index_timeseries.csv,index_class,str,-,Favourable | Acceptable | Degraded | Critical; null if FAILED.
 index_timeseries.csv,dominant_component,str,-,"Single, deterministically-chosen dominant adverse component (A/V/M) from the priority hierarchy; null if FAILED or no rule fired."
 index_timeseries.csv,co_dominant_components,str,-,Semicolon-joined component(s) tied for dominance (includes dominant_component); length 1 unless a documented tie survived every step.
 index_timeseries.csv,worst_component_class,str,-,Highest-severity class reached by any available component's own dominant class.
@@ -16,7 +16,7 @@ component_scores_timeseries.csv,window_minutes,int,minutes,Aggregation window si
 component_scores_timeseries.csv,component,str,-,A (aerosol) | V (ventilation) | M (microclimate).
 component_scores_timeseries.csv,available,bool,-,Whether this component had sufficient coverage to be computed.
 component_scores_timeseries.csv,crisp_score,float,0-100,Centroid crisp score on the same scale as the final index; null if unavailable.
-component_scores_timeseries.csv,membership_favorable,float,0-1,Degree of membership in Favorable.
+component_scores_timeseries.csv,membership_favorable,float,0-1,Degree of membership in Favourable.
 component_scores_timeseries.csv,membership_acceptable,float,0-1,Degree of membership in Acceptable.
 component_scores_timeseries.csv,membership_degraded,float,0-1,Degree of membership in Degraded.
 component_scores_timeseries.csv,membership_critical,float,0-1,Degree of membership in Critical.
@@ -217,7 +217,7 @@ outdoor_context_timeseries.csv,pm10,float,ug/m3,Outdoor PM10 (context only).
 outdoor_context_timeseries.csv,temperature_2m,float,degC,Outdoor temperature at 2m (context only).
 continuity_grid.csv,boundary_id,str,-,Identifier for the control-region boundary under test (channel + breakpoint).
 continuity_grid.csv,channel,str,-,pm2_5 | pm10 | co2 | temperature | humidity.
-continuity_grid.csv,context,str,-,"favorable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."
+continuity_grid.csv,context,str,-,"favourable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."
 continuity_grid.csv,boundary_value,float,channel units,The control-region breakpoint this grid straddles.
 continuity_grid.csv,grid_index,int,-,0-based position within the dense input grid.
 continuity_grid.csv,input_value,float,channel units,The perturbed channel's value at this grid point.
@@ -226,7 +226,7 @@ continuity_grid.csv,index_value,float,0-100,Index value at this grid point.
 continuity_grid.csv,index_class,str,-,Index class at this grid point.
 continuity_summary.csv,boundary_id,str,-,Identifier for the control-region boundary under test.
 continuity_summary.csv,channel,str,-,pm2_5 | pm10 | co2 | temperature | humidity.
-continuity_summary.csv,context,str,-,"favorable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."
+continuity_summary.csv,context,str,-,"favourable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."
 continuity_summary.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
 continuity_summary.csv,max_adjacent_jump,float,index points,Largest index-value change between adjacent grid points.
 continuity_summary.csv,mean_adjacent_jump,float,index points,Mean index-value change between adjacent grid points.
@@ -238,7 +238,7 @@ continuity_summary.csv,n_class_transitions,int,count,Number of grid points where
 continuity_summary.csv,class_transition_positions,str,-,Semicolon-joined input_values where a class transition occurred.
 continuity_summary.csv,index_range,float,index points,max(index_value) - min(index_value) across the grid.
 continuity_summary.csv,monotonicity_violations,int,count,Adjacent-point decreases for a monotonic (higher-is-worse) pollutant channel.
-continuity_summary.csv,masked_by_favorable,bool,-,Whether a favorable component prevented the adverse channel from dominating the aggregated result.
+continuity_summary.csv,masked_by_favorable,bool,-,Whether a favourable component prevented the adverse channel from dominating the aggregated result.
 continuity_summary.csv,area_between_curves_vs_crisp_max,float,index points x channel units,Trapezoidal integral of |PROPOSED_HFIS - FUZZY_COMPONENT_MAX| over the swept input; only populated for method=PROPOSED_HFIS.
 multi_component_grid.csv,a,float,0-100,Aerosol (A) component crisp score at this grid point.
 multi_component_grid.csv,v,float,0-100,Ventilation (V) component crisp score at this grid point.
