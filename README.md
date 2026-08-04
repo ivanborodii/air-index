@@ -384,49 +384,64 @@ List of `{room, season, provisional, ranges}` entries. See §10.
 
 ## 10. Room and seasonal profiles
 
-Exactly two temperature profiles are currently defined, both verified
-directly against **ДБН В.2.5-67:2013, Додаток Д, Таблиця Д.4** (p.100):
+Three temperature profiles are currently defined:
 
 | Room | Season | Source | Favourable band |
 |---|---|---|---|
-| `kitchen` | `cold_period` | DBN Table Д.4, "інші об'єми (кухня, гардеробна, комора тощо)", heating-period column | 18.0–21.0 °C |
-| `general_residential` | `warm_period` | DBN Table Д.4, "житлові об'єми (..., **кухня-їдальня**...)", cooling-period column | 23.5–25.5 °C |
+| `kitchen` | `cold_period` | DBN Table Д.4, "інші об'єми (кухня, гардеробна, комора тощо)", heating-period column — verified directly against **ДБН В.2.5-67:2013, Додаток Д, Таблиця Д.4** (p.100) | 18.0–21.0 °C |
+| `general_residential` | `warm_period` | DBN Table Д.4, "житлові об'єми (..., **кухня-їдальня**...)", cooling-period column — same DBN table | 23.5–25.5 °C |
+| `kitchen` | `warm_period` | **Substitute standard** (DBN itself has no value — see below): ДСТУ Б EN 15251:2011, Таблиця А.2, "Житлові приміщення: спальні, вітальні, **кухні** тощо" (kitchen named explicitly), sedentary ~1.2 met, Category I/II/III | 21.0–25.5 °C |
 
-**There is deliberately no `kitchen`/`warm_period` profile.** DBN Table
-Д.4's standalone-kitchen row has a **literal dash** in the cooling-period
-column: the standard genuinely gives no summer value for this exact room
-type. Investigated further into ДБН В.2.2-15:2019 (which likely only
-re-references the same EN 15251/16798-1 framework DBN B.2.5-67's own
-table is already built from) without finding an independent
-kitchen-specific figure.
+**DBN Table Д.4's standalone-kitchen row has a literal dash in the
+cooling-period column**: the standard genuinely gives no summer value for
+this exact room type. Investigated further into ДБН В.2.2-15:2019 (which
+likely only re-references the same EN 15251/16798-1 framework DBN
+B.2.5-67's own table is already built from) without finding an independent
+kitchen-specific figure there either.
+
+**Resolved via an explicit author decision + substitute-standard
+citation**: rather than leave the microclimate (M) component permanently
+undefined for this deployment's real (all warm-period) data, `kitchen`/
+`warm_period` is sourced to **ДСТУ Б EN 15251:2011**
+("Розрахункові параметри мікроклімату приміщень...", the Ukrainian IDT
+adoption of EN 15251:2007 — the same EN framework DBN B.2.5-67's own table
+is built from), which has its own Таблиця А.2 ("Examples of recommended
+design values of the indoor temperature for design of buildings and HVAC
+systems"), naming **кухні (kitchens)** explicitly in a residential row
+alongside bedrooms/living rooms, with real Category I/II/III
+heating-min/cooling-max values:
+
+| Category | Heating min | Cooling max |
+|---|---|---|
+| I | 21.0 °C | 25.5 °C |
+| II | 20.0 °C | 26.0 °C |
+| III | 18.0 °C | 27.0 °C |
+
+Verified directly against the standard PDF (not a secondhand summary):
+freely downloadable, Ukrainian-hosted, p.35. Categories I/II/III are
+nested (I ⊂ II ⊂ III) and mapped into `room_profiles.yaml`'s
+favourable/acceptable/degraded/critical schema the same way DBN's
+Підвищені оптимальні/Оптимальні/Допустимі tiers are mapped elsewhere in
+this file. Note the same standard's Table A.3 (hourly energy-calculation
+ranges — a different purpose from Table A.2's design/comfort bands) groups
+kitchen with storage/halls instead and has **no** cooling value for that
+grouping either — Table A.2 is the structurally correct analogue to DBN's
+Table Д.4 (design/comfort bands, not hourly simulation ranges), and is the
+one actually used.
 
 **The real deployed sensor is in a standalone/enclosed kitchen** (confirmed
 by the author, see `config/iaq_hfis.yaml`'s `deployment:` block) — **not**
-a kitchen-dining/general-residential space. Reusing
-`general_residential/warm_period`'s numbers for it would misrepresent
-which DBN row governs the result, so `select_room_season` raises a
-structured `TEMPERATURE_PROFILE_NOT_DEFINED` error (never a silent
-fallback) whenever a warm-period computed_ts is requested for `kitchen`.
-In **strict `mode=publication`** (the default) this aborts the entire
-pipeline run. An optional **`mode=exploratory`** structurally omits the
-microclimate (M) component instead (never fabricates it) and tags the run
-so it can never be promoted into `research_results/final` — see
-`research_results/exploratory/` for the current A/V-only analysis.
+a kitchen-dining/general-residential space, and this profile does not
+reclassify it as one: it is still keyed to `room: kitchen`, just sourced to
+a different (DSTU, not DBN) standard for the warm period specifically. A
+room/season combination with **neither** a DBN nor a DSTU citation (e.g.
+`general_residential`/`cold_period`) still fails loudly with a structured
+`TEMPERATURE_PROFILE_NOT_DEFINED` error — never a silent fallback, never
+DBN-row substitution, never fabrication.
 
-**Two scientifically valid ways to obtain a full manuscript-ready result
-for this deployment:**
-1. Collect standalone-kitchen data during the DBN cold period (roughly
-   October–March), where `kitchen`/`cold_period` (a real, DBN-confirmed
-   profile) applies; or
-2. If the deployment room is genuinely reclassified as a kitchen-dining /
-   general-residential space (not merely to unblock this result), document
-   that reclassification explicitly and add a truthfully-labeled
-   `general_residential`/`warm_period` deployment.
-
-Never substitute a different room's DBN numbers to manufacture a result.
 Adding a new room/season combination is config-only (`room_profiles.yaml`);
 `profiles.select_room_season` fails loudly, listing available profiles and
-the DBN source, if the requested combination doesn't exist — it never
+the DBN/DSTU source, if the requested combination doesn't exist — it never
 silently falls back to another room, another season, interpolation, or
 outdoor temperature.
 
@@ -493,6 +508,7 @@ Table 2 of the manuscript, exactly as configured in `control_regions`:
 | RH (%) | 30–50 | 25–<30 or >50–60 | 20–<25 or >60–70 | <20 or >70 | ДБН В.2.5-67:2013 Table Д.5 |
 | T, kitchen/cold | 18–21 | 16.5–<18 or >21–22.5 | 15.5–<16.5 or >22.5–23.5 | <15.5 or >23.5 | ДБН В.2.5-67:2013 Table Д.4 |
 | T, general_residential/warm | 23.5–25.5 | 23–<23.5 or >25.5–26 | 22–<23 or >26–27 | <22 or >27 | ДБН В.2.5-67:2013 Table Д.4 |
+| T, kitchen/warm | 21–25.5 | 20–<21 or >25.5–26 | 18–<20 or >26–27 | <18 or >27 | ДСТУ Б EN 15251:2011 Table A.2 (substitute standard — §10) |
 | Output index I | [0,25) | [25,50) | [50,75) | [75,100] | The proposed method's own scale |
 
 ## 15. Membership-function construction
@@ -839,18 +855,17 @@ sampling is bounded separately by `stability_max_*`/
 
 ## 29. Limitations
 
-- **No full three-component (A/V/M/I) manuscript-ready result currently
-  exists for this deployment.** `kitchen/warm_period` has no DBN-defined
-  temperature profile (DBN V.2.5-67:2013 Table D.4 gives no value for a
-  standalone kitchen in the warm period), and all raw data collected so
-  far falls entirely within the warm period. `iaq_hfis run` (the default,
-  strict `mode=publication`) correctly aborts with
-  `TEMPERATURE_PROFILE_NOT_DEFINED` rather than substituting a different
-  room's numbers. See `research_results/final/README.md` for the current
-  blocked status, and `research_results/exploratory/` for an A/V-only
-  analysis of the real data in the meantime. §10 explains the two
-  scientifically valid ways to unblock this (cold-period data, or a
-  genuine room reclassification — never a fabricated one).
+- **The kitchen/warm_period microclimate component is sourced to a
+  substitute standard, not DBN.** DBN V.2.5-67:2013 Table D.4 gives no
+  value for a standalone kitchen in the warm period; the profile actually
+  used is instead cited to ДСТУ Б EN 15251:2011 Table A.2 (§10), an
+  explicit author decision, per the manuscript's own stated fallback
+  rule. This is a real, verified, standards-based citation — not a
+  fabrication or a different-room substitution — but readers should know
+  the warm-period microclimate component rests on a different
+  (EN-derived, Ukrainian-adopted) standard than the cold-period one,
+  which is direct DBN. `research_results/final/` discloses this
+  explicitly wherever it affects a claim.
 - **CO2 has no cross-channel confirmation signal.** Unlike PM (auxiliary
   channels) and T/RH (dual sensors), a SUSPECT CO2 reading can only be
   confirmed by persistence — a sustained sensor fault that also persists
@@ -936,7 +951,7 @@ sampling is bounded separately by `stability_max_*`/
 | RH control regions | ДБН В.2.5-67:2013, Таблиця Д.5 | Manuscript citation |
 | kitchen/cold_period T | ДБН В.2.5-67:2013, Додаток Д, Таблиця Д.4, p.100, "інші об'єми" row, heating column | **Verified directly against the actual standard PDF** during this project — exact match |
 | general_residential/warm_period T | Same table, "кухня-їдальня" row, cooling column | **Verified directly against the actual standard PDF** |
-| kitchen/warm_period T | No DBN value exists for this specific room (verified: literal dash in the table; ДБН В.2.2-15:2019 investigated, likely only re-references the same EN framework) | **No profile defined.** Deliberately removed 2026-07-31 (was previously an author decision to reuse general_residential's numbers; audited and found to misrepresent the governing DBN row) — see §10 |
+| kitchen/warm_period T | No DBN value exists for this specific room (verified: literal dash in the table; ДБН В.2.2-15:2019 investigated, likely only re-references the same EN framework). Sourced instead to ДСТУ Б EN 15251:2011, Таблиця А.2, "кухні" row, Category I/II/III | **Verified directly against the actual standard PDF** — an explicit author decision to use a substitute standard rather than leave M permanently undefined for this deployment's real (all warm-period) data — see §10 |
 | CO2 uncertainty (±70 ppm) | Sensirion SCD4x Datasheet v1.7 (Apr 2025), Table 1 p.3: ±(50 ppm + 2.5%) for 400-1000 ppm | **Verified against the official datasheet** — representative value at this deployment's ~800 ppm typical range |
 | SCD41 temp/RH uncertainty (±0.8°C / ±6% RH) | Same datasheet, Tables 2-3 p.3, 15-35°C / 20-65% RH band | **Verified against the official datasheet** — exact match to prior guessed values |
 | BME688 temp uncertainty (±0.5°C) | Bosch BME688 Datasheet Rev.1.3 (Feb 2024), Table 10 p.14 | **Verified against the official datasheet** — corrected from an incorrect ±1.0°C guess |
@@ -986,13 +1001,12 @@ live data will differ.)
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `TEMPERATURE_PROFILE_NOT_DEFINED` | Requested room/season combination isn't in `room_profiles.yaml` (e.g. `kitchen`/`warm_period`) | Add a real DBN-sourced profile, or use `--mode exploratory` to omit M instead of substituting a different room's numbers; the error lists available profiles |
+| `TEMPERATURE_PROFILE_NOT_DEFINED` | Requested room/season combination isn't in `room_profiles.yaml` (e.g. `general_residential`/`cold_period`) | Add a real DBN- or DSTU-sourced profile, or use `--mode exploratory` to omit M instead of substituting a different room's numbers; the error lists available profiles |
 | `SnapshotError: could not take a consistent snapshot` | `air_monitor.duckdb` changed mid-copy repeatedly (very high write rate) or disk pressure | Retry; check `data/iaq_hfis/logs/iaq_hfis.log` for the underlying exception |
 | All timestamps FAILED | Coverage below `min_ratio` for ≥2 channels, or bad `schema_mapping` | Check `window_aggregates.coverage_ratio`; verify `schema_mapping` columns exist |
 | `MembershipConfigError: ... narrower than declared sensor uncertainty` | A configured `transition_widths` entry is smaller than `sensor_specs.yaml`'s `declared_uncertainty` for that channel | Widen the transition width, or set `membership.overlap_width_policy: auto_expand` |
 | `evaluate`/`report`/`plot` says "run 'iaq_hfis run' first" | No `run_summary_{pipeline_run_id}.json` (or no data in the derived DB) for that pipeline_run_id/range | Run the prerequisite step; check the pipeline_run_id was copied correctly |
 | A plot is silently missing | Its source CSV had nothing to export this run (logged at INFO level) | Check the log; this is by design (§25), not a bug |
-| `iaq_hfis run` aborts immediately with `TEMPERATURE_PROFILE_NOT_DEFINED` on real kitchen summer data | `kitchen`/`warm_period` has no DBN value and this deployment's data is currently all warm-period (§10, §29) | Expected, by design — not a bug. Use `--mode exploratory` for an A/V-only analysis, or wait for cold-period data |
 | `LegacySchemaError: ... pipeline_run_id column` or `... schema_version=N` | The derived database predates the run-isolated schema, or a code/schema version mismatch | `python -m iaq_hfis.cli rebuild-db --confirm` (only deletes the derived DB, never raw sources) |
 | `validate-artifacts` reports a violation | A generated artifact is stale, hand-edited, or a real bug in report generation | Regenerate with `iaq_hfis report` + `iaq_hfis plot`; if it recurs, treat as a real bug, not something to work around |
 

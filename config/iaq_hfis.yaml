@@ -130,9 +130,13 @@ deployment:
 profile_selection:
   # room: kitchen matches the real deployment (manuscript: sensor is in the
   # kitchen). kitchen/cold_period is the real manuscript/DBN profile.
-  # kitchen/warm_period has no DBN-defined value (see room_profiles.yaml) --
-  # a warm-period run fails with TEMPERATURE_PROFILE_NOT_DEFINED rather than
-  # substituting a different room's numbers.
+  # kitchen/warm_period has no DBN-defined value but is sourced instead to
+  # ДСТУ Б EN 15251:2011 Table A.2, an explicit author decision to use a
+  # substitute standard rather than leave M undefined for this deployment's
+  # real (all warm-period) data (see room_profiles.yaml). A room/season
+  # combination with neither a DBN nor a DSTU value still fails loudly with
+  # TEMPERATURE_PROFILE_NOT_DEFINED rather than substituting a different
+  # room's numbers.
   room: kitchen
   season_month_ranges:             # PROVISIONAL cutover months, not given in the manuscript
     cold_period: [10, 11, 12, 1, 2, 3]

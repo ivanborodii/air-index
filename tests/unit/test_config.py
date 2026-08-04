@@ -82,7 +82,10 @@ def test_sensor_specs_and_room_profiles_load():
     kitchen_cold = profiles.find("kitchen", "cold_period")
     assert kitchen_cold is not None and kitchen_cold.provisional is False  # real manuscript/DBN profile
     # DBN Table D.4 has no room-specific value for a standalone kitchen in the warm
-    # period (literal dash in the table) -- this profile must not exist, and must
-    # never silently reuse general_residential/warm_period's numbers.
-    assert profiles.find("kitchen", "warm_period") is None
+    # period (literal dash in the table), so this profile is sourced instead to
+    # DSTU B EN 15251:2011 Table A.2 (a substitute standard, explicit author
+    # decision) -- never a silent reuse of general_residential/warm_period's
+    # numbers, which come from a different DBN row.
+    kitchen_warm = profiles.find("kitchen", "warm_period")
+    assert kitchen_warm is not None and kitchen_warm.provisional is False
     assert profiles.find("general_residential", "cold_period") is None  # still genuinely missing

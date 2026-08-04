@@ -13,8 +13,9 @@ from iaq_hfis.pipeline import run_pipeline
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RUN_SUMMARY_SCHEMA = json.loads((REPO_ROOT / "config" / "run_summary.schema.json").read_text())
 
-# A January instant so the manuscript's kitchen/cold_period profile (the
-# only kitchen profile documented) applies without an override.
+# A January instant so the manuscript's kitchen/cold_period (DBN-cited)
+# profile applies without an override -- distinct from kitchen/warm_period,
+# which is sourced to a substitute standard (DSTU B EN 15251:2011).
 COMPUTED_TS = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
 WINDOW_START = COMPUTED_TS - timedelta(minutes=15)
 
@@ -120,26 +121,42 @@ def test_cold_period_kitchen_default_config_is_provisional_param_free(run_and_in
     assert not any(p.startswith("room_profiles.") for p in summary["provisional_parameters_used"])
 
 
-def test_publication_mode_blocks_warm_period_kitchen_run(run_and_inspect):
-    # DBN Table D.4 has no room-specific value for a standalone kitchen in
-    # the warm period. Publication mode (the default) must abort the entire
-    # run rather than silently substituting or omitting the microclimate
-    # component for a "full" A/V/M/I result.
+def test_publication_mode_succeeds_for_warm_period_kitchen_run(run_and_inspect):
+    # kitchen/warm_period is sourced to DSTU B EN 15251:2011 Table A.2 (a
+    # substitute standard, explicit author decision -- DBN Table D.4 itself
+    # still has no value for this room/season). This is a confirmed
+    # (non-provisional) profile, so publication mode must produce a full
+    # A/V/M/I OK-completeness result instead of aborting.
     summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+    summary, row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
+    assert row[0] == "OK"
+    assert summary["mode"] == "publication"
+    assert not any(p.startswith("room_profiles.") for p in summary["provisional_parameters_used"])
+
+
+def test_publication_mode_blocks_still_undefined_profile(run_and_inspect, base_settings):
+    # general_residential/cold_period is genuinely absent from both DBN and
+    # DSTU citations in room_profiles.yaml. Publication mode (the default)
+    # must still abort the entire run rather than silently substituting or
+    # omitting the microclimate component for a "full" A/V/M/I result.
+    base_settings.profile_selection.room = "general_residential"
+    winter_ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
     with pytest.raises(TemperatureProfileNotDefinedError) as exc_info:
-        run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
+        run_and_inspect(_clean_rows(computed_ts=winter_ts), computed_ts=winter_ts)
     err = exc_info.value
-    assert err.requested_room == "kitchen"
-    assert err.requested_season == "warm_period"
+    assert err.requested_room == "general_residential"
+    assert err.requested_season == "cold_period"
 
 
-def test_exploratory_mode_omits_microclimate_for_warm_period_kitchen(run_and_inspect):
+def test_exploratory_mode_omits_microclimate_for_undefined_profile(run_and_inspect, base_settings):
     # Exploratory mode never fabricates the microclimate component: with no
-    # DBN profile for kitchen/warm_period, M is structurally omitted (like a
-    # genuinely missing component), and A/V still produce a PARTIAL result.
-    summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+    # DBN/DSTU profile for general_residential/cold_period (still genuinely
+    # undefined), M is structurally omitted (like a genuinely missing
+    # component), and A/V still produce a PARTIAL result.
+    base_settings.profile_selection.room = "general_residential"
+    winter_ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
     summary, (status, index_value, index_class, missing) = run_and_inspect(
-        _clean_rows(computed_ts=summer_ts), computed_ts=summer_ts, mode="exploratory"
+        _clean_rows(computed_ts=winter_ts), computed_ts=winter_ts, mode="exploratory"
     )
     assert summary["mode"] == "exploratory"
     assert status == "PARTIAL"
@@ -156,8 +173,9 @@ def test_provisional_room_profile_usage_is_tracked_in_run_summary(run_and_inspec
     # by its actual provenance path (room_profiles.<room>/<season>.transition_width),
     # not the raw internal event string -- that path is what parameter_provenance.csv
     # and every other artifact key off of. Uses general_residential/warm_period
-    # (a real, currently-non-provisional profile) rather than the now-removed
-    # kitchen/warm_period, temporarily marking it provisional for this test.
+    # (a real, currently-non-provisional profile), temporarily marking it
+    # provisional for this test, independent of which profiles are provisional
+    # by default today.
     summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
     base_settings.profile_selection.room = "general_residential"
     profile = room_profiles.find("general_residential", "warm_period")
