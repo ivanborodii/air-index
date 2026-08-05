@@ -1,0 +1,313 @@
+file,column,dtype,unit,description
+index_timeseries.csv,computed_ts,datetime,UTC timestamp,Instant the index was computed for (end of the rolling window).
+index_timeseries.csv,window_minutes,int,minutes,Aggregation window size used for this row.
+index_timeseries.csv,completeness_status,str,-,OK | PARTIAL | FAILED.
+index_timeseries.csv,index_value,float,0-100,Defuzzified PROPOSED_HFIS index value; null if FAILED.
+index_timeseries.csv,index_class,str,-,Favourable | Acceptable | Degraded | Critical; null if FAILED.
+index_timeseries.csv,dominant_component,str,-,"Single, deterministically-chosen dominant adverse component (A/V/M) from the priority hierarchy; null if FAILED or no rule fired."
+index_timeseries.csv,co_dominant_components,str,-,Semicolon-joined component(s) tied for dominance (includes dominant_component); length 1 unless a documented tie survived every step.
+index_timeseries.csv,worst_component_class,str,-,Highest-severity class reached by any available component's own dominant class.
+index_timeseries.csv,largest_component_score,float,0-100,max(component crisp scores) among available components.
+index_timeseries.csv,dominance_reason,str,-,Which step of the priority hierarchy resolved dominant_component (see fuzzy_engine.determine_dominance).
+index_timeseries.csv,rule_level_contributors,str,-,Diagnostic only: semicolon-joined component(s) that bound the min() in fired rules -- NOT the dominant adverse component.
+index_timeseries.csv,n_rules_fired,int,count,Number of Mamdani rules with nonzero firing strength.
+component_scores_timeseries.csv,computed_ts,datetime,UTC timestamp,Instant the component was computed for.
+component_scores_timeseries.csv,window_minutes,int,minutes,Aggregation window size used.
+component_scores_timeseries.csv,component,str,-,A (aerosol) | V (ventilation) | M (microclimate).
+component_scores_timeseries.csv,available,bool,-,Whether this component had sufficient coverage to be computed.
+component_scores_timeseries.csv,crisp_score,float,0-100,Centroid crisp score on the same scale as the final index; null if unavailable.
+component_scores_timeseries.csv,membership_favorable,float,0-1,Degree of membership in Favourable.
+component_scores_timeseries.csv,membership_acceptable,float,0-1,Degree of membership in Acceptable.
+component_scores_timeseries.csv,membership_degraded,float,0-1,Degree of membership in Degraded.
+component_scores_timeseries.csv,membership_critical,float,0-1,Degree of membership in Critical.
+component_scores_timeseries.csv,room,str,-,Room profile used for the microclimate component (temperature range selection).
+component_scores_timeseries.csv,season,str,-,Season profile used (cold_period | warm_period).
+method_comparison.csv,computed_ts,datetime,UTC timestamp,Instant compared across all four methods.
+method_comparison.csv,proposed_status,str,-,PROPOSED_HFIS completeness status.
+method_comparison.csv,proposed_index_value,float,0-100,PROPOSED_HFIS index value.
+method_comparison.csv,proposed_index_class,str,-,PROPOSED_HFIS index class.
+method_comparison.csv,crisp_max_index_value,float,0-100,FUZZY_COMPONENT_MAX baseline index value.
+method_comparison.csv,crisp_max_index_class,str,-,FUZZY_COMPONENT_MAX baseline index class.
+method_comparison.csv,crisp_class_max_index_value,float,0-100,CRISP_CLASS_MAX baseline index value (genuinely hard/discontinuous).
+method_comparison.csv,crisp_class_max_index_class,str,-,CRISP_CLASS_MAX baseline index class.
+method_comparison.csv,weighted_mean_index_value,float,0-100,WEIGHTED_MEAN baseline index value.
+method_comparison.csv,weighted_mean_index_class,str,-,WEIGHTED_MEAN baseline index class.
+data_quality_summary.csv,computed_ts,datetime,UTC timestamp,Window this coverage figure applies to.
+data_quality_summary.csv,window_minutes,int,minutes,Aggregation window size.
+data_quality_summary.csv,channel,str,-,pm2_5 | pm10 | co2 | temperature | humidity.
+data_quality_summary.csv,n_expected,int,count,Expected samples in the window at the configured cadence.
+data_quality_summary.csv,n_usable,int,count,VALID + confirmed-SUSPECT samples.
+data_quality_summary.csv,coverage_ratio,float,0-1,n_usable / n_expected.
+data_quality_summary.csv,coverage_ok,bool,-,coverage_ratio >= configured min_ratio.
+data_quality_summary.csv,weighted_mean,float,channel units,Time-weighted mean; null if coverage_ok is false.
+reason_code_frequency.csv,reason_code,str,-,single_spike | stuck_value | data_loss | gradual_drift | out_of_range.
+reason_code_frequency.csv,count,int,count,Number of observation_quality rows carrying this reason code.
+stability_samples.csv,sample_id,str,-,Unique identifier for this sampled computed_ts.
+stability_samples.csv,computed_ts,datetime,UTC timestamp,The sampled instant.
+stability_samples.csv,selection_reason,str,-,boundary_adjacent | random_comparison.
+stability_samples.csv,boundary_channel,str,-,Channel whose boundary this sample is nearest to (boundary_adjacent samples only).
+stability_samples.csv,baseline_class_hfis,str,-,Unperturbed PROPOSED_HFIS class at this sample.
+stability_samples.csv,baseline_index_hfis,float,0-100,Unperturbed PROPOSED_HFIS index value.
+stability_samples.csv,baseline_class_crisp_max,str,-,Unperturbed FUZZY_COMPONENT_MAX class.
+stability_samples.csv,baseline_index_crisp_max,float,0-100,Unperturbed FUZZY_COMPONENT_MAX index value.
+stability_samples.csv,baseline_class_crisp_class_max,str,-,Unperturbed CRISP_CLASS_MAX class.
+stability_samples.csv,baseline_index_crisp_class_max,float,0-100,Unperturbed CRISP_CLASS_MAX index value.
+stability_samples.csv,baseline_class_weighted_mean,str,-,Unperturbed WEIGHTED_MEAN class.
+stability_samples.csv,baseline_index_weighted_mean,float,0-100,Unperturbed WEIGHTED_MEAN index value.
+stability_trials.csv,sample_id,str,-,Which sampled computed_ts this trial belongs to.
+stability_trials.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+stability_trials.csv,trial_index,int,-,0-based perturbation trial number within this sample/method.
+stability_trials.csv,trial_class,str,-,Index class recomputed after perturbing every available channel within its declared uncertainty.
+stability_trials.csv,trial_index_value,float,0-100,Index value for this trial.
+stability_trials.csv,changed_from_baseline,bool,-,Whether this trial's class differs from this sample/method's own baseline class.
+stability_trials.csv,abs_index_change,float,index points,Absolute difference between this trial's index value and the baseline.
+stability_by_point.csv,sample_id,str,-,Sampled computed_ts identifier.
+stability_by_point.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+stability_by_point.csv,selection_reason,str,-,boundary_adjacent | random_comparison.
+stability_by_point.csv,boundary_channel,str,-,Channel whose boundary this point is nearest to (boundary_adjacent only).
+stability_by_point.csv,original_class,str,-,This method's own unperturbed (baseline) class at this point.
+stability_by_point.csv,n_samples,int,count,Number of distinct sampled computed_ts points contributing to this row.
+stability_by_point.csv,n_trials_total,int,count,Total perturbation trials across the contributing points.
+stability_by_point.csv,n_class_changes,int,count,Trials whose class differed from that point/method's own baseline.
+stability_by_point.csv,class_change_rate,float,0-1,n_class_changes / n_trials_total.
+stability_by_point.csv,class_change_rate_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_by_point.csv,class_change_rate_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_by_point.csv,mean_abs_index_change,float,index points,Mean absolute index change across trials.
+stability_by_point.csv,median_abs_index_change,float,index points,Median absolute index change.
+stability_by_point.csv,p95_abs_index_change,float,index points,95th percentile absolute index change.
+stability_by_point.csv,max_abs_index_change,float,index points,Maximum absolute index change observed.
+stability_by_point.csv,n_comparable_for_direction,int,count,Trials with both a defined trial class and baseline class (denominator for the better/worse probabilities).
+stability_by_point.csv,n_moved_better,int,count,Trials whose class had strictly lower severity (CLASS_SEVERITY) than the baseline.
+stability_by_point.csv,n_moved_worse,int,count,Trials whose class had strictly higher severity than the baseline.
+stability_by_point.csv,prob_moved_better,float,0-1,n_moved_better / n_comparable_for_direction.
+stability_by_point.csv,prob_moved_worse,float,0-1,n_moved_worse / n_comparable_for_direction.
+stability_by_point.csv,prob_moved_better_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_by_point.csv,prob_moved_better_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_by_point.csv,prob_moved_worse_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_by_point.csv,prob_moved_worse_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+stability_summary.csv,n_samples,int,count,Number of distinct sampled computed_ts points contributing to this row.
+stability_summary.csv,n_trials_total,int,count,Total perturbation trials across the contributing points.
+stability_summary.csv,n_class_changes,int,count,Trials whose class differed from that point/method's own baseline.
+stability_summary.csv,class_change_rate,float,0-1,n_class_changes / n_trials_total.
+stability_summary.csv,class_change_rate_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary.csv,class_change_rate_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary.csv,mean_abs_index_change,float,index points,Mean absolute index change across trials.
+stability_summary.csv,median_abs_index_change,float,index points,Median absolute index change.
+stability_summary.csv,p95_abs_index_change,float,index points,95th percentile absolute index change.
+stability_summary.csv,max_abs_index_change,float,index points,Maximum absolute index change observed.
+stability_summary.csv,n_comparable_for_direction,int,count,Trials with both a defined trial class and baseline class (denominator for the better/worse probabilities).
+stability_summary.csv,n_moved_better,int,count,Trials whose class had strictly lower severity (CLASS_SEVERITY) than the baseline.
+stability_summary.csv,n_moved_worse,int,count,Trials whose class had strictly higher severity than the baseline.
+stability_summary.csv,prob_moved_better,float,0-1,n_moved_better / n_comparable_for_direction.
+stability_summary.csv,prob_moved_worse,float,0-1,n_moved_worse / n_comparable_for_direction.
+stability_summary.csv,prob_moved_better_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary.csv,prob_moved_better_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary.csv,prob_moved_worse_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary.csv,prob_moved_worse_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary_by_variable.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+stability_summary_by_variable.csv,selection_reason,str,-,boundary_adjacent | random_comparison.
+stability_summary_by_variable.csv,boundary_channel,str,-,Channel whose boundary these points are nearest to (null for random_comparison).
+stability_summary_by_variable.csv,n_samples,int,count,Number of distinct sampled computed_ts points contributing to this row.
+stability_summary_by_variable.csv,n_trials_total,int,count,Total perturbation trials across the contributing points.
+stability_summary_by_variable.csv,n_class_changes,int,count,Trials whose class differed from that point/method's own baseline.
+stability_summary_by_variable.csv,class_change_rate,float,0-1,n_class_changes / n_trials_total.
+stability_summary_by_variable.csv,class_change_rate_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary_by_variable.csv,class_change_rate_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary_by_variable.csv,mean_abs_index_change,float,index points,Mean absolute index change across trials.
+stability_summary_by_variable.csv,median_abs_index_change,float,index points,Median absolute index change.
+stability_summary_by_variable.csv,p95_abs_index_change,float,index points,95th percentile absolute index change.
+stability_summary_by_variable.csv,max_abs_index_change,float,index points,Maximum absolute index change observed.
+stability_summary_by_variable.csv,n_comparable_for_direction,int,count,Trials with both a defined trial class and baseline class (denominator for the better/worse probabilities).
+stability_summary_by_variable.csv,n_moved_better,int,count,Trials whose class had strictly lower severity (CLASS_SEVERITY) than the baseline.
+stability_summary_by_variable.csv,n_moved_worse,int,count,Trials whose class had strictly higher severity than the baseline.
+stability_summary_by_variable.csv,prob_moved_better,float,0-1,n_moved_better / n_comparable_for_direction.
+stability_summary_by_variable.csv,prob_moved_worse,float,0-1,n_moved_worse / n_comparable_for_direction.
+stability_summary_by_variable.csv,prob_moved_better_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary_by_variable.csv,prob_moved_better_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary_by_variable.csv,prob_moved_worse_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary_by_variable.csv,prob_moved_worse_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary_by_original_class.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+stability_summary_by_original_class.csv,original_class,str,-,This method's own unperturbed (baseline) class -- does stability depend on where a point started?
+stability_summary_by_original_class.csv,n_samples,int,count,Number of distinct sampled computed_ts points contributing to this row.
+stability_summary_by_original_class.csv,n_trials_total,int,count,Total perturbation trials across the contributing points.
+stability_summary_by_original_class.csv,n_class_changes,int,count,Trials whose class differed from that point/method's own baseline.
+stability_summary_by_original_class.csv,class_change_rate,float,0-1,n_class_changes / n_trials_total.
+stability_summary_by_original_class.csv,class_change_rate_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary_by_original_class.csv,class_change_rate_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary_by_original_class.csv,mean_abs_index_change,float,index points,Mean absolute index change across trials.
+stability_summary_by_original_class.csv,median_abs_index_change,float,index points,Median absolute index change.
+stability_summary_by_original_class.csv,p95_abs_index_change,float,index points,95th percentile absolute index change.
+stability_summary_by_original_class.csv,max_abs_index_change,float,index points,Maximum absolute index change observed.
+stability_summary_by_original_class.csv,n_comparable_for_direction,int,count,Trials with both a defined trial class and baseline class (denominator for the better/worse probabilities).
+stability_summary_by_original_class.csv,n_moved_better,int,count,Trials whose class had strictly lower severity (CLASS_SEVERITY) than the baseline.
+stability_summary_by_original_class.csv,n_moved_worse,int,count,Trials whose class had strictly higher severity than the baseline.
+stability_summary_by_original_class.csv,prob_moved_better,float,0-1,n_moved_better / n_comparable_for_direction.
+stability_summary_by_original_class.csv,prob_moved_worse,float,0-1,n_moved_worse / n_comparable_for_direction.
+stability_summary_by_original_class.csv,prob_moved_better_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary_by_original_class.csv,prob_moved_better_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+stability_summary_by_original_class.csv,prob_moved_worse_ci95_low,float,0-1,95% Wilson score confidence interval lower bound.
+stability_summary_by_original_class.csv,prob_moved_worse_ci95_high,float,0-1,95% Wilson score confidence interval upper bound.
+sensitivity_window_by_point.csv,sample_id,str,-,Sampled computed_ts identifier.
+sensitivity_window_by_point.csv,computed_ts,datetime,UTC timestamp,The sampled instant.
+sensitivity_window_by_point.csv,stratum,str,-,Which stratification group this sample was drawn from.
+sensitivity_window_by_point.csv,reference_completeness_status,str,-,Completeness status at the configured (15-minute) window.
+sensitivity_window_by_point.csv,reference_index_class,str,-,Index class at the configured (15-minute) window.
+sensitivity_window_by_point.csv,reference_index_value,float,0-100,Index value at the configured (15-minute) window; null if not OK.
+sensitivity_window_by_point.csv,value,int,minutes,"Window size tested (manuscript-specified: 5, 15, 30, 60)."
+sensitivity_window_by_point.csv,completeness_status,str,-,OK | PARTIAL | FAILED at this window size.
+sensitivity_window_by_point.csv,index_value,float,0-100,Index value at this window size; null if FAILED.
+sensitivity_window_by_point.csv,index_class,str,-,Index class at this window size; null if FAILED.
+sensitivity_window_summary.csv,varied_parameter,str,-,Always 'window_minutes' in this file.
+sensitivity_window_summary.csv,value,int,minutes,Window size tested.
+sensitivity_window_summary.csv,n_eligible,int,count,Sampled points selected for this window size (denominator before availability filtering).
+sensitivity_window_summary.csv,n_evaluated,int,count,"Of those, how many produced a non-null completeness_status (the sweep actually ran)."
+sensitivity_window_summary.csv,n_unavailable,int,count,n_eligible - n_evaluated.
+sensitivity_window_summary.csv,n_valid_comparisons,int,count,"Of the evaluated points, how many had both a swept and reference index_value (denominator for the index-difference statistics)."
+sensitivity_window_summary.csv,n_samples,int,count,"Alias of n_eligible, kept for backward-compatible column naming."
+sensitivity_window_summary.csv,n_status_transitions,int,count,Evaluated samples whose completeness status differed from the reference.
+sensitivity_window_summary.csv,n_class_transitions,int,count,Evaluated samples whose index class differed from the reference.
+sensitivity_window_summary.csv,n_agreement,int,count,n_evaluated - n_class_transitions.
+sensitivity_window_summary.csv,class_agreement_with_reference,float,0-1,n_agreement / n_evaluated; null if n_evaluated is 0.
+sensitivity_window_summary.csv,mean_abs_index_diff,float,index points,"Mean absolute index difference from the reference, over n_valid_comparisons."
+sensitivity_window_summary.csv,median_abs_index_diff,float,index points,Median absolute index difference from the reference.
+sensitivity_window_summary.csv,p95_abs_index_diff,float,index points,95th percentile absolute index difference from the reference.
+sensitivity_window_summary.csv,max_abs_index_diff,float,index points,Maximum absolute index difference from the reference.
+sensitivity_coverage_by_point.csv,sample_id,str,-,Sampled computed_ts identifier.
+sensitivity_coverage_by_point.csv,computed_ts,datetime,UTC timestamp,The sampled instant.
+sensitivity_coverage_by_point.csv,stratum,str,-,Which stratification group this sample was drawn from.
+sensitivity_coverage_by_point.csv,reference_completeness_status,str,-,Completeness status at the configured coverage threshold.
+sensitivity_coverage_by_point.csv,reference_index_class,str,-,Index class at the configured coverage threshold.
+sensitivity_coverage_by_point.csv,reference_index_value,float,0-100,Index value at the configured coverage threshold; null if not OK.
+sensitivity_coverage_by_point.csv,value,float,0-1,"Coverage threshold tested (manuscript-specified: 0.70, 0.80, 0.90)."
+sensitivity_coverage_by_point.csv,completeness_status,str,-,OK | PARTIAL | FAILED at this threshold.
+sensitivity_coverage_by_point.csv,index_value,float,0-100,Index value at this threshold; null if FAILED.
+sensitivity_coverage_by_point.csv,index_class,str,-,Index class at this threshold; null if FAILED.
+sensitivity_coverage_summary.csv,varied_parameter,str,-,Always 'coverage_threshold' in this file.
+sensitivity_coverage_summary.csv,value,float,0-1,Coverage threshold tested.
+sensitivity_coverage_summary.csv,n_eligible,int,count,Sampled points selected for this threshold (denominator before availability filtering).
+sensitivity_coverage_summary.csv,n_evaluated,int,count,"Of those, how many produced a non-null completeness_status (the sweep actually ran)."
+sensitivity_coverage_summary.csv,n_unavailable,int,count,n_eligible - n_evaluated.
+sensitivity_coverage_summary.csv,n_valid_comparisons,int,count,"Of the evaluated points, how many had both a swept and reference index_value (denominator for the index-difference statistics)."
+sensitivity_coverage_summary.csv,n_samples,int,count,"Alias of n_eligible, kept for backward-compatible column naming."
+sensitivity_coverage_summary.csv,n_status_transitions,int,count,Evaluated samples whose completeness status differed from the reference.
+sensitivity_coverage_summary.csv,n_class_transitions,int,count,Evaluated samples whose index class differed from the reference.
+sensitivity_coverage_summary.csv,n_agreement,int,count,n_evaluated - n_class_transitions.
+sensitivity_coverage_summary.csv,class_agreement_with_reference,float,0-1,n_agreement / n_evaluated; null if n_evaluated is 0.
+sensitivity_coverage_summary.csv,mean_abs_index_diff,float,index points,"Mean absolute index difference from the reference, over n_valid_comparisons."
+sensitivity_coverage_summary.csv,median_abs_index_diff,float,index points,Median absolute index difference from the reference.
+sensitivity_coverage_summary.csv,p95_abs_index_diff,float,index points,95th percentile absolute index difference from the reference.
+sensitivity_coverage_summary.csv,max_abs_index_diff,float,index points,Maximum absolute index difference from the reference.
+masking_summary.csv,method,str,-,FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+masking_summary.csv,severity_threshold,str,-,Severity a component must reach to count as 'hidden' if the baseline doesn't also reach it.
+masking_summary.csv,n_critical_events,int,count,Computed_ts where at least one component reached severity_threshold.
+masking_summary.csv,n_masked,int,count,"Of those, how many the baseline's aggregated class did not also reach."
+masking_summary.csv,masking_rate,float,0-1,"n_masked / n_critical_events; null if n_critical_events is 0 (nothing to mask, not a fabricated 0)."
+reference_case_consistency.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+reference_case_consistency.csv,n,int,count,"Synthetic, pre-labeled boundary-adjacent reference cases scored."
+reference_case_consistency.csv,n_excluded,int,count,Cases excluded for lack of a predicted class (e.g. FAILED).
+reference_case_consistency.csv,macro_f1,float,0-1,"Unweighted mean per-class F1 against the predefined synthetic labels -- consistency, NOT empirical accuracy."
+reference_case_consistency.csv,cohens_kappa,float,-1 to 1,"Cohen's kappa against the predefined synthetic labels -- consistency, NOT empirical accuracy."
+outdoor_context_timeseries.csv,computed_ts,datetime,UTC timestamp,Instant the outdoor context was fetched for.
+outdoor_context_timeseries.csv,outdoor_forecast_time,datetime,UTC timestamp,"Timestamp of the outdoor observation actually used (as-of, never future)."
+outdoor_context_timeseries.csv,age_minutes,float,minutes,computed_ts minus outdoor_forecast_time.
+outdoor_context_timeseries.csv,is_stale,bool,-,age_minutes exceeds the configured staleness threshold.
+outdoor_context_timeseries.csv,pm2_5,float,ug/m3,"Outdoor PM2.5 (context only, never a direct index input)."
+outdoor_context_timeseries.csv,pm10,float,ug/m3,Outdoor PM10 (context only).
+outdoor_context_timeseries.csv,temperature_2m,float,degC,Outdoor temperature at 2m (context only).
+continuity_grid.csv,boundary_id,str,-,Identifier for the control-region boundary under test (channel + breakpoint).
+continuity_grid.csv,channel,str,-,pm2_5 | pm10 | co2 | temperature | humidity.
+continuity_grid.csv,context,str,-,"favourable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."
+continuity_grid.csv,boundary_value,float,channel units,The control-region breakpoint this grid straddles.
+continuity_grid.csv,grid_index,int,-,0-based position within the dense input grid.
+continuity_grid.csv,input_value,float,channel units,The perturbed channel's value at this grid point.
+continuity_grid.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+continuity_grid.csv,index_value,float,0-100,Index value at this grid point.
+continuity_grid.csv,index_class,str,-,Index class at this grid point.
+continuity_summary.csv,boundary_id,str,-,Identifier for the control-region boundary under test.
+continuity_summary.csv,channel,str,-,pm2_5 | pm10 | co2 | temperature | humidity.
+continuity_summary.csv,context,str,-,"favourable | acceptable | degraded -- severity of the OTHER, non-swept channels for this sweep."
+continuity_summary.csv,method,str,-,PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN.
+continuity_summary.csv,max_adjacent_jump,float,index points,Largest index-value change between adjacent grid points.
+continuity_summary.csv,mean_adjacent_jump,float,index points,Mean index-value change between adjacent grid points.
+continuity_summary.csv,median_adjacent_jump,float,index points,Median index-value change between adjacent grid points.
+continuity_summary.csv,p95_adjacent_jump,float,index points,95th percentile index-value change between adjacent grid points.
+continuity_summary.csv,total_variation,float,index points,Sum of absolute adjacent index-value changes across the whole grid.
+continuity_summary.csv,local_lipschitz_ratio,float,index points / channel unit,max(|delta index| / |delta input|) between adjacent grid points -- the discrete-grid Lipschitz constant.
+continuity_summary.csv,n_class_transitions,int,count,Number of grid points where the index class changed from the previous point.
+continuity_summary.csv,class_transition_positions,str,-,Semicolon-joined input_values where a class transition occurred.
+continuity_summary.csv,index_range,float,index points,max(index_value) - min(index_value) across the grid.
+continuity_summary.csv,monotonicity_violations,int,count,Adjacent-point decreases for a monotonic (higher-is-worse) pollutant channel.
+continuity_summary.csv,masked_by_favorable,bool,-,Whether a favourable component prevented the adverse channel from dominating the aggregated result.
+continuity_summary.csv,area_between_curves_vs_crisp_max,float,index points x channel units,Trapezoidal integral of |PROPOSED_HFIS - FUZZY_COMPONENT_MAX| over the swept input; only populated for method=PROPOSED_HFIS.
+multi_component_grid.csv,a,float,0-100,Aerosol (A) component crisp score at this grid point.
+multi_component_grid.csv,v,float,0-100,Ventilation (V) component crisp score at this grid point.
+multi_component_grid.csv,m,float,0-100,Microclimate (M) component crisp score at this grid point.
+multi_component_grid.csv,hfis_index_value,float,0-100,"PROPOSED_HFIS index value for this (A, V, M) triple."
+multi_component_grid.csv,hfis_index_class,str,-,PROPOSED_HFIS index class.
+multi_component_grid.csv,fuzzy_component_max_index_value,float,0-100,FUZZY_COMPONENT_MAX index value.
+multi_component_grid.csv,fuzzy_component_max_index_class,str,-,FUZZY_COMPONENT_MAX index class.
+multi_component_grid.csv,crisp_class_max_index_value,float,0-100,CRISP_CLASS_MAX index value.
+multi_component_grid.csv,crisp_class_max_index_class,str,-,CRISP_CLASS_MAX index class.
+multi_component_grid.csv,weighted_mean_index_value,float,0-100,WEIGHTED_MEAN index value.
+multi_component_grid.csv,weighted_mean_index_class,str,-,WEIGHTED_MEAN index class.
+multi_component_grid_summary.csv,method_a,str,-,First method of this pairwise comparison.
+multi_component_grid_summary.csv,method_b,str,-,Second method of this pairwise comparison.
+multi_component_grid_summary.csv,n_points,int,count,Grid points where both methods produced a defined index value.
+multi_component_grid_summary.csv,mean_abs_diff,float,index points,Mean |method_a - method_b| across the grid.
+multi_component_grid_summary.csv,median_abs_diff,float,index points,Median |method_a - method_b|.
+multi_component_grid_summary.csv,p95_abs_diff,float,index points,95th percentile |method_a - method_b|.
+multi_component_grid_summary.csv,max_abs_diff,float,index points,Maximum |method_a - method_b| observed.
+multi_component_grid_summary.csv,mean_signed_diff,float,index points,Mean(method_a - method_b); sign shows which method scores systematically higher.
+multi_component_grid_summary.csv,class_agreement_rate,float,0-1,Fraction of grid points where both methods gave the same index class.
+multi_component_grid_summary.csv,n_class_disagreements,int,count,Grid points where the two methods' classes differed.
+fault_injection_events.csv,scenario_id,str,-,Synthetic scenario identifier.
+fault_injection_events.csv,dataset_split,str,-,"calibration | validation -- disjoint scenario sets, no data leakage between them."
+fault_injection_events.csv,channel,str,-,Channel the fault was injected into.
+fault_injection_events.csv,fault_type,str,-,single_spike | stuck_value | data_loss | gradual_drift | out_of_range.
+fault_injection_events.csv,injected_at_index,int,-,0-based sample index within the scenario where the fault begins.
+fault_injection_events.csv,duration_samples,int,count,Number of consecutive samples the fault spans.
+fault_injection_events.csv,description,str,-,Human-readable description of the injected fault.
+fault_detection_predictions.csv,scenario_id,str,-,Synthetic scenario identifier.
+fault_detection_predictions.csv,dataset_split,str,-,calibration | validation.
+fault_detection_predictions.csv,channel,str,-,Channel under test.
+fault_detection_predictions.csv,sample_index,int,-,0-based sample index within the scenario.
+fault_detection_predictions.csv,true_fault_type,str,-,"Injected fault type at this sample, or null if genuinely clean."
+fault_detection_predictions.csv,predicted_reason_codes,str,-,Semicolon-joined reason codes the quality layer actually assigned.
+fault_detection_predictions.csv,stage2_state,str,-,VALID | SUSPECT | INVALID | MISSING assigned by the quality layer.
+fault_detection_predictions.csv,usable,bool,-,Whether the quality layer counted this sample toward coverage.
+fault_detection_metrics.csv,dataset_split,str,-,"calibration | validation -- validation is the headline, publication-facing split."
+fault_detection_metrics.csv,reason_code,str,-,single_spike | stuck_value | data_loss | gradual_drift | out_of_range.
+fault_detection_metrics.csv,tp,int,count,Row-level true positives (every affected sample counted individually).
+fault_detection_metrics.csv,fp,int,count,Row-level false positives.
+fault_detection_metrics.csv,fn,int,count,Row-level false negatives.
+fault_detection_metrics.csv,tn,int,count,Row-level true negatives.
+fault_detection_metrics.csv,precision,float,0-1,tp / (tp + fp).
+fault_detection_metrics.csv,recall,float,0-1,tp / (tp + fn).
+fault_detection_metrics.csv,f1,float,0-1,Harmonic mean of precision and recall.
+fault_detection_metrics.csv,specificity,float,0-1,tn / (tn + fp).
+fault_detection_metrics.csv,false_positive_rate,float,0-1,fp / (fp + tn); 1 - specificity.
+fault_detection_metrics.csv,mean_detection_delay,float,samples,"Mean number of samples between fault onset and first detection, for sequential faults."
+fault_detection_event_metrics.csv,dataset_split,str,-,"calibration | validation -- validation is the headline, publication-facing split."
+fault_detection_event_metrics.csv,reason_code,str,-,single_spike | stuck_value | data_loss | gradual_drift | out_of_range.
+fault_detection_event_metrics.csv,temporal_tolerance_samples,int,samples,Matching tolerance used: a predicted detection interval and a true event match if they overlap or are within this many samples.
+fault_detection_event_metrics.csv,n_true_events,int,count,Injected faults of this type in this split.
+fault_detection_event_metrics.csv,n_predicted_events,int,count,"Predicted detection intervals of this type (contiguous runs of flagged samples, merged within tolerance) in this split."
+fault_detection_event_metrics.csv,tp,int,count,Event-level true positives (one-to-one matched).
+fault_detection_event_metrics.csv,fp,int,count,Predicted events with no matching true event.
+fault_detection_event_metrics.csv,fn,int,count,True events with no matching predicted event.
+fault_detection_event_metrics.csv,precision,float,0-1,tp / (tp + fp).
+fault_detection_event_metrics.csv,recall,float,0-1,tp / (tp + fn).
+fault_detection_event_metrics.csv,f1,float,0-1,Harmonic mean of precision and recall.
+fault_detection_event_metrics.csv,mean_detection_delay,float,samples,"Mean (matched predicted interval start - true event start), across true positives."
+fault_detection_confusion_matrix.csv,dataset_split,str,-,calibration | validation.
+fault_detection_confusion_matrix.csv,true_label,str,-,"The sample's true fault type, or 'none' if genuinely clean/a genuine_event."
+fault_detection_confusion_matrix.csv,predicted_label,str,-,"A reason code actually predicted for that sample, or 'none' if it carried zero."
+fault_detection_confusion_matrix.csv,count,int,count,"Number of samples with this (true_label, predicted_label) pair."
+hampel_calibration.csv,dataset_split,str,-,calibration | validation.
+hampel_calibration.csv,window_size,int,samples,Hampel filter window size tested.
+hampel_calibration.csv,mad_multiplier,float,-,Hampel filter MAD multiplier tested.
+hampel_calibration.csv,fault_recall,float,0-1,Recall for single_spike detection on this split.
+hampel_calibration.csv,genuine_event_preservation_rate,float,0-1,Fraction of genuine rapid environmental events not falsely flagged.
+hampel_calibration.csv,objective_score,float,-,Balanced objective combining fault_recall and genuine_event_preservation_rate.
+hampel_calibration.csv,selected,bool,-,Whether this configuration was the one selected from calibration results.

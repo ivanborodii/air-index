@@ -1,0 +1,97 @@
+# config/room_profiles.yaml
+# Room/season temperature control regions.
+# Source, verified directly against the standard (not secondhand): ДБН
+# В.2.5-67:2013, Додаток Д (mandatory), Таблиця Д.4 "Діапазони результуючої
+# температури приміщення для опалення та охолодження", p.100.
+# Table Д.4 gives four category levels per row (Підвищені оптимальні /
+# Оптимальні / Допустимі, plus everything outside Допустимі = Critical) and
+# two period columns (опалювальний/холодний = heating/cold_period,
+# охолодження/теплий = cooling/warm_period). Only two of its residential
+# rows are used here -- see per-profile notes below for the row and exact
+# figures each profile maps to.
+#
+# Any additional room/season combination beyond what's cited to a specific
+# Table Д.4 row MUST be marked provisional: true until confirmed.
+# profiles.select_room_season() fails loudly (lists available profiles)
+# rather than silently falling back when a requested combination is missing.
+profiles:
+  - room: kitchen
+    season: cold_period
+    # CONFIRMED: Table Д.4 row "Житлові будівлі: інші об'єми (кухня,
+    # гардеробна, комора тощо)" (standing/walking, ~1.5 met), heating-period
+    # column: Підвищені оптимальні 19.5+/-1.5degC, Оптимальні 19.5+/-3.0degC,
+    # Допустимі 19.5+/-4.0degC. Mapped: Favourable=enhanced-optimal band,
+    # Acceptable=out to optimal band edge, Degraded=out to permissible band
+    # edge, Critical=beyond permissible.
+    provisional: false
+    ranges:
+      favourable: [18.0, 21.0]        # 19.5 +/- 1.5 (Підвищені оптимальні)
+      acceptable_low: [16.5, 18.0]
+      acceptable_high: [21.0, 22.5]  # outer edge = 19.5 +/- 3.0 (Оптимальні)
+      degraded_low: [15.5, 16.5]
+      degraded_high: [22.5, 23.5]    # outer edge = 19.5 +/- 4.0 (Допустимі)
+      critical_low_max: 15.5
+      critical_high_min: 23.5
+      transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
+  - room: general_residential
+    season: warm_period
+    # CONFIRMED: Table Д.4 row "Житлові будівлі: житлові об'єми (спальна
+    # кімната, вітальня, кабінет, кухня-їдальня тощо)" (sitting, ~1.2 met),
+    # cooling/warm-period column: Підвищені оптимальні 24.5+/-1.0degC,
+    # Оптимальні 24.5+/-1.5degC, Допустимі 24.5+/-2.5degC. NOTE this row is
+    # "кухня-їдальня" -- an open-plan kitchen combined with dining/living
+    # space -- not a standalone enclosed kitchen (see kitchen/warm_period
+    # below for that distinction).
+    provisional: false
+    ranges:
+      favourable: [23.5, 25.5]        # 24.5 +/- 1.0 (Підвищені оптимальні)
+      acceptable_low: [23.0, 23.5]
+      acceptable_high: [25.5, 26.0]  # outer edge = 24.5 +/- 1.5 (Оптимальні)
+      degraded_low: [22.0, 23.0]
+      degraded_high: [26.0, 27.0]    # outer edge = 24.5 +/- 2.5 (Допустимі)
+      critical_low_max: 22.0
+      critical_high_min: 27.0
+      transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
+  - room: kitchen
+    season: warm_period
+    # CONFIRMED via explicit author decision + substitute-standard citation.
+    # DBN B.2.5-67:2013 Table Д.4's standalone-kitchen row ("інші об'єми:
+    # кухня, гардеробна, комора тощо") has a literal dash ("--") in the
+    # cooling/warm-period column -- DBN itself defines no value here. Author
+    # decision: rather than leave the microclimate (M) component undefined
+    # for this deployment's real (all warm-period) data, this profile is
+    # sourced to ДСТУ Б EN 15251:2011 (Ukrainian IDT adoption of EN
+    # 15251:2007 -- the same EN framework DBN B.2.5-67's own table is built
+    # from), Таблиця А.2 / Table A.2 "Examples of recommended design values
+    # of the indoor temperature for design of buildings and HVAC systems",
+    # row "Житлові приміщення: спальні, вітальні, кухні тощо" (residential:
+    # bedrooms, living rooms, KITCHEN named explicitly), sedentary ~1.2 met.
+    # Verified directly against the standard PDF (mathcentre.com.ua-hosted
+    # copy), p.35:
+    #   Category I:   21.0 (heating min) / 25.5 (cooling max)
+    #   Category II:  20.0 / 26.0
+    #   Category III: 18.0 / 27.0
+    # Category I/II/III are nested (I subset of II subset of III), mapped
+    # the same way DBN's Підвищені оптимальні/Оптимальні/Допустимі tiers are
+    # mapped for the two profiles above: I=favourable, out to II=acceptable
+    # edge, out to III=degraded edge, beyond III=critical. NOT a DBN
+    # citation -- this is a different (EN-derived, Ukrainian-adopted)
+    # standard than the cold-period profile above, by deliberate choice, not
+    # oversight.
+    provisional: false
+    ranges:
+      favourable: [21.0, 25.5]        # Category I
+      acceptable_low: [20.0, 21.0]
+      acceptable_high: [25.5, 26.0]  # outer edge = Category II
+      degraded_low: [18.0, 20.0]
+      degraded_high: [26.0, 27.0]    # outer edge = Category III
+      critical_low_max: 18.0
+      critical_high_min: 27.0
+      transition_width: 0.5    # matches sensor_specs.yaml bme_temp.declared_uncertainty (Bosch datasheet, +/-0.5 degC)
+# The real deployed sensor is in a standalone/enclosed kitchen (confirmed by
+# the author, see README.md "Deployment"). The kitchen/warm_period profile
+# above does not reclassify it as a different room -- it stays keyed to
+# room: kitchen, just sourced to a different (DSTU, not DBN) standard for
+# the warm period specifically. general_residential/warm_period's numbers
+# are still never reused for kitchen -- that would misrepresent which row
+# governs the result.

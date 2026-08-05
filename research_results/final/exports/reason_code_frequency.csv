@@ -1,0 +1,6 @@
+reason_code,count
+out_of_range,32637
+single_spike,69325
+stuck_value,15916
+data_loss,2988
+gradual_drift,1779

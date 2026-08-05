@@ -1,0 +1,185 @@
+# config/iaq_hfis.yaml
+# Runtime configuration for the iaq_hfis fuzzy IAQ index pipeline.
+# Paths are relative to the air_ml/ repository root.
+#
+# Values marked PROVISIONAL are not given numerically in the manuscript and
+# must be confirmed by the author before use in the publication. See
+# README.md "Scientific cautions" for the full list.
+
+paths:
+  air_monitor_db_path: "air-monitor/data/air_monitor.duckdb"   # READ-ONLY, owned by the live pipeline
+  weather_db_path: "air-monitor/data/weather.duckdb"           # READ-ONLY
+  derived_db_path: "data/iaq_hfis/iaq_hfis.duckdb"              # owned exclusively by iaq_hfis
+  snapshot_dir: "data/iaq_hfis/snapshots"
+  log_path: "data/iaq_hfis/logs/iaq_hfis.log"
+  run_summary_dir: "data/iaq_hfis/run_summaries"
+
+cadence:
+  sample_cadence_seconds: 30          # manuscript: 30 s collection cycle
+  aggregation_window_minutes: 15      # manuscript: primary operational window
+  allowed_window_minutes: [5, 15, 30, 60]   # manuscript: sensitivity-analysis window set
+  recompute_interval_minutes: 5       # manuscript: index recomputed every 5 min
+  # PROVISIONAL: half the sample cadence. computed_ts has an arbitrary phase
+  # offset from the sensor's own ~30s cadence, so a tolerance below half the
+  # cadence would systematically miss real readings that were never dropped.
+  slot_match_tolerance_seconds: 15.0
+
+coverage:
+  min_ratio: 0.80    # manuscript: rho_i(t) >= 0.80 (24/30 slots passes, 23/30 fails)
+
+hampel:
+  # PROVISIONAL, but now literature-grounded rather than a guess: these are
+  # the exact illustrative-example parameters (K=5 -> 2K+1=11 point window,
+  # t=1) used by Pearson, Neuvo, Astola, Gabbouj, "Generalized Hampel
+  # Filters" (2016) -- the exact paper the manuscript cites for this filter
+  # -- verified 2026-07-24 against its EUSIPCO 2015 conference precursor
+  # (same authors/definition, Sec. 2 and Figs. 3/5). The paper presents
+  # this as a worked example, not a formal general recommendation, so this
+  # remains provisional. Verified empirically against live data: no
+  # completeness/coverage regression vs the prior window=5/t=3 guess.
+  window_size: 11
+  mad_multiplier: 1.0
+
+confirmation:           # PROVISIONAL — tolerances not given numerically in the manuscript
+  pm_cross_channel_tolerance_pct: 20.0
+  # dual-channel T/RH agreement tolerance is NOT configured here -- derived at
+  # runtime as declared_uncertainty(primary) + declared_uncertainty(secondary)
+  # from sensor_specs.yaml (schema.py:dual_channel_tolerance), so it's one
+  # fewer independently-guessed number and can't drift out of sync with the
+  # uncertainty figures used everywhere else.
+  persistence_min_consecutive_samples: 2
+  stuck_value_min_repeats: 5
+  gradual_drift_min_consecutive_steps: 5
+  # cumulative run magnitude must reach this multiple of the channel's declared
+  # sensor uncertainty to count as drift, not just an ordinary smooth trend
+  # (e.g. CO2 falling steadily after ventilation) -- see quality/reasons.py.
+  gradual_drift_magnitude_multiplier: 3.0
+  # DERIVED (2 x actual outdoor fetch cadence): air-monitor/scripts/fetch_weather.py
+  # runs hourly via cron (crontab: "5 * * * *"), so tolerating one missed/delayed
+  # fetch cycle before flagging staleness is 2 x 60 = 120 min. Still a threshold
+  # choice (why 2 cycles and not 1 or 3), but now tied to the real fetch cadence
+  # rather than an arbitrary number.
+  outdoor_context_max_age_minutes: 120.0
+
+schema_mapping:
+  required_raw_columns:
+    - ts
+    - co2_ppm
+    - scd_temp_c
+    - scd_humidity_pct
+    - bme_temp_c
+    - bme_humidity_pct
+    - mass_pm1_0
+    - mass_pm2_5
+    - mass_pm4_0
+    - mass_pm10
+    - number_pm0_5
+    - number_pm1_0
+    - number_pm2_5
+    - number_pm4_0
+    - number_pm10
+    - typical_size_um
+    - sensor_status
+    - scd41_status
+    - bme688_status
+    - sps30_status
+  channels:
+    - canonical_name: pm2_5
+      source_column: mass_pm2_5
+      device_status_column: sps30_status
+    - canonical_name: pm10
+      source_column: mass_pm10
+      device_status_column: sps30_status
+    - canonical_name: co2
+      source_column: co2_ppm
+      device_status_column: scd41_status
+    - canonical_name: temperature
+      source_column: bme_temp_c            # PRIMARY channel — confirmed by author (2026-07-24)
+      secondary_column: scd_temp_c          # used only for dual-channel confirmation
+      device_status_column: bme688_status
+    - canonical_name: humidity
+      source_column: bme_humidity_pct       # PRIMARY channel — confirmed by author (2026-07-24)
+      secondary_column: scd_humidity_pct
+      device_status_column: bme688_status
+
+# Maps raw_observations device status flags to the 4 quality states.
+# 'partial' maps to VALID here because it is a per-cycle sensor_status summary,
+# not a per-channel flag; the per-channel technical-range/numeric checks in
+# quality/hard_checks.py are what actually catch bad individual readings.
+device_status_state_map:
+  ok: VALID
+  partial: VALID
+  failed: INVALID
+  disabled: MISSING
+  data_not_ready: MISSING
+
+membership:
+  output_transition_width: 2.0    # PROVISIONAL, index points, straddling 25/50/75
+  overlap_width_policy: reject     # "reject" | "auto_expand"
+
+deployment:
+  # Explicit, author-attested evidence for the physical room -- never
+  # inferred from sensor readings or from wanting a particular DBN profile
+  # to exist. See room_profiles.yaml for why this fact matters: it rules
+  # out treating this deployment as a kitchen-dining/general-residential
+  # space just to obtain a warm-period temperature profile.
+  room_type: kitchen
+  room_type_evidence: "Confirmed by the author: the sensor is deployed in a standalone/enclosed kitchen, not an open-plan kitchen-dining or living space (see README.md 'Deployment')."
+  season_source: timestamp
+
+profile_selection:
+  # room: kitchen matches the real deployment (manuscript: sensor is in the
+  # kitchen). kitchen/cold_period is the real manuscript/DBN profile.
+  # kitchen/warm_period has no DBN-defined value but is sourced instead to
+  # ДСТУ Б EN 15251:2011 Table A.2, an explicit author decision to use a
+  # substitute standard rather than leave M undefined for this deployment's
+  # real (all warm-period) data (see room_profiles.yaml). A room/season
+  # combination with neither a DBN nor a DSTU value still fails loudly with
+  # TEMPERATURE_PROFILE_NOT_DEFINED rather than substituting a different
+  # room's numbers.
+  room: kitchen
+  season_month_ranges:             # PROVISIONAL cutover months, not given in the manuscript
+    cold_period: [10, 11, 12, 1, 2, 3]
+    warm_period: [4, 5, 6, 7, 8, 9]
+
+control_regions:
+  # WHO 2021 24h reference points, used here as operational control points
+  # for a 15-min index (NOT a WHO compliance assessment — see README).
+  pm2_5:
+    breakpoints: [15, 25, 50]                 # ug/m3
+    # Matches sensor_specs.yaml pm_mass_fine.declared_uncertainty (SPS30
+    # datasheet, PM1/PM2.5 precision +/-5 ug/m3 -- see sensor_specs.yaml).
+    transition_widths: [5.0, 5.0, 5.0]
+  pm10:
+    breakpoints: [45, 75, 100]                # ug/m3
+    # Matches sensor_specs.yaml pm_mass_coarse.declared_uncertainty (SPS30
+    # datasheet, PM4/PM10 precision +/-25 ug/m3 -- 5x wider than PM1/PM2.5;
+    # was incorrectly using the fine-particle figure here until 2026-07-24).
+    transition_widths: [25.0, 25.0, 25.0]
+  co2:
+    # Operational ventilation scale, NOT a universal toxicity limit (see README).
+    breakpoints: [800, 1000, 1500]            # ppm
+    # Matches sensor_specs.yaml co2.declared_uncertainty (SCD41 datasheet
+    # accuracy at this deployment's typical ~800ppm indoor range).
+    transition_widths: [70.0, 70.0, 70.0]
+  relative_humidity:   # DBN B.2.5-67:2013, %
+    favourable: [30.0, 50.0]
+    acceptable_low: [25.0, 30.0]
+    acceptable_high: [50.0, 60.0]
+    degraded_low: [20.0, 25.0]
+    degraded_high: [60.0, 70.0]
+    critical_low_max: 20.0
+    critical_high_min: 70.0
+    transition_width: 3.0    # PROVISIONAL, matches sensor_specs.yaml bme_humidity.declared_uncertainty
+  output:     # index scale 0-100, boundaries fixed by the method at 25/50/75
+    breakpoints: [25, 50, 75]
+    transition_widths: [2.0, 2.0, 2.0]     # PROVISIONAL
+
+evaluation:
+  stability_seed: 42               # PROVISIONAL: manuscript requires a fixed seed, gives no value
+  stability_n_trials: 30           # PROVISIONAL
+  sensitivity_window_minutes: [5, 15, 30, 60]           # manuscript-specified, not provisional
+  sensitivity_coverage_thresholds: [0.70, 0.80, 0.90]   # only 0.80 is manuscript-specified; 0.70/0.90 are repository evaluation choices (author_defined), not manuscript values
+  masking_severity_threshold: Critical   # PROVISIONAL: which severity counts as "hidden" by aggregation
+
+engine_version: "0.1.0"
