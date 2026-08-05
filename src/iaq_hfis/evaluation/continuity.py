@@ -1,18 +1,19 @@
-"""Boundary continuity experiment: compares PROPOSED-HFIS's smooth Mamdani
-inference against the CRISP-MAX and WEIGHTED-MEAN baselines directly, by
-sweeping a dense input grid across every manuscript control-region boundary.
+"""Boundary continuity experiment: compares PROPOSED_HFIS's smooth Mamdani
+inference against the FUZZY_COMPONENT_MAX, CRISP_CLASS_MAX, and WEIGHTED_MEAN
+baselines directly, by sweeping a dense input grid across every manuscript
+control-region boundary.
 
 Each boundary is swept under THREE separate "other components" contexts --
-``favorable``, ``acceptable``, ``degraded`` -- not just a single
-deeply-favorable baseline. This matters: when every other channel is pinned
-fully Favorable, the 2nd-level Mamdani engine's class-activation vector
+``favourable``, ``acceptable``, ``degraded`` -- not just a single
+deeply-favourable baseline. This matters: when every other channel is pinned
+fully Favourable, the 2nd-level Mamdani engine's class-activation vector
 becomes mathematically identical to the swept channel's own component-level
-class-activation vector (worst-of consequent + Favorable's minimal severity
-rank), so PROPOSED-HFIS and CRISP-MAX are *provably* forced to coincide in
+class-activation vector (worst-of consequent + Favourable's minimal severity
+rank), so PROPOSED_HFIS and FUZZY_COMPONENT_MAX are *provably* forced to coincide in
 that one regime -- see docs/hfis_vs_crispmax_audit.md section 3 for the
 proof. Testing only that regime would make any "HFIS is smoother" claim
 untestable, not merely weak. The acceptable/degraded contexts exercise the
-genuine multi-input rule interaction the favorable-only sweep cannot reach.
+genuine multi-input rule interaction the favourable-only sweep cannot reach.
 
 Every ``room_profiles.yaml`` room/season combination is swept for
 temperature boundaries (not just the run's representative profile), so
@@ -25,10 +26,10 @@ p95 adjacent-point index jump, total variation, a local Lipschitz ratio
 discrete-grid analogue of a Lipschitz constant), class-transition
 count/positions, index range, monotonicity violations (for monotonic
 pollutant channels, a decrease as the input worsens), and whether a
-favorable component masked the adverse channel's own severity in the
-aggregated result. PROPOSED-HFIS rows additionally report the area between
-its own curve and CRISP-MAX's curve (trapezoidal integral of
-|HFIS(x) - CRISP-MAX(x)| over the swept input) -- a single number
+favourable component masked the adverse channel's own severity in the
+aggregated result. PROPOSED_HFIS rows additionally report the area between
+its own curve and FUZZY_COMPONENT_MAX's curve (trapezoidal integral of
+|HFIS(x) - FUZZY_COMPONENT_MAX(x)| over the swept input) -- a single number
 summarizing how much the two methods diverge across the whole boundary
 sweep, not just at isolated points.
 
@@ -42,13 +43,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from iaq_hfis.baselines import crisp_max, weighted_mean
+from iaq_hfis.baselines import crisp_class_max, fuzzy_component_max, weighted_mean
 from iaq_hfis.pipeline import RuntimeContext, infer_from_values
 from iaq_hfis.schema import channel_uncertainty
 
-METHODS = ["PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"]
+METHODS = ["PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN"]
 MONOTONIC_CHANNELS = {"pm2_5", "pm10", "co2"}
-CONTEXTS = ["favorable", "acceptable", "degraded"]
+CONTEXTS = ["favourable", "acceptable", "degraded"]
 
 
 @dataclass(frozen=True)
@@ -90,12 +91,12 @@ class ContinuitySummaryRow:
     index_range: float | None
     monotonicity_violations: int
     masked_by_favorable: bool
-    area_between_curves_vs_crisp_max: float | None  # only populated for method == "PROPOSED-HFIS"
+    area_between_curves_vs_crisp_max: float | None  # only populated for method == "PROPOSED_HFIS"
 
 
 def _monotonic_context_value(breakpoints: list[float], context: str) -> float:
     b0, b1, b2 = breakpoints
-    if context == "favorable":
+    if context == "favourable":
         return b0 / 2.0
     if context == "acceptable":
         return (b0 + b1) / 2.0
@@ -108,8 +109,8 @@ def _two_sided_context_value(ranges, context: str) -> float:
     but fixed and documented choice -- the low/high bands are symmetric in
     how the worst-of rule base treats them, so either side exercises the
     same rule-interaction behavior)."""
-    if context == "favorable":
-        lo, hi = ranges.favorable
+    if context == "favourable":
+        lo, hi = ranges.favourable
     elif context == "acceptable":
         lo, hi = ranges.acceptable_high
     else:
@@ -118,13 +119,18 @@ def _two_sided_context_value(ranges, context: str) -> float:
 
 
 def _context_values(control_regions, room_profile, context: str) -> dict[str, float]:
-    return {
+    """``room_profile`` may be ``None`` (exploratory mode, no DBN profile for
+    this room/season) -- "temperature" is simply omitted from the returned
+    values, never fabricated."""
+    values = {
         "pm2_5": _monotonic_context_value(control_regions.pm2_5.breakpoints, context),
         "pm10": _monotonic_context_value(control_regions.pm10.breakpoints, context),
         "co2": _monotonic_context_value(control_regions.co2.breakpoints, context),
-        "temperature": _two_sided_context_value(room_profile.ranges, context),
         "humidity": _two_sided_context_value(control_regions.relative_humidity, context),
     }
+    if room_profile is not None:
+        values["temperature"] = _two_sided_context_value(room_profile.ranges, context)
+    return values
 
 
 def _monotonic_boundaries(control_regions) -> list[ContinuityBoundary]:
@@ -139,8 +145,8 @@ def _two_sided_boundaries(channel: str, ranges, boundary_suffix: str, room: str 
     edges = {
         "critical_low": ranges.critical_low_max,
         "acceptable_low_edge": ranges.acceptable_low[1],
-        "favorable_low_edge": ranges.favorable[0],
-        "favorable_high_edge": ranges.favorable[1],
+        "favorable_low_edge": ranges.favourable[0],
+        "favorable_high_edge": ranges.favourable[1],
         "acceptable_high_edge": ranges.acceptable_high[0],
         "critical_high": ranges.critical_high_min,
     }
@@ -183,6 +189,11 @@ def sweep_boundary(
     n_points: int,
 ) -> list[GridPoint]:
     profile = _representative_profile_for(boundary, room_profiles, fallback_profile)
+    # profile is None only for a non-temperature boundary swept with no fallback profile
+    # (exploratory mode, no DBN profile for this room/season) -- M is omitted, never
+    # fabricated. Temperature boundaries always carry their own specific, real profile
+    # (see _representative_profile_for), so this never applies to a temperature sweep.
+    available_components = {"A", "V", "M"} if profile is not None else {"A", "V"}
     uncertainty = channel_uncertainty(boundary.channel, ctx.settings.schema_mapping, ctx.sensor_specs)
     grid = _grid_values(boundary.boundary_value, uncertainty, n_points)
 
@@ -190,18 +201,20 @@ def sweep_boundary(
     for i, x in enumerate(grid):
         values = _context_values(control_regions, profile, context)
         values[boundary.channel] = float(x)
-        component_results, index_result = infer_from_values(ctx, values, {"A", "V", "M"}, profile)
+        component_results, index_result = infer_from_values(ctx, values, available_components, profile)
         scores = {c: r.crisp_score for c, r in component_results.items()}
 
         hfis_value = index_result.index_value if index_result else None
         hfis_class = index_result.index_class if index_result else None
-        cm = crisp_max(scores)
+        cm = fuzzy_component_max(scores)
+        ccm = crisp_class_max(values, control_regions, profile.ranges if profile is not None else None)
         wm = weighted_mean(scores)
 
         for method, value, cls in (
-            ("PROPOSED-HFIS", hfis_value, hfis_class),
-            ("CRISP-MAX", cm.index_value, cm.index_class),
-            ("WEIGHTED-MEAN", wm.index_value, wm.index_class),
+            ("PROPOSED_HFIS", hfis_value, hfis_class),
+            ("FUZZY_COMPONENT_MAX", cm.index_value, cm.index_class),
+            ("CRISP_CLASS_MAX", ccm.index_value, ccm.index_class),
+            ("WEIGHTED_MEAN", wm.index_value, wm.index_class),
         ):
             points.append(
                 GridPoint(
@@ -217,9 +230,9 @@ def summarize_boundary(boundary: ContinuityBoundary, context: str, points: list[
     for method in METHODS:
         by_method[method] = sorted((p for p in points if p.method == method), key=lambda p: p.grid_index)
 
-    hfis_values = [p.index_value for p in by_method["PROPOSED-HFIS"]]
-    crisp_max_values = [p.index_value for p in by_method["CRISP-MAX"]]
-    inputs_for_area = [p.input_value for p in by_method["PROPOSED-HFIS"]]
+    hfis_values = [p.index_value for p in by_method["PROPOSED_HFIS"]]
+    crisp_max_values = [p.index_value for p in by_method["FUZZY_COMPONENT_MAX"]]
+    inputs_for_area = [p.input_value for p in by_method["PROPOSED_HFIS"]]
 
     rows = []
     for method in METHODS:
@@ -249,15 +262,15 @@ def summarize_boundary(boundary: ContinuityBoundary, context: str, points: list[
         if boundary.channel in MONOTONIC_CHANNELS:
             monotonicity_violations = sum(1 for a, b in zip(values, values[1:]) if a is not None and b is not None and b < a - 1e-9)
 
-        # "masked by favorable": at the boundary's own crossing point, the adverse channel is
-        # the only non-favorable input by construction only in the favorable context; kept as a
+        # "masked by favourable": at the boundary's own crossing point, the adverse channel is
+        # the only non-favourable input by construction only in the favourable context; kept as a
         # per-context diagnostic (still meaningful under acceptable/degraded contexts: does the
-        # aggregated class stay more favorable than the swept channel's own crossing would imply?).
+        # aggregated class stay more favourable than the swept channel's own crossing would imply?).
         crossing_idx = min(range(len(inputs)), key=lambda i: abs(inputs[i] - boundary.boundary_value))
-        masked = classes[crossing_idx] is not None and classes[crossing_idx] == "Favorable" and boundary.boundary_value > 0
+        masked = classes[crossing_idx] is not None and classes[crossing_idx] == "Favourable" and boundary.boundary_value > 0
 
         area = None
-        if method == "PROPOSED-HFIS":
+        if method == "PROPOSED_HFIS":
             pairs = [(x, h, c) for x, h, c in zip(inputs_for_area, hfis_values, crisp_max_values) if h is not None and c is not None]
             if len(pairs) >= 2:
                 xs = np.array([p[0] for p in pairs])
@@ -285,8 +298,8 @@ def summarize_boundary(boundary: ContinuityBoundary, context: str, points: list[
 
 
 def summarize_continuity_smoothness(summaries: list[ContinuitySummaryRow]) -> dict:
-    """Aggregate, honest comparison of PROPOSED-HFIS's smoothness against
-    CRISP-MAX across every (boundary, context) pair actually swept -- never
+    """Aggregate, honest comparison of PROPOSED_HFIS's smoothness against
+    FUZZY_COMPONENT_MAX across every (boundary, context) pair actually swept -- never
     a single cherry-picked case. Computed directly from ``summaries`` (never
     independently recomputed elsewhere), so this is the same object
     ``run_summary.json``, the narrative, and the artifact validator all see.
@@ -307,8 +320,8 @@ def summarize_continuity_smoothness(summaries: list[ContinuitySummaryRow]) -> di
     crisp_max_lipschitz: list[float] = []
     areas: list[float] = []
     for pair in by_key.values():
-        hfis = pair.get("PROPOSED-HFIS")
-        cm = pair.get("CRISP-MAX")
+        hfis = pair.get("PROPOSED_HFIS")
+        cm = pair.get("FUZZY_COMPONENT_MAX")
         if hfis is None or cm is None:
             continue
         if hfis.local_lipschitz_ratio is not None:
@@ -335,7 +348,7 @@ def summarize_continuity_smoothness(summaries: list[ContinuitySummaryRow]) -> di
         conclusion = "No (boundary, context) pairs had a defined Lipschitz ratio for both methods -- no smoothness comparison possible."
     elif hfis_smoother == 0 and crisp_max_smoother == 0:
         conclusion = (
-            f"PROPOSED-HFIS and CRISP-MAX had numerically identical local Lipschitz ratios on all {n_pairs} "
+            f"PROPOSED_HFIS and FUZZY_COMPONENT_MAX had numerically identical local Lipschitz ratios on all {n_pairs} "
             f"boundary/context pairs tested -- no smoothness advantage observed under this experimental design. "
             f"This is expected, not a defect in either method: each sweep perturbs only ONE channel within a "
             f"narrow +/-sensor-uncertainty window while the other channels are held at a FIXED representative "
@@ -349,18 +362,18 @@ def summarize_continuity_smoothness(summaries: list[ContinuitySummaryRow]) -> di
         )
     elif hfis_smoother > crisp_max_smoother:
         conclusion = (
-            f"PROPOSED-HFIS had a strictly lower local Lipschitz ratio than CRISP-MAX on {hfis_smoother}/{n_pairs} "
-            f"boundary/context pairs ({crisp_max_smoother} the reverse, {tied} tied) -- PROPOSED-HFIS is smoother "
-            f"than CRISP-MAX on most of the boundaries and contexts tested, not uniformly."
+            f"PROPOSED_HFIS had a strictly lower local Lipschitz ratio than FUZZY_COMPONENT_MAX on {hfis_smoother}/{n_pairs} "
+            f"boundary/context pairs ({crisp_max_smoother} the reverse, {tied} tied) -- PROPOSED_HFIS is smoother "
+            f"than FUZZY_COMPONENT_MAX on most of the boundaries and contexts tested, not uniformly."
         )
     elif crisp_max_smoother > hfis_smoother:
         conclusion = (
-            f"CRISP-MAX had a strictly lower local Lipschitz ratio than PROPOSED-HFIS on {crisp_max_smoother}/{n_pairs} "
-            f"boundary/context pairs ({hfis_smoother} the reverse, {tied} tied) -- PROPOSED-HFIS is NOT smoother than "
-            f"CRISP-MAX on most of the boundaries and contexts tested; any smoothness claim must be scoped accordingly."
+            f"FUZZY_COMPONENT_MAX had a strictly lower local Lipschitz ratio than PROPOSED_HFIS on {crisp_max_smoother}/{n_pairs} "
+            f"boundary/context pairs ({hfis_smoother} the reverse, {tied} tied) -- PROPOSED_HFIS is NOT smoother than "
+            f"FUZZY_COMPONENT_MAX on most of the boundaries and contexts tested; any smoothness claim must be scoped accordingly."
         )
     else:
-        conclusion = f"PROPOSED-HFIS was smoother on {hfis_smoother}/{n_pairs} pairs and CRISP-MAX on an equal number ({crisp_max_smoother}/{n_pairs}) -- no overall smoothness advantage either way."
+        conclusion = f"PROPOSED_HFIS was smoother on {hfis_smoother}/{n_pairs} pairs and FUZZY_COMPONENT_MAX on an equal number ({crisp_max_smoother}/{n_pairs}) -- no overall smoothness advantage either way."
 
     return {
         "n_boundary_context_pairs_compared": n_pairs,
@@ -370,6 +383,83 @@ def summarize_continuity_smoothness(summaries: list[ContinuitySummaryRow]) -> di
         "mean_local_lipschitz_ratio_hfis": mean_hfis_lipschitz,
         "mean_local_lipschitz_ratio_crisp_max": mean_crisp_max_lipschitz,
         "mean_area_between_curves_vs_crisp_max": mean_area,
+        "conclusion": conclusion,
+    }
+
+
+def summarize_continuity_smoothness_vs_baseline(summaries: list[ContinuitySummaryRow], baseline_method: str) -> dict:
+    """Generalized version of :func:`summarize_continuity_smoothness` for
+    any baseline method (e.g. CRISP_CLASS_MAX, the genuinely hard/
+    discontinuous baseline -- the most direct test of the manuscript's
+    "smoother near thresholds than a hard/crisp baseline" claim, since
+    FUZZY_COMPONENT_MAX is only a diagnostic, still-smooth baseline). Does
+    not compute an area-between-curves figure (that is FUZZY_COMPONENT_MAX-
+    specific, computed once in :func:`summarize_boundary`); everything else
+    mirrors :func:`summarize_continuity_smoothness`'s logic exactly, so the
+    two are directly comparable.
+    """
+    by_key: dict[tuple[str, str], dict[str, ContinuitySummaryRow]] = {}
+    for s in summaries:
+        by_key.setdefault((s.boundary_id, s.context), {})[s.method] = s
+
+    n_pairs = 0
+    hfis_smoother, baseline_smoother, tied = 0, 0, 0
+    hfis_lipschitz: list[float] = []
+    baseline_lipschitz: list[float] = []
+    for pair in by_key.values():
+        hfis = pair.get("PROPOSED_HFIS")
+        baseline = pair.get(baseline_method)
+        if hfis is None or baseline is None:
+            continue
+        if hfis.local_lipschitz_ratio is not None:
+            hfis_lipschitz.append(hfis.local_lipschitz_ratio)
+        if baseline.local_lipschitz_ratio is not None:
+            baseline_lipschitz.append(baseline.local_lipschitz_ratio)
+        if hfis.local_lipschitz_ratio is None or baseline.local_lipschitz_ratio is None:
+            continue
+        n_pairs += 1
+        if hfis.local_lipschitz_ratio < baseline.local_lipschitz_ratio - 1e-9:
+            hfis_smoother += 1
+        elif hfis.local_lipschitz_ratio > baseline.local_lipschitz_ratio + 1e-9:
+            baseline_smoother += 1
+        else:
+            tied += 1
+
+    mean_hfis_lipschitz = float(np.mean(hfis_lipschitz)) if hfis_lipschitz else None
+    mean_baseline_lipschitz = float(np.mean(baseline_lipschitz)) if baseline_lipschitz else None
+
+    if n_pairs == 0:
+        conclusion = f"No (boundary, context) pairs had a defined Lipschitz ratio for both PROPOSED_HFIS and {baseline_method} -- no smoothness comparison possible."
+    elif hfis_smoother == 0 and baseline_smoother == 0:
+        conclusion = (
+            f"PROPOSED_HFIS and {baseline_method} had numerically identical local Lipschitz ratios on all {n_pairs} "
+            f"boundary/context pairs tested -- no smoothness advantage observed under this single-channel-swept "
+            f"experimental design (see docs/hfis_vs_crispmax_audit.md section 3); see the multi-component grid "
+            f"experiment for evidence on whether the two methods diverge once more than one component carries signal."
+        )
+    elif hfis_smoother > baseline_smoother:
+        conclusion = (
+            f"PROPOSED_HFIS had a strictly lower local Lipschitz ratio than {baseline_method} on {hfis_smoother}/{n_pairs} "
+            f"boundary/context pairs ({baseline_smoother} the reverse, {tied} tied) -- PROPOSED_HFIS is smoother "
+            f"than {baseline_method} on most of the boundaries and contexts tested, not uniformly."
+        )
+    elif baseline_smoother > hfis_smoother:
+        conclusion = (
+            f"{baseline_method} had a strictly lower local Lipschitz ratio than PROPOSED_HFIS on {baseline_smoother}/{n_pairs} "
+            f"boundary/context pairs ({hfis_smoother} the reverse, {tied} tied) -- PROPOSED_HFIS is NOT smoother than "
+            f"{baseline_method} on most of the boundaries and contexts tested; any smoothness claim must be scoped accordingly."
+        )
+    else:
+        conclusion = f"PROPOSED_HFIS was smoother on {hfis_smoother}/{n_pairs} pairs and {baseline_method} on an equal number ({baseline_smoother}/{n_pairs}) -- no overall smoothness advantage either way."
+
+    return {
+        "baseline_method": baseline_method,
+        "n_boundary_context_pairs_compared": n_pairs,
+        "hfis_smoother_count": hfis_smoother,
+        "baseline_smoother_count": baseline_smoother,
+        "tied_count": tied,
+        "mean_local_lipschitz_ratio_hfis": mean_hfis_lipschitz,
+        "mean_local_lipschitz_ratio_baseline": mean_baseline_lipschitz,
         "conclusion": conclusion,
     }
 

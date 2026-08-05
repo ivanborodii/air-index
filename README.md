@@ -60,7 +60,7 @@ audit).
 humidity, pressure) every 30 seconds into a DuckDB database. `iaq_hfis` is
 a **separate, read-only consumer** of that data: it validates it, aggregates
 it into rolling windows, and computes a single 0–100 index describing how
-favorable the indoor air is, using a two-level Mamdani fuzzy-inference
+favourable the indoor air is, using a two-level Mamdani fuzzy-inference
 system. It also implements two simpler baseline methods for comparison
 (§20), a quantitative evaluation protocol (agreement, masking, stability,
 sensitivity, ground-truth scoring), and a full reporting layer (narrative,
@@ -81,7 +81,7 @@ strictly separate:
 
 | Concept | Values | Answers | Where |
 |---|---|---|---|
-| **Air-quality class** | Favorable / Acceptable / Degraded / Critical | "How good is the air, given the data we trust?" | `iaq_index_results.index_class`, `component_scores.membership_*` |
+| **Air-quality class** | Favourable / Acceptable / Degraded / Critical | "How good is the air, given the data we trust?" | `iaq_index_results.index_class`, `component_scores.membership_*` |
 | **Data-quality state** | VALID / SUSPECT / INVALID / MISSING | "Can we trust this specific reading?" | `observation_quality.stage2_state` |
 | **Completeness status** | OK / PARTIAL / FAILED | "Did we have enough trustworthy data to compute a class at all?" | `iaq_index_results.completeness_status` |
 
@@ -107,7 +107,7 @@ flowchart TD
         mem --> engine[fuzzy_engine.py<br/>Mamdani: min/max/centroid]
         comp --> engine
         engine --> write[(iaq_hfis.duckdb<br/>derived tables)]
-        write --> base[baselines.py<br/>CRISP-MAX / WEIGHTED-MEAN]
+        write --> base[baselines.py<br/>FUZZY_COMPONENT_MAX / WEIGHTED_MEAN]
         write --> eval[evaluation/*<br/>agreement, masking, multi-point stability/sensitivity,<br/>continuity, fault injection, reference cases]
         base --> eval
         eval --> write
@@ -155,7 +155,7 @@ air_ml/
 │   ├── fuzzy_engine.py            # MamdaniEngine (min/max/centroid), dominant_components, classify_output
 │   ├── completeness.py            # OK/PARTIAL/FAILED
 │   ├── pipeline.py                # RuntimeContext, compute_index_at, infer_from_values, run_pipeline
-│   ├── baselines.py                # CRISP-MAX, WEIGHTED-MEAN
+│   ├── baselines.py                # FUZZY_COMPONENT_MAX, WEIGHTED_MEAN
 │   ├── evaluate.py                 # orchestrates the Phase 2A evaluation suite
 │   ├── evaluation/
 │   │   ├── _metrics.py             # percent_agreement, cohens_kappa, macro_f1
@@ -163,7 +163,7 @@ air_ml/
 │   │   ├── agreement.py            # inter-method agreement (unlabeled real data)
 │   │   ├── multi_point_stability.py    # deterministic boundary-adjacent + random-comparison perturbation sampling
 │   │   ├── multi_point_sensitivity.py  # deterministic stratified window/coverage-threshold sweeps
-│   │   ├── continuity.py           # HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment
+│   │   ├── continuity.py           # HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN boundary continuity experiment
 │   │   ├── fault_injection.py      # labeled synthetic fault-injection benchmark + Hampel calibration
 │   │   ├── masking.py              # masking-rate detection
 │   │   └── faults.py               # status proportions, reason-code frequency (unlabeled real data)
@@ -339,6 +339,7 @@ typo'd key fails loudly rather than being silently ignored.
 | `membership` | `output_transition_width` (2.0) | Overlap width for the output scale | **yes** |
 | | `overlap_width_policy` (`reject`\|`auto_expand`) | What to do if a width < declared uncertainty | — (policy choice) |
 | | `dominant_component_tie_tolerance` (1.0) | Crisp-score margin within which multiple components are jointly reported as dominant adverse | author_defined |
+| `deployment` | `room_type` (`kitchen`), `room_type_evidence`, `season_source` (`timestamp`) | Explicit, author-attested deployment room classification -- never inferred from sensor values; rules out treating this deployment as a kitchen-dining space just to unblock a warm-period profile (§10) | — (author-attested fact) |
 | `profile_selection` | `room` (`kitchen`) | Which room profile to use | — (matches real deployment) |
 | | `season_month_ranges` | Calendar cutover months | **yes** |
 | `control_regions` | `pm2_5`, `pm10`, `co2`, `relative_humidity`, `output` | See §14 | breakpoints = manuscript/standard; transition_widths = **yes** (mostly sensor_specification-matched) |
@@ -348,6 +349,7 @@ typo'd key fails loudly rather than being silently ignored.
 | | `sensitivity_max_samples_per_stratum` (5) | Multi-point sensitivity sample-size bound | author_defined |
 | | `masking_severity_threshold` (`Critical`) | Which severity counts as "hidden" | **yes** |
 | | `continuity_grid_points` (21) | Boundary continuity experiment grid density | author_defined |
+| | `multi_component_grid_points_per_axis` (11; override to 41 via `evaluate --multi-component-grid-points` for the spec's own worked example) | Independent A/V/M grid experiment resolution per axis | author_defined |
 | `engine_version` | `"0.1.0"` | Recorded in every derived row and run summary | — |
 
 Full per-parameter machine-readable provenance (path, effective value,
@@ -382,33 +384,66 @@ List of `{room, season, provisional, ranges}` entries. See §10.
 
 ## 10. Room and seasonal profiles
 
-The manuscript documents exactly two temperature profiles, both verified
-directly against **ДБН В.2.5-67:2013, Додаток Д, Таблиця Д.4** (p.100):
+Three temperature profiles are currently defined:
 
-| Room | Season | Source | Favorable band |
+| Room | Season | Source | Favourable band |
 |---|---|---|---|
-| `kitchen` | `cold_period` | DBN Table Д.4, "інші об'єми (кухня, гардеробна, комора тощо)", heating-period column | 18.0–21.0 °C |
-| `general_residential` | `warm_period` | DBN Table Д.4, "житлові об'єми (..., **кухня-їдальня**...)", cooling-period column | 23.5–25.5 °C |
+| `kitchen` | `cold_period` | DBN Table Д.4, "інші об'єми (кухня, гардеробна, комора тощо)", heating-period column — verified directly against **ДБН В.2.5-67:2013, Додаток Д, Таблиця Д.4** (p.100) | 18.0–21.0 °C |
+| `general_residential` | `warm_period` | DBN Table Д.4, "житлові об'єми (..., **кухня-їдальня**...)", cooling-period column — same DBN table | 23.5–25.5 °C |
+| `kitchen` | `warm_period` | **Substitute standard** (DBN itself has no value — see below): ДСТУ Б EN 15251:2011, Таблиця А.2, "Житлові приміщення: спальні, вітальні, **кухні** тощо" (kitchen named explicitly), sedentary ~1.2 met, Category I/II/III | 21.0–25.5 °C |
+
+**DBN Table Д.4's standalone-kitchen row has a literal dash in the
+cooling-period column**: the standard genuinely gives no summer value for
+this exact room type. Investigated further into ДБН В.2.2-15:2019 (which
+likely only re-references the same EN 15251/16798-1 framework DBN
+B.2.5-67's own table is already built from) without finding an independent
+kitchen-specific figure there either.
+
+**Resolved via an explicit author decision + substitute-standard
+citation**: rather than leave the microclimate (M) component permanently
+undefined for this deployment's real (all warm-period) data, `kitchen`/
+`warm_period` is sourced to **ДСТУ Б EN 15251:2011**
+("Розрахункові параметри мікроклімату приміщень...", the Ukrainian IDT
+adoption of EN 15251:2007 — the same EN framework DBN B.2.5-67's own table
+is built from), which has its own Таблиця А.2 ("Examples of recommended
+design values of the indoor temperature for design of buildings and HVAC
+systems"), naming **кухні (kitchens)** explicitly in a residential row
+alongside bedrooms/living rooms, with real Category I/II/III
+heating-min/cooling-max values:
+
+| Category | Heating min | Cooling max |
+|---|---|---|
+| I | 21.0 °C | 25.5 °C |
+| II | 20.0 °C | 26.0 °C |
+| III | 18.0 °C | 27.0 °C |
+
+Verified directly against the standard PDF (not a secondhand summary):
+freely downloadable, Ukrainian-hosted, p.35. Categories I/II/III are
+nested (I ⊂ II ⊂ III) and mapped into `room_profiles.yaml`'s
+favourable/acceptable/degraded/critical schema the same way DBN's
+Підвищені оптимальні/Оптимальні/Допустимі tiers are mapped elsewhere in
+this file. Note the same standard's Table A.3 (hourly energy-calculation
+ranges — a different purpose from Table A.2's design/comfort bands) groups
+kitchen with storage/halls instead and has **no** cooling value for that
+grouping either — Table A.2 is the structurally correct analogue to DBN's
+Table Д.4 (design/comfort bands, not hourly simulation ranges), and is the
+one actually used.
 
 **The real deployed sensor is in a standalone/enclosed kitchen** (confirmed
-by the author) — DBN Table Д.4's standalone-kitchen row has a **literal
-dash** in the cooling-period column: the standard genuinely gives no
-summer value for this exact room type. Investigated further into ДБН
-В.2.2-15:2019 (which likely only re-references the same EN 15251/16798-1
-framework DBN B.2.5-67's own table is already built from) without finding
-an independent kitchen-specific figure. **Author decision (2026-07-24):**
-the kitchen is treated as falling under the general residential-building
-temperature requirements for the warm period, rather than needing a
-distinct kitchen-specific value — `config/room_profiles.yaml`'s third
-entry, `kitchen`/`warm_period`, deliberately reuses the "житлові об'єми
-(..., кухня-їдальня, ...)" row's numbers (same source as
-`general_residential`/`warm_period`), `provisional: false`. This is a
-documented methodological choice, not a placeholder guess — cite it as
-such in the manuscript's methods section.
+by the author, see `config/iaq_hfis.yaml`'s `deployment:` block) — **not**
+a kitchen-dining/general-residential space, and this profile does not
+reclassify it as one: it is still keyed to `room: kitchen`, just sourced to
+a different (DSTU, not DBN) standard for the warm period specifically. A
+room/season combination with **neither** a DBN nor a DSTU citation (e.g.
+`general_residential`/`cold_period`) still fails loudly with a structured
+`TEMPERATURE_PROFILE_NOT_DEFINED` error — never a silent fallback, never
+DBN-row substitution, never fabrication.
 
 Adding a new room/season combination is config-only (`room_profiles.yaml`);
-`profiles.select_room_season` fails loudly, listing available profiles,
-if the requested combination doesn't exist — it never silently falls back.
+`profiles.select_room_season` fails loudly, listing available profiles and
+the DBN/DSTU source, if the requested combination doesn't exist — it never
+silently falls back to another room, another season, interpolation, or
+outdoor temperature.
 
 ## 11. Hard and soft validation logic
 
@@ -465,7 +500,7 @@ clipped to the window bounds at the edges (`aggregation.py:time_weighted_mean`).
 
 Table 2 of the manuscript, exactly as configured in `control_regions`:
 
-| Channel | Favorable | Acceptable | Degraded | Critical | Source |
+| Channel | Favourable | Acceptable | Degraded | Critical | Source |
 |---|---|---|---|---|---|
 | PM2.5 (µg/m³) | ≤15 | 15–25 | 25–50 | >50 | WHO 2021 |
 | PM10 (µg/m³) | ≤45 | 45–75 | 75–100 | >100 | WHO 2021 |
@@ -473,6 +508,7 @@ Table 2 of the manuscript, exactly as configured in `control_regions`:
 | RH (%) | 30–50 | 25–<30 or >50–60 | 20–<25 or >60–70 | <20 or >70 | ДБН В.2.5-67:2013 Table Д.5 |
 | T, kitchen/cold | 18–21 | 16.5–<18 or >21–22.5 | 15.5–<16.5 or >22.5–23.5 | <15.5 or >23.5 | ДБН В.2.5-67:2013 Table Д.4 |
 | T, general_residential/warm | 23.5–25.5 | 23–<23.5 or >25.5–26 | 22–<23 or >26–27 | <22 or >27 | ДБН В.2.5-67:2013 Table Д.4 |
+| T, kitchen/warm | 21–25.5 | 20–<21 or >25.5–26 | 18–<20 or >26–27 | <18 or >27 | ДСТУ Б EN 15251:2011 Table A.2 (substitute standard — §10) |
 | Output index I | [0,25) | [25,50) | [50,75) | [75,100] | The proposed method's own scale |
 
 ## 15. Membership-function construction
@@ -480,10 +516,10 @@ Table 2 of the manuscript, exactly as configured in `control_regions`:
 Every class is a trapezoid `μ(x;a,b,c,d) = max(0, min((x-a)/(b-a), 1, (d-x)/(d-c)))`
 (`membership.py:trapezoid`), with `±math.inf` sentinels for pure shoulders
 (extreme classes on monotonic channels). Monotonic channels (PM2.5, PM10,
-CO2, output) get right-shoulder-only Favorable/Critical classes (higher
+CO2, output) get right-shoulder-only Favourable/Critical classes (higher
 never improves the class). Two-sided channels (T, RH) get Critical/Degraded/
 Acceptable as the union of a low-side and high-side band, and a single
-central Favorable band. Two adjacent classes sharing a numeric boundary
+central Favourable band. Two adjacent classes sharing a numeric boundary
 cross at exactly membership 0.5 there (verified by test).
 
 Transition (overlap) width must be ≥ the channel's `declared_uncertainty`
@@ -500,7 +536,7 @@ rules, `I ← (A, V, M)` = 64 rules — **96 total**. `V` is a single-input
 pass-through (no combination rules needed). This single choice provably
 gives three properties simultaneously: worsening any input never improves
 the consequent; any Critical input forces a Critical consequent; the
-consequent is Favorable only when every input is Favorable.
+consequent is Favourable only when every input is Favourable.
 
 ## 17. Mamdani min/max/centroid procedure
 
@@ -511,7 +547,7 @@ consequent is Favorable only when every input is Favorable.
    discretized at 401 points
 
 Output classification (`classify_output`) is closed on the *worse* side at
-the boundaries: `[0,25)` Favorable, `[25,50)` Acceptable, `[50,75)`
+the boundaries: `[0,25)` Favourable, `[25,50)` Acceptable, `[50,75)`
 Degraded, `[75,100]` Critical — per the manuscript's explicit statement
 about the output scale specifically (direct-input Table 2 boundaries keep
 their own literal ≤/> convention and only parameterize the continuous
@@ -552,11 +588,12 @@ coverage; microclimate `M` requires **both** T and RH.
 
 | Method | Formula | Notes |
 |---|---|---|
-| **CRISP-MAX** | `max(component crisp scores)` | Reproduces a prior paper's logic; structurally cannot mask a critical component (max of a Critical-range score is itself Critical-range) |
-| **WEIGHTED-MEAN** | `mean(component crisp scores)` | Neutral, no expert weighting; can and does mask a critical component by dilution — this is the phenomenon `evaluation/masking.py` measures |
-| **PROPOSED-HFIS** | Two-level Mamdani (§17) | The method this repository implements |
+| **FUZZY_COMPONENT_MAX** | `max(component crisp scores)` | Reproduces a prior paper's logic; still operates on already-fuzzified, smoothly-varying component scores -- a diagnostic baseline, not the hard one the manuscript's introduction criticises |
+| **CRISP_CLASS_MAX** | Hard-classify each available direct input via the class control-region breakpoints (no fuzzy overlap), take the most adverse per-component class, map deterministically to a fixed representative value | The genuinely discontinuous baseline -- exhibits a true step at every control-region boundary (`baselines.crisp_class_max`) |
+| **WEIGHTED_MEAN** | `mean(component crisp scores)` | Neutral, no expert weighting; can and does mask a critical component by dilution — this is the phenomenon `evaluation/masking.py` measures |
+| **PROPOSED_HFIS** | Two-level Mamdani (§17) | The method this repository implements |
 
-All three degrade over available components identically (never impute a
+All four degrade over available components identically (never impute a
 value for a missing one).
 
 ## 21. CLI examples
@@ -568,22 +605,28 @@ the whole pipeline at once). Every derived-DB row is isolated by
 `docs/reproducibility.md`.
 
 ```bash
-# 1. Compute the index over a time range and persist results (creates a fresh pipeline_run_id)
-python -m iaq_hfis.cli run --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00
+# 1. Compute the index over a time range and persist results (creates a fresh pipeline_run_id).
+#    mode=publication (default, strict): a missing DBN temperature profile aborts the whole run.
+#    mode=exploratory: the microclimate component is omitted (never fabricated) where no profile
+#    exists; the run is tagged exploratory and can never be finalized into research_results/final.
+python -m iaq_hfis.cli run --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00 [--mode publication|exploratory]
 
-# -> prints: Run <pipeline_run_id>: success
+# -> prints: Run <pipeline_run_id> (mode=publication): success
 #    processed N timestamps over window=15min
 #    completeness: {'OK': .., 'PARTIAL': .., 'FAILED': ..}
 
 # 2. Run the full evaluation suite (agreement, masking, reference cases, multi-point
-#    stability/sensitivity, boundary continuity, fault-injection benchmark) -- always
-#    creates a NEW evaluation_run_id, never mixes rows with a prior evaluation
-python -m iaq_hfis.cli evaluate --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00 --pipeline-run-id <id>
+#    stability/sensitivity, boundary continuity, multi-component grid, fault-injection
+#    benchmark) -- always creates a NEW evaluation_run_id, never mixes rows with a prior
+#    evaluation. --multi-component-grid-points overrides the per-axis grid resolution
+#    (default kept modest; use 41 for the manuscript-validation task spec's own worked example).
+python -m iaq_hfis.cli evaluate --from 2026-07-23T00:00:00+00:00 --to 2026-07-23T06:00:00+00:00 --pipeline-run-id <id> [--multi-component-grid-points 41]
 
 # 3. Generate run_summary.md, run_narrative.md, article_results_summary.md, CSVs,
 #    data dictionary, plot manifest, parameter_provenance.csv,
-#    provisional_parameter_assessment.md, and publication_readiness
-#    (persisted back into run_summary.json)
+#    provisional_parameter_assessment.md, parameter_selection.json,
+#    manuscript_readiness.json/.md, and publication_claims_matrix.csv/.md
+#    (readiness persisted back into run_summary.json)
 python -m iaq_hfis.cli report --pipeline-run-id <id>
 
 # 4. Render PNGs from the plot manifest
@@ -596,6 +639,18 @@ python -m iaq_hfis.cli validate-artifacts --pipeline-run-id <id>
 # 6. Rebuild the derived database (never touches raw air-monitor/weather source DBs) --
 #    required if it predates the run-isolated schema (LegacySchemaError)
 python -m iaq_hfis.cli rebuild-db --confirm
+
+# 7. Run the full test suite (required before finalize; refuses if ok=false)
+python -m iaq_hfis.cli test-report
+
+# 8. Build the tracked publication snapshot -- requires artifact_readiness,
+#    the same git commit that computed the run, and a clean working tree.
+#    Refuses if pipeline_run_id was computed with --mode exploratory.
+python -m iaq_hfis.cli finalize --pipeline-run-id <id> --test-report-json test_report.json
+
+# 8b. For an exploratory-mode run: writes research_results/exploratory/ instead
+#     (never research_results/final/ -- the microclimate component was omitted)
+python -m iaq_hfis.cli finalize --pipeline-run-id <id> --exploratory
 
 # All of 1-4 at once, over the last 24 hours:
 scripts/run_iaq_hfis.sh 1440
@@ -635,7 +690,7 @@ pre-isolation databases are detected and rejected -- see §33 and
 | `evaluation_sensitivity` | (evaluation_run_id, sample_id, varied_parameter, value) | stratum, reference_*, completeness_status, index_value |
 | `evaluation_masking` | (evaluation_run_id, method, severity_threshold) | n_critical_events, n_masked, masking_rate |
 | `evaluation_reference_cases` | (evaluation_run_id, method) | n, macro_f1, cohens_kappa (consistency, not accuracy) |
-| `evaluation_continuity_grid` / `evaluation_continuity_summary` | grid point / (boundary, context, method) | context (favorable/acceptable/degraded); index_value; max/mean_adjacent_jump, local_lipschitz_ratio, area_between_curves_vs_crisp_max |
+| `evaluation_continuity_grid` / `evaluation_continuity_summary` | grid point / (boundary, context, method) | context (favourable/acceptable/degraded); index_value; max/mean_adjacent_jump, local_lipschitz_ratio, area_between_curves_vs_crisp_max |
 | `fault_injection_events` / `fault_detection_predictions` | event / sample | dataset_split (calibration/validation); fault_type; predicted_reason_codes |
 | `fault_detection_metrics` / `fault_detection_event_metrics` | (dataset_split, reason_code) | row-level tp/fp/fn/tn/specificity vs. event-level one-to-one-matched tp/fp/fn |
 | `fault_detection_confusion_matrix` | (dataset_split, true_label, predicted_label) | count |
@@ -678,7 +733,7 @@ written empty as if it were real data.
 |---|---|---|
 | `index_timeseries.csv` | one row per computed_ts | The final index value/class over time, plus dominant_component/co_dominant_components/dominance_reason and the rule_level_contributors diagnostic |
 | `component_scores_timeseries.csv` | one row per (computed_ts, component) | A/V/M crisp scores and membership degrees over time |
-| `method_comparison.csv` | one row per computed_ts | PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN side by side |
+| `method_comparison.csv` | one row per computed_ts | PROPOSED_HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN side by side |
 | `data_quality_summary.csv` | one row per (computed_ts, channel) | Coverage ratio per channel over time |
 | `reason_code_frequency.csv` | one row per reason code | Which fault categories occurred on real data, and how often (unlabeled) |
 | `stability_samples.csv` | one row per sampled point | Which computed_ts were sampled (boundary_adjacent/random_comparison) and their baselines |
@@ -687,10 +742,10 @@ written empty as if it were real data.
 | `stability_summary_by_variable.csv` / `stability_summary_by_original_class.csv` | per (method, boundary channel) / per (method, originating class) | The same stability metrics broken down by which boundary a point was near, and by which class it started in |
 | `sensitivity_window_by_point.csv` / `sensitivity_window_summary.csv` | per sampled point / per window size | Index value/status at each of 5/15/30/60 min, per-point and aggregated |
 | `sensitivity_coverage_by_point.csv` / `sensitivity_coverage_summary.csv` | per sampled point / per threshold | Index value/status at each of 0.70/0.80/0.90, per-point and aggregated |
-| `masking_summary.csv` | one row per baseline method | Masking rate for CRISP-MAX and WEIGHTED-MEAN |
+| `masking_summary.csv` | one row per baseline method | Masking rate for FUZZY_COMPONENT_MAX and WEIGHTED_MEAN |
 | `reference_case_consistency.csv` | one row per method | macro-F1/kappa against the synthetic reference cases — consistency, NOT accuracy |
 | `outdoor_context_timeseries.csv` | one row per computed_ts | Outdoor PM/temperature context (never a direct index input) |
-| `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, context, method) | HFIS vs CRISP-MAX vs WEIGHTED-MEAN numerical behavior across every control-region boundary, under favorable/acceptable/degraded "other components" contexts; see `docs/hfis_vs_crispmax_audit.md` |
+| `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, context, method) | HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN numerical behavior across every control-region boundary, under favourable/acceptable/degraded "other components" contexts; see `docs/hfis_vs_crispmax_audit.md` |
 | `fault_injection_events.csv` / `fault_detection_predictions.csv` | event / sample | The labeled synthetic fault-injection benchmark (separate from real, unlabeled data); dataset_split = calibration or validation |
 | `fault_detection_metrics.csv` / `fault_detection_event_metrics.csv` | (dataset_split, reason_code) | Row-level vs event-level (one-to-one matched) precision/recall/F1; validation split is the headline, publication-facing number |
 | `fault_detection_confusion_matrix.csv` | (dataset_split, true_label, predicted_label) | Full row-level confusion matrix, including "none" |
@@ -786,11 +841,13 @@ scaling to much larger windows or higher channel counts. `evaluate` is
 now considerably heavier than `run` per invocation, because it always
 executes several fixed-cost synthetic experiments regardless of how much
 real data is being evaluated: the boundary continuity experiment
-(`continuity_grid_points` x 13 boundaries x 3 methods) and the
-fault-injection benchmark's Hampel calibration grid (`HAMPEL_WINDOW_GRID`
-x `HAMPEL_MULTIPLIER_GRID` x 2 splits, each re-running the quality layer
-on several synthetic scenarios). Both grids are deliberately kept small
-for this reason (§9's `continuity_grid_points` and
+(`continuity_grid_points` x 13 boundaries x 4 methods), the independent
+multi-component grid experiment (`multi_component_grid_points_per_axis`^3
+combinations x 4 methods), and the fault-injection benchmark's Hampel
+calibration grid (`HAMPEL_WINDOW_GRID` x `HAMPEL_MULTIPLIER_GRID` x 2
+splits, each re-running the quality layer on several synthetic scenarios).
+All three grids are deliberately kept small for this reason (§9's
+`continuity_grid_points`, `multi_component_grid_points_per_axis`, and
 `evaluation.hampel_calibration_grid` provenance entries explain the
 tradeoff) -- the real, data-dependent multi-point stability/sensitivity
 sampling is bounded separately by `stability_max_*`/
@@ -798,11 +855,17 @@ sampling is bounded separately by `stability_max_*`/
 
 ## 29. Limitations
 
-- **`kitchen/warm_period` has no independent DBN citation.** It deliberately
-  reuses `general_residential/warm_period`'s numbers by author decision
-  (§10), not because DBN gives that room its own summer value — a
-  documented methodological choice, worth stating explicitly in the
-  manuscript rather than assuming it reads as a direct citation.
+- **The kitchen/warm_period microclimate component is sourced to a
+  substitute standard, not DBN.** DBN V.2.5-67:2013 Table D.4 gives no
+  value for a standalone kitchen in the warm period; the profile actually
+  used is instead cited to ДСТУ Б EN 15251:2011 Table A.2 (§10), an
+  explicit author decision, per the manuscript's own stated fallback
+  rule. This is a real, verified, standards-based citation — not a
+  fabrication or a different-room substitution — but readers should know
+  the warm-period microclimate component rests on a different
+  (EN-derived, Ukrainian-adopted) standard than the cold-period one,
+  which is direct DBN. `research_results/final/` discloses this
+  explicitly wherever it affects a claim.
 - **CO2 has no cross-channel confirmation signal.** Unlike PM (auxiliary
   channels) and T/RH (dual sensors), a SUSPECT CO2 reading can only be
   confirmed by persistence — a sustained sensor fault that also persists
@@ -836,8 +899,8 @@ sampling is bounded separately by `stability_max_*`/
   against one Raspberry Pi 5 with one set of SPS30/SCD41/BME688 units —
   generalization to other sensor batches/models is untested.
 - **The boundary continuity experiment cannot currently show whether HFIS
-  is smoother than CRISP-MAX.** Perturbing one channel while holding every
-  other channel fixed (even under the favorable/acceptable/degraded
+  is smoother than FUZZY_COMPONENT_MAX.** Perturbing one channel while holding every
+  other channel fixed (even under the favourable/acceptable/degraded
   "other components" contexts) is a case the worst-of rule base is
   mathematically forced to make both methods agree on exactly, regardless
   of context — confirmed empirically on the tracked reference run. See
@@ -888,7 +951,7 @@ sampling is bounded separately by `stability_max_*`/
 | RH control regions | ДБН В.2.5-67:2013, Таблиця Д.5 | Manuscript citation |
 | kitchen/cold_period T | ДБН В.2.5-67:2013, Додаток Д, Таблиця Д.4, p.100, "інші об'єми" row, heating column | **Verified directly against the actual standard PDF** during this project — exact match |
 | general_residential/warm_period T | Same table, "кухня-їдальня" row, cooling column | **Verified directly against the actual standard PDF** |
-| kitchen/warm_period T | No DBN value exists for this specific room (verified: literal dash in the table; ДБН В.2.2-15:2019 investigated, likely only re-references the same EN framework) | Author decision (2026-07-24): kitchen follows general_residential requirements in the warm period — documented methodological choice, not a citation |
+| kitchen/warm_period T | No DBN value exists for this specific room (verified: literal dash in the table; ДБН В.2.2-15:2019 investigated, likely only re-references the same EN framework). Sourced instead to ДСТУ Б EN 15251:2011, Таблиця А.2, "кухні" row, Category I/II/III | **Verified directly against the actual standard PDF** — an explicit author decision to use a substitute standard rather than leave M permanently undefined for this deployment's real (all warm-period) data — see §10 |
 | CO2 uncertainty (±70 ppm) | Sensirion SCD4x Datasheet v1.7 (Apr 2025), Table 1 p.3: ±(50 ppm + 2.5%) for 400-1000 ppm | **Verified against the official datasheet** — representative value at this deployment's ~800 ppm typical range |
 | SCD41 temp/RH uncertainty (±0.8°C / ±6% RH) | Same datasheet, Tables 2-3 p.3, 15-35°C / 20-65% RH band | **Verified against the official datasheet** — exact match to prior guessed values |
 | BME688 temp uncertainty (±0.5°C) | Bosch BME688 Datasheet Rev.1.3 (Feb 2024), Table 10 p.14 | **Verified against the official datasheet** — corrected from an incorrect ±1.0°C guess |
@@ -901,8 +964,8 @@ sampling is bounded separately by `stability_max_*`/
 
 ## 32. Worked example
 
-A real 15-minute window, PM2.5 near-favorable, CO2 favorable, temperature
-above the `general_residential/warm_period` favorable band:
+A real 15-minute window, PM2.5 near-favourable, CO2 favourable, temperature
+above the `general_residential/warm_period` favourable band:
 
 1. **Raw data**: 30 expected 30 s slots; 30 arrive within tolerance, all
    pass hard checks (numeric, in technical range, PM-ordered) → all
@@ -914,21 +977,21 @@ above the `general_residential/warm_period` favorable band:
 4. **Aggregation**: time-weighted means — PM2.5≈4.0 µg/m³, PM10≈5.0 µg/m³,
    CO2≈700 ppm, T≈26.6 °C, RH≈29 %.
 5. **Completeness**: all 3 components available, all coverage OK → **OK**.
-6. **Membership**: PM2.5=4.0 → Favorable≈1.0 (deep in the favorable
-   shoulder). CO2=700 → Favorable≈1.0. T=26.6 in the
-   general_residential/warm_period profile (favorable 23.5–25.5, degraded_high
+6. **Membership**: PM2.5=4.0 → Favourable≈1.0 (deep in the favourable
+   shoulder). CO2=700 → Favourable≈1.0. T=26.6 in the
+   general_residential/warm_period profile (favourable 23.5–25.5, degraded_high
    26.0–27.0) → Degraded≈0.87, Critical≈0.13 (see §15's crossing behavior).
-7. **Component inference**: A ≈ Favorable (crisp≈13). V ≈ Favorable
+7. **Component inference**: A ≈ Favourable (crisp≈13). V ≈ Favourable
    (crisp≈13). M: worst-of(T-class, RH-class) ≈ Degraded (crisp≈74.5).
 8. **Index inference**: worst-of(A,V,M) ⇒ Degraded-dominated rules fire
    strongest; centroid ≈ **65–67**, class **Degraded**,
    `dominant_component=M`, `co_dominant_components=[M]`,
    `dominance_reason=unique_max_firing_rule`.
-9. **Baselines**: CRISP-MAX ≈ max(13,13,74.5) ≈ 74 (Degraded/Critical
-   boundary). WEIGHTED-MEAN ≈ mean(13,13,74.5) ≈ 33 (Acceptable) — this is
-   the masking effect (§20): averaging with two deeply-favorable
-   components dilutes the one unfavorable one well below where PROPOSED-HFIS
-   and CRISP-MAX both land.
+9. **Baselines**: FUZZY_COMPONENT_MAX ≈ max(13,13,74.5) ≈ 74 (Degraded/Critical
+   boundary). WEIGHTED_MEAN ≈ mean(13,13,74.5) ≈ 33 (Acceptable) — this is
+   the masking effect (§20): averaging with two deeply-favourable
+   components dilutes the one unfavorable one well below where PROPOSED_HFIS
+   and FUZZY_COMPONENT_MAX both land.
 
 (These are real numbers observed during development against the live
 sensor, reproduced here for illustration — re-running against current
@@ -938,13 +1001,12 @@ live data will differ.)
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ConfigError: no room profile configured for (room=..., season=...)` | Requested room/season combination isn't in `room_profiles.yaml` | Add it, or use `--config` to point at a variant; the error lists available profiles |
+| `TEMPERATURE_PROFILE_NOT_DEFINED` | Requested room/season combination isn't in `room_profiles.yaml` (e.g. `general_residential`/`cold_period`) | Add a real DBN- or DSTU-sourced profile, or use `--mode exploratory` to omit M instead of substituting a different room's numbers; the error lists available profiles |
 | `SnapshotError: could not take a consistent snapshot` | `air_monitor.duckdb` changed mid-copy repeatedly (very high write rate) or disk pressure | Retry; check `data/iaq_hfis/logs/iaq_hfis.log` for the underlying exception |
 | All timestamps FAILED | Coverage below `min_ratio` for ≥2 channels, or bad `schema_mapping` | Check `window_aggregates.coverage_ratio`; verify `schema_mapping` columns exist |
 | `MembershipConfigError: ... narrower than declared sensor uncertainty` | A configured `transition_widths` entry is smaller than `sensor_specs.yaml`'s `declared_uncertainty` for that channel | Widen the transition width, or set `membership.overlap_width_policy: auto_expand` |
 | `evaluate`/`report`/`plot` says "run 'iaq_hfis run' first" | No `run_summary_{pipeline_run_id}.json` (or no data in the derived DB) for that pipeline_run_id/range | Run the prerequisite step; check the pipeline_run_id was copied correctly |
 | A plot is silently missing | Its source CSV had nothing to export this run (logged at INFO level) | Check the log; this is by design (§25), not a bug |
-| Real kitchen summer run uses general_residential's numbers | `kitchen/warm_period` has no independent DBN value; author decided to reuse general_residential's (§10, §29) | Expected, by design — not flagged provisional (it's a confirmed decision, not a guess) |
 | `LegacySchemaError: ... pipeline_run_id column` or `... schema_version=N` | The derived database predates the run-isolated schema, or a code/schema version mismatch | `python -m iaq_hfis.cli rebuild-db --confirm` (only deletes the derived DB, never raw sources) |
 | `validate-artifacts` reports a violation | A generated artifact is stale, hand-edited, or a real bug in report generation | Regenerate with `iaq_hfis report` + `iaq_hfis plot`; if it recurs, treat as a real bug, not something to work around |
 
@@ -974,8 +1036,8 @@ Read `run_summary.md` top to bottom:
    dataset, whether conclusions depend strongly on it).
 4. **Baseline Comparison / Masking / Reference-Case Consistency** — read
    these together: high agreement + low masking + high macro-F1 for
-   PROPOSED-HFIS relative to WEIGHTED-MEAN is the evidence the manuscript's
-   method is doing something CRISP-MAX/WEIGHTED-MEAN don't. Remember:
+   PROPOSED_HFIS relative to WEIGHTED_MEAN is the evidence the manuscript's
+   method is doing something FUZZY_COMPONENT_MAX/WEIGHTED_MEAN don't. Remember:
    agreement is not accuracy, and reference-case macro-F1/kappa is
    consistency with a synthetic label, not empirical accuracy.
 5. **Stability** — a high class-change rate near a real operating point

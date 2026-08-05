@@ -6,7 +6,7 @@ own class (via ``classify_output(component.crisp_score)``, the same 0-100
 scale and boundaries the final index uses) reaches ``severity_threshold``,
 but the baseline's aggregated class does not.
 
-CRISP-MAX cannot mask by construction: it IS the max of the component
+FUZZY_COMPONENT_MAX cannot mask by construction: it IS the max of the component
 scores, so if any component reaches the threshold severity, so does the
 max — this is a structural property, verified directly rather than only
 empirically (see the corresponding test).

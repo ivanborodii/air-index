@@ -16,17 +16,18 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 
 from iaq_hfis import membership, profiles, timegrid
 from iaq_hfis.aggregation import aggregate_channel
 from iaq_hfis.completeness import completeness_status
-from iaq_hfis.config import RoomProfilesConfig, RoomTemperatureProfile, SensorSpecs, Settings, config_hash
+from iaq_hfis.config import RoomProfilesConfig, RoomTemperatureProfile, SensorSpecs, Settings, TemperatureProfileNotDefinedError, config_hash
 from iaq_hfis.constants import COMPONENT_INPUTS, OUTPUT_MAX, OUTPUT_MIN
 from iaq_hfis.db import AirMonitorSource, DerivedResultsWriter
 from iaq_hfis.fuzzy_engine import MamdaniEngine
-from iaq_hfis.models import ComponentInferenceResult, CoverageResult, IndexInferenceResult
+from iaq_hfis.models import ComponentInferenceResult, CompletenessResult, CoverageResult, IndexInferenceResult
 from iaq_hfis.outdoor_context import fetch_outdoor_context
 from iaq_hfis.provenance import collect_parameter_provenance, engaged_provisional_paths
 from iaq_hfis.quality.hard_checks import run_hard_checks
@@ -120,26 +121,33 @@ def _compute_outdoor_trend_sign(outdoor_ctx: dict, channel: str) -> int | None:
 
 
 def infer_from_values(
-    ctx: RuntimeContext, values: dict[str, float], available_components: set[str], profile: RoomTemperatureProfile
+    ctx: RuntimeContext, values: dict[str, float], available_components: set[str], profile: RoomTemperatureProfile | None
 ) -> tuple[dict[str, ComponentInferenceResult], IndexInferenceResult | None]:
     """Pure inference from already-aggregated channel values (no I/O, no DB
     writes): builds membership degrees, runs the two-level Mamdani engine,
     and returns per-component results plus the final index result (None if
     no components are available).
 
+    ``profile`` may be ``None`` only when "M" has already been excluded from
+    ``available_components`` (exploratory mode with no DBN-supported
+    temperature profile for this room/season) -- it is never dereferenced
+    in that case.
+
     Reused by :func:`compute_index_at` (the live pipeline) and by
     :mod:`iaq_hfis.evaluation.stability` / :mod:`iaq_hfis.baselines` callers
     that need to recompute from perturbed or synthetic values without
     re-running validation/aggregation.
     """
-    temperature_shapes = ctx.temperature_shapes_by_profile[(profile.room, profile.season)]
     component_results: dict[str, ComponentInferenceResult] = {}
     for component, inputs in COMPONENT_INPUTS.items():
         if component not in available_components:
             continue
         input_memberships = {}
         for ch in inputs:
-            shapes = temperature_shapes if ch == "temperature" else ctx.static_shapes["relative_humidity" if ch == "humidity" else ch]
+            if ch == "temperature":
+                shapes = ctx.temperature_shapes_by_profile[(profile.room, profile.season)]
+            else:
+                shapes = ctx.static_shapes["relative_humidity" if ch == "humidity" else ch]
             input_memberships[ch] = membership.evaluate_memberships(values[ch], shapes)
         component_results[component] = ctx.engine.infer_component(component, input_memberships)
 
@@ -160,6 +168,7 @@ def compute_index_at(
     window_minutes: int,
     writer: DerivedResultsWriter | None,
     pipeline_run_id: str | None = None,
+    mode: Literal["publication", "exploratory"] = "publication",
 ) -> dict:
     """Full pipeline for one (computed_ts, window_minutes) pair: validate,
     aggregate, infer, classify completeness, and (if ``writer`` given)
@@ -211,12 +220,37 @@ def compute_index_at(
 
     completeness = completeness_status(coverage)
 
-    profile = profiles.select_room_season(ctx.room_profiles, computed_ts, settings.profile_selection)
-    if profile.provisional:
+    try:
+        profile = profiles.select_room_season(ctx.room_profiles, computed_ts, settings.profile_selection)
+    except TemperatureProfileNotDefinedError:
+        if mode == "publication":
+            # Publication mode: a missing temperature profile is a blocking
+            # configuration error. The full A/V/M/I manuscript run must not
+            # proceed at all -- propagate and abort the whole pipeline run
+            # rather than silently degrading this one timestamp.
+            raise
+        # Exploratory mode: the microclimate component is structurally
+        # omitted (never fabricated) for this timestamp; A and V may still
+        # be computed. This is never eligible for research_results/final.
+        profile = None
+
+    if profile is not None and profile.provisional:
         ctx.provisional_profiles_used.add(f"room_profile:{profile.room}/{profile.season}")
 
     availability = {comp: comp not in completeness.missing_components for comp in COMPONENT_INPUTS}
+    if profile is None:
+        availability["M"] = False
     available_components = {comp for comp, ok in availability.items() if ok}
+
+    if profile is None:
+        # Re-derive completeness so a profile-caused M exclusion is reflected
+        # consistently in the persisted status/missing_components, not just
+        # in local component selection.
+        missing_components = sorted(set(completeness.missing_components) | {"M"})
+        missing_inputs = sorted(set(completeness.missing_inputs) | {"temperature", "humidity"})
+        n_missing = len(missing_components)
+        status = "OK" if n_missing == 0 else "PARTIAL" if n_missing == 1 else "FAILED"
+        completeness = CompletenessResult(status=status, missing_components=missing_components, missing_inputs=missing_inputs)
 
     component_results, index_result = infer_from_values(ctx, weighted_means, available_components, profile)
     if completeness.status == "FAILED":
@@ -224,6 +258,8 @@ def compute_index_at(
         # the manuscript requires index/class stay unformed regardless, not a placeholder number.
         index_result = None
 
+    profile_room = profile.room if profile is not None else None
+    profile_season = profile.season if profile is not None else None
     if writer is not None:
         for component, result in component_results.items():
             cd = result.class_degrees
@@ -233,7 +269,7 @@ def compute_index_at(
                     membership_favorable, membership_acceptable, membership_degraded, membership_critical,
                     crisp_score, room, season)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                [pipeline_run_id, computed_ts, window_minutes, component, True, [], cd.get("Favorable"), cd.get("Acceptable"), cd.get("Degraded"), cd.get("Critical"), result.crisp_score, profile.room, profile.season],
+                [pipeline_run_id, computed_ts, window_minutes, component, True, [], cd.get("Favourable"), cd.get("Acceptable"), cd.get("Degraded"), cd.get("Critical"), result.crisp_score, profile_room, profile_season],
             )
         for component in COMPONENT_INPUTS:
             if not availability[component]:
@@ -244,7 +280,7 @@ def compute_index_at(
                         membership_favorable, membership_acceptable, membership_degraded, membership_critical,
                         crisp_score, room, season)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    [pipeline_run_id, computed_ts, window_minutes, component, False, missing, None, None, None, None, None, profile.room, profile.season],
+                    [pipeline_run_id, computed_ts, window_minutes, component, False, missing, None, None, None, None, None, profile_room, profile_season],
                 )
 
     if writer is not None:
@@ -300,7 +336,15 @@ def _minutes(n: int):
     return timedelta(minutes=n)
 
 
-def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: RoomProfilesConfig, from_ts: datetime, to_ts: datetime, window_minutes: int | None = None) -> dict:
+def run_pipeline(
+    settings: Settings,
+    sensor_specs: SensorSpecs,
+    room_profiles: RoomProfilesConfig,
+    from_ts: datetime,
+    to_ts: datetime,
+    window_minutes: int | None = None,
+    mode: Literal["publication", "exploratory"] = "publication",
+) -> dict:
     """Runs the full pipeline over every recompute instant in
     ``(from_ts, to_ts]`` and writes a minimal reproducibility-metadata
     run_summary.json. Opens exactly one snapshot of air_monitor.duckdb for
@@ -311,6 +355,17 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
     range writes rows under its own distinct pipeline_run_id and never
     overwrites or reads the first call's rows (see :mod:`iaq_hfis.db`'s
     run-isolated schema).
+
+    ``mode="publication"`` (default, strict): a missing DBN temperature
+    profile for any computed_ts aborts the entire run --
+    :class:`iaq_hfis.config.TemperatureProfileNotDefinedError` propagates
+    out uncaught, since a full A/V/M/I manuscript result must never be
+    produced with a substituted or omitted microclimate component.
+    ``mode="exploratory"``: the microclimate component is structurally
+    omitted (never fabricated) wherever no profile is defined; the run is
+    tagged ``mode="exploratory"`` in ``pipeline_runs`` and must never be
+    promoted into ``research_results/final`` (enforced in
+    :mod:`iaq_hfis.final_snapshot`).
     """
     window_minutes = window_minutes or settings.cadence.aggregation_window_minutes
     pipeline_run_id = uuid.uuid4().hex
@@ -327,7 +382,7 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
         try:
             for computed_ts in computed_timestamps:
                 t0 = time.perf_counter()
-                result = compute_index_at(ctx, source, computed_ts, window_minutes, writer, pipeline_run_id)
+                result = compute_index_at(ctx, source, computed_ts, window_minutes, writer, pipeline_run_id, mode=mode)
                 per_timestamp_seconds.append(time.perf_counter() - t0)
                 status_counts[result["completeness_status"]] += 1
 
@@ -337,13 +392,13 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
             writer.connection.execute(
                 """INSERT OR REPLACE INTO pipeline_runs
                    (pipeline_run_id, started_at, finished_at, status, computed_ts_min, computed_ts_max,
-                    window_minutes, n_timestamps_processed, n_snapshot_retries, config_hash, engine_version, source_git_commit)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    window_minutes, n_timestamps_processed, n_snapshot_retries, config_hash, engine_version, source_git_commit, mode)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 [pipeline_run_id, started_at, finished_at, run_status,
                  computed_timestamps[0] if computed_timestamps else None,
                  computed_timestamps[-1] if computed_timestamps else None,
                  window_minutes, len(computed_timestamps), source.snapshot_retry_count, ctx.config_hash,
-                 settings.engine_version, environment.get("git_commit")],
+                 settings.engine_version, environment.get("git_commit"), mode],
             )
             derived_row_counts = {
                 table: writer.connection.execute(f"SELECT COUNT(*) FROM {table} WHERE pipeline_run_id = ?", [pipeline_run_id]).fetchone()[0]
@@ -384,6 +439,7 @@ def run_pipeline(settings: Settings, sensor_specs: SensorSpecs, room_profiles: R
 
     summary = {
         "pipeline_run_id": pipeline_run_id,
+        "mode": mode,
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "status": run_status,

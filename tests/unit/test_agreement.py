@@ -19,14 +19,14 @@ def test_no_macro_f1_or_accuracy_computed_by_agreement_module():
 
 
 def test_pairwise_agreement_is_labeled_agreement_not_accuracy():
-    results = pairwise_agreement({"A": ["Favorable", "Critical"], "B": ["Favorable", "Critical"]})
+    results = pairwise_agreement({"A": ["Favourable", "Critical"], "B": ["Favourable", "Critical"]})
     assert len(results) == 1
     assert isinstance(results[0], AgreementResult)
     assert results[0].percent_agreement == 1.0
 
 
 def test_pairwise_agreement_excludes_none_positions():
-    results = pairwise_agreement({"A": ["Favorable", None, "Critical"], "B": ["Favorable", "Degraded", "Critical"]})
+    results = pairwise_agreement({"A": ["Favourable", None, "Critical"], "B": ["Favourable", "Degraded", "Critical"]})
     r = results[0]
     assert r.n == 2
     assert r.n_excluded == 1
@@ -34,7 +34,7 @@ def test_pairwise_agreement_excludes_none_positions():
 
 
 def test_pairwise_agreement_covers_every_method_pair():
-    results = pairwise_agreement({"A": ["Favorable"], "B": ["Favorable"], "C": ["Critical"]})
+    results = pairwise_agreement({"A": ["Favourable"], "B": ["Favourable"], "C": ["Critical"]})
     pairs = {(r.method_a, r.method_b) for r in results}
     assert pairs == {("A", "B"), ("A", "C"), ("B", "C")}
 

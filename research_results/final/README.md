@@ -6,11 +6,13 @@ regenerable directory. It was produced by
 `src/iaq_hfis/final_snapshot.py:build_final_snapshot` and replaced
 atomically (never hand-edited).
 
-- pipeline_run_id: `a09f711d3c0c44508cd499e12028ae17`
-- evaluation_run_id: `81fadef3088d4f658fb1cb03ab44d47e`
+
+
+- pipeline_run_id: `2bb2374fbdcc4fbda817178b3b07eb4c`
+- evaluation_run_id: `410c40df13524947a383b8aaecacf887`
 
 See `latest_run.json` for the full identity chain (config hash, git
-commit, generation timestamp, publication-readiness status) and
+commit, generation timestamp, readiness status) and
 `docs/reproducibility.md` (repo root) for how to reproduce it.
 
 `run_narrative.md` and `article_results_summary.md` are software-generated

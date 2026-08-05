@@ -9,7 +9,7 @@ from iaq_hfis.rules import build_rule_base
 
 #: Representative crisp scores (0-100) per class, for tests that need a
 #: plausible component_crisp_scores dict but don't assert on it directly.
-_REPRESENTATIVE_SCORE = {"Favorable": 10.0, "Acceptable": 35.0, "Degraded": 60.0, "Critical": 90.0}
+_REPRESENTATIVE_SCORE = {"Favourable": 10.0, "Acceptable": 35.0, "Degraded": 60.0, "Critical": 90.0}
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def _infer(engine, degrees: dict, available: set, component_classes: dict, tie_t
     return engine.infer_index(degrees, available, _scores(component_classes), tie_tolerance)
 
 
-@pytest.mark.parametrize("out_class,expected_low,expected_high", [("Favorable", 0, 25), ("Acceptable", 25, 50), ("Degraded", 50, 75), ("Critical", 75, 100)])
+@pytest.mark.parametrize("out_class,expected_low,expected_high", [("Favourable", 0, 25), ("Acceptable", 25, 50), ("Degraded", 50, 75), ("Critical", 75, 100)])
 def test_pure_class_index_lands_in_expected_range(engine, out_class, expected_low, expected_high):
     degrees = {"A": _degrees(out_class), "V": _degrees(out_class), "M": _degrees(out_class)}
     result = _infer(engine, degrees, {"A", "V", "M"}, {"A": out_class, "V": out_class, "M": out_class})
@@ -39,7 +39,7 @@ def test_pure_class_index_lands_in_expected_range(engine, out_class, expected_lo
 
 
 def test_output_boundaries_are_25_50_75_closed_worse_side():
-    assert classify_output(24.999) == "Favorable"
+    assert classify_output(24.999) == "Favourable"
     assert classify_output(25.0) == "Acceptable"
     assert classify_output(49.999) == "Acceptable"
     assert classify_output(50.0) == "Degraded"
@@ -49,65 +49,65 @@ def test_output_boundaries_are_25_50_75_closed_worse_side():
 
 
 def test_all_favorable_gives_favorable_result(engine):
-    degrees = {"A": _degrees("Favorable"), "V": _degrees("Favorable"), "M": _degrees("Favorable")}
-    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Favorable", "V": "Favorable", "M": "Favorable"})
-    assert result.index_class == "Favorable"
+    degrees = {"A": _degrees("Favourable"), "V": _degrees("Favourable"), "M": _degrees("Favourable")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Favourable", "V": "Favourable", "M": "Favourable"})
+    assert result.index_class == "Favourable"
 
 
 def test_one_critical_component_prevents_favorable_result(engine):
-    degrees = {"A": _degrees("Critical"), "V": _degrees("Favorable"), "M": _degrees("Favorable")}
-    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favorable", "M": "Favorable"})
-    assert result.index_class != "Favorable"
+    degrees = {"A": _degrees("Critical"), "V": _degrees("Favourable"), "M": _degrees("Favourable")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favourable", "M": "Favourable"})
+    assert result.index_class != "Favourable"
     assert result.index_class == "Critical"
 
 
 def test_monotonic_worsening_never_improves_index(engine):
     prior_value = 0.0
     for cls in CLASS_ORDER:
-        degrees = {"A": _degrees(cls), "V": _degrees("Favorable"), "M": _degrees("Favorable")}
-        result = _infer(engine, degrees, {"A", "V", "M"}, {"A": cls, "V": "Favorable", "M": "Favorable"})
+        degrees = {"A": _degrees(cls), "V": _degrees("Favourable"), "M": _degrees("Favourable")}
+        result = _infer(engine, degrees, {"A", "V", "M"}, {"A": cls, "V": "Favourable", "M": "Favourable"})
         assert result.index_value >= prior_value - 1e-9
         prior_value = result.index_value
 
 
 def test_centroid_is_deterministic(engine):
-    degrees = {"A": _degrees("Degraded"), "V": _degrees("Acceptable"), "M": _degrees("Favorable")}
-    classes = {"A": "Degraded", "V": "Acceptable", "M": "Favorable"}
+    degrees = {"A": _degrees("Degraded"), "V": _degrees("Acceptable"), "M": _degrees("Favourable")}
+    classes = {"A": "Degraded", "V": "Acceptable", "M": "Favourable"}
     r1 = _infer(engine, degrees, {"A", "V", "M"}, classes)
     r2 = _infer(engine, degrees, {"A", "V", "M"}, classes)
     assert r1.index_value == r2.index_value
 
 
 def test_partial_mode_two_components_favorable_gives_favorable(engine):
-    degrees = {"A": _degrees("Favorable"), "V": _degrees("Favorable")}
-    result = _infer(engine, degrees, {"A", "V"}, {"A": "Favorable", "V": "Favorable"})
-    assert result.index_class == "Favorable"
+    degrees = {"A": _degrees("Favourable"), "V": _degrees("Favourable")}
+    result = _infer(engine, degrees, {"A", "V"}, {"A": "Favourable", "V": "Favourable"})
+    assert result.index_class == "Favourable"
     assert result.index_value < 25.0
 
 
 def test_partial_mode_one_critical_component_gives_critical(engine):
-    degrees = {"A": _degrees("Critical"), "M": _degrees("Favorable")}
-    result = _infer(engine, degrees, {"A", "M"}, {"A": "Critical", "M": "Favorable"})
+    degrees = {"A": _degrees("Critical"), "M": _degrees("Favourable")}
+    result = _infer(engine, degrees, {"A", "M"}, {"A": "Critical", "M": "Favourable"})
     assert result.index_class == "Critical"
 
 
 def test_temperature_and_humidity_both_directions_worsen_microclimate(engine):
-    # Low, mid, high membership vectors for a two-sided channel (favorable in the middle)
-    mid = {"Favorable": 1.0, "Acceptable": 0.0, "Degraded": 0.0, "Critical": 0.0}
-    low_extreme = {"Favorable": 0.0, "Acceptable": 0.0, "Degraded": 0.0, "Critical": 1.0}
-    high_extreme = {"Favorable": 0.0, "Acceptable": 0.0, "Degraded": 0.0, "Critical": 1.0}
+    # Low, mid, high membership vectors for a two-sided channel (favourable in the middle)
+    mid = {"Favourable": 1.0, "Acceptable": 0.0, "Degraded": 0.0, "Critical": 0.0}
+    low_extreme = {"Favourable": 0.0, "Acceptable": 0.0, "Degraded": 0.0, "Critical": 1.0}
+    high_extreme = {"Favourable": 0.0, "Acceptable": 0.0, "Degraded": 0.0, "Critical": 1.0}
 
     mid_result = engine.infer_component("M", {"temperature": mid, "humidity": mid})
     low_result = engine.infer_component("M", {"temperature": low_extreme, "humidity": mid})
     high_result = engine.infer_component("M", {"temperature": high_extreme, "humidity": mid})
 
-    assert mid_result.class_degrees["Favorable"] == 1.0
+    assert mid_result.class_degrees["Favourable"] == 1.0
     assert low_result.class_degrees["Critical"] == 1.0
     assert high_result.class_degrees["Critical"] == 1.0
 
 
 def test_v_component_is_pass_through(engine):
-    co2_degrees = {"Favorable": 0.0, "Acceptable": 1.0, "Degraded": 0.0, "Critical": 0.0}
+    co2_degrees = {"Favourable": 0.0, "Acceptable": 1.0, "Degraded": 0.0, "Critical": 0.0}
     result = engine.infer_component("V", {"co2": co2_degrees})
     assert result.class_degrees == co2_degrees
     assert result.fired_rules == []
@@ -123,8 +123,8 @@ def test_v_component_is_pass_through(engine):
 
 
 def test_dominance_clearly_dominant_component(engine):
-    degrees = {"A": _degrees("Critical"), "V": _degrees("Favorable"), "M": _degrees("Favorable")}
-    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favorable", "M": "Favorable"})
+    degrees = {"A": _degrees("Critical"), "V": _degrees("Favourable"), "M": _degrees("Favourable")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favourable", "M": "Favourable"})
     dom = result.dominance
     assert dom.dominant_component == "A"
     assert dom.co_dominant_components == ["A"]
@@ -134,8 +134,8 @@ def test_dominance_clearly_dominant_component(engine):
 
 
 def test_dominance_two_components_tied(engine):
-    degrees = {"A": _degrees("Critical"), "V": _degrees("Favorable"), "M": _degrees("Critical")}
-    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favorable", "M": "Critical"})
+    degrees = {"A": _degrees("Critical"), "V": _degrees("Favourable"), "M": _degrees("Critical")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Critical", "V": "Favourable", "M": "Critical"})
     dom = result.dominance
     assert dom.co_dominant_components == ["A", "M"]
     assert dom.dominant_component == "A"  # alphabetically-first of the tie, deterministic
@@ -143,11 +143,11 @@ def test_dominance_two_components_tied(engine):
 
 
 def test_dominance_all_favorable_ties_every_component(engine):
-    degrees = {"A": _degrees("Favorable"), "V": _degrees("Favorable"), "M": _degrees("Favorable")}
-    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Favorable", "V": "Favorable", "M": "Favorable"})
+    degrees = {"A": _degrees("Favourable"), "V": _degrees("Favourable"), "M": _degrees("Favourable")}
+    result = _infer(engine, degrees, {"A", "V", "M"}, {"A": "Favourable", "V": "Favourable", "M": "Favourable"})
     dom = result.dominance
     assert dom.co_dominant_components == ["A", "M", "V"]
-    assert dom.worst_component_class == "Favorable"
+    assert dom.worst_component_class == "Favourable"
     assert dom.dominance_reason == "co_dominant_tie"
 
 
@@ -162,8 +162,8 @@ def test_dominance_one_critical_component_among_lesser_severities(engine):
 
 def test_dominance_missing_component_under_partial_is_never_consulted(engine):
     # V is missing entirely (PARTIAL) -- must not appear anywhere in the result.
-    degrees = {"A": _degrees("Critical"), "M": _degrees("Favorable")}
-    result = _infer(engine, degrees, {"A", "M"}, {"A": "Critical", "M": "Favorable"})
+    degrees = {"A": _degrees("Critical"), "M": _degrees("Favourable")}
+    result = _infer(engine, degrees, {"A", "M"}, {"A": "Critical", "M": "Favourable"})
     dom = result.dominance
     assert dom.dominant_component == "A"
     assert "V" not in dom.co_dominant_components
@@ -178,9 +178,9 @@ def test_dominance_equal_crisp_scores_but_different_memberships_favors_higher_se
     Degraded / half Critical (0.5 each) -- despite an engineered tie in
     crisp_score, M's antecedent reaches Critical severity and wins."""
     degrees = {
-        "A": {"Favorable": 0.0, "Acceptable": 0.0, "Degraded": 1.0, "Critical": 0.0},
-        "V": _degrees("Favorable"),
-        "M": {"Favorable": 0.0, "Acceptable": 0.0, "Degraded": 0.5, "Critical": 0.5},
+        "A": {"Favourable": 0.0, "Acceptable": 0.0, "Degraded": 1.0, "Critical": 0.0},
+        "V": _degrees("Favourable"),
+        "M": {"Favourable": 0.0, "Acceptable": 0.0, "Degraded": 0.5, "Critical": 0.5},
     }
     scores = {"A": 60.0, "V": 10.0, "M": 60.0}  # equal scores for A and M by construction
     result = engine.infer_index(degrees, {"A", "V", "M"}, scores, dominant_component_tie_tolerance=1.0)
@@ -201,7 +201,7 @@ def test_determine_dominance_no_rules_fired_returns_none():
 
 
 def test_rule_level_contributors_single_winner():
-    rule = Rule(antecedents=(("A", "Critical"), ("V", "Favorable")), consequent_class="Critical", level=2)
+    rule = Rule(antecedents=(("A", "Critical"), ("V", "Favourable")), consequent_class="Critical", level=2)
     fired = [FiredRule(rule=rule, antecedent_degrees={"A": 0.3, "V": 0.9}, firing_strength=0.3)]
     assert rule_level_contributors(fired) == ["A"]
 
@@ -213,6 +213,6 @@ def test_rule_level_contributors_ties_preserved():
 
 
 def test_rule_level_contributors_empty_when_nothing_fires():
-    rule = Rule(antecedents=(("A", "Favorable"),), consequent_class="Favorable", level=1)
+    rule = Rule(antecedents=(("A", "Favourable"),), consequent_class="Favourable", level=1)
     fired = [FiredRule(rule=rule, antecedent_degrees={"A": 0.0}, firing_strength=0.0)]
     assert rule_level_contributors(fired) == []

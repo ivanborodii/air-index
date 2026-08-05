@@ -27,9 +27,9 @@ def test_worst_of_consequent_is_max_severity():
 
 def test_all_favorable_antecedents_give_favorable_consequent():
     rules = generate_component_rules(["A", "V", "M"], level=2)
-    all_favorable = [r for r in rules if all(cls == "Favorable" for _, cls in r.antecedents)]
+    all_favorable = [r for r in rules if all(cls == "Favourable" for _, cls in r.antecedents)]
     assert len(all_favorable) == 1
-    assert all_favorable[0].consequent_class == "Favorable"
+    assert all_favorable[0].consequent_class == "Favourable"
 
 
 def test_any_critical_antecedent_gives_critical_consequent():

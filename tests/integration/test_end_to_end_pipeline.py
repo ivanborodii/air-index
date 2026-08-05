@@ -7,13 +7,15 @@ import jsonschema
 import pytest
 from fixtures.build_synthetic_db import DEFAULT_ROW, create_air_monitor_db, create_weather_db, default_weather_row
 
+from iaq_hfis.config import TemperatureProfileNotDefinedError
 from iaq_hfis.pipeline import run_pipeline
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 RUN_SUMMARY_SCHEMA = json.loads((REPO_ROOT / "config" / "run_summary.schema.json").read_text())
 
-# A January instant so the manuscript's kitchen/cold_period profile (the
-# only kitchen profile documented) applies without an override.
+# A January instant so the manuscript's kitchen/cold_period (DBN-cited)
+# profile applies without an override -- distinct from kitchen/warm_period,
+# which is sourced to a substitute standard (DSTU B EN 15251:2011).
 COMPUTED_TS = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
 WINDOW_START = COMPUTED_TS - timedelta(minutes=15)
 
@@ -26,7 +28,7 @@ def _oscillate(base: float, amplitude: float, i: int) -> float:
 
 
 def _clean_rows(n: int = 30, computed_ts: datetime = COMPUTED_TS, **nullify) -> list[dict]:
-    """``n`` rows of otherwise-favorable, non-flat data ending at ``computed_ts``.
+    """``n`` rows of otherwise-favourable, non-flat data ending at ``computed_ts``.
     Pass e.g. ``mass_pm2_5=True`` to null out a field across every row
     (simulating a fully unavailable channel)."""
     window_start = computed_ts - timedelta(minutes=15)
@@ -60,11 +62,11 @@ def _clean_rows(n: int = 30, computed_ts: datetime = COMPUTED_TS, **nullify) -> 
 
 @pytest.fixture
 def run_and_inspect(base_settings, sensor_specs, room_profiles):
-    def _run(rows, computed_ts: datetime = COMPUTED_TS):
+    def _run(rows, computed_ts: datetime = COMPUTED_TS, mode: str = "publication"):
         create_air_monitor_db(Path(base_settings.paths.air_monitor_db_path), rows)
         create_weather_db(Path(base_settings.paths.weather_db_path), [default_weather_row(computed_ts - timedelta(hours=1))])
         summary = run_pipeline(
-            base_settings, sensor_specs, room_profiles, computed_ts - timedelta(minutes=1), computed_ts + timedelta(minutes=1), window_minutes=15
+            base_settings, sensor_specs, room_profiles, computed_ts - timedelta(minutes=1), computed_ts + timedelta(minutes=1), window_minutes=15, mode=mode
         )
         con = duckdb.connect(base_settings.paths.derived_db_path, read_only=True)
         result_row = con.execute(
@@ -105,46 +107,83 @@ def test_two_missing_components_gives_failed(run_and_inspect):
     assert index_class is None
 
 
-def test_default_config_works_in_both_seasons(run_and_inspect):
-    # provisional_parameters_used is now the single authoritative catalog
+def test_cold_period_kitchen_default_config_is_provisional_param_free(run_and_inspect):
+    # provisional_parameters_used is the single authoritative catalog
     # (iaq_hfis.provenance.engaged_provisional_paths), which always includes
-    # every config-level PROVISIONAL parameter (e.g. Hampel filter settings)
-    # regardless of season -- those apply to every computed_ts by
-    # construction. Neither kitchen/cold_period nor kitchen/warm_period is
-    # itself a provisional room profile in the current config, so no
-    # room_profiles.* path should appear.
+    # every config-level PROVISIONAL parameter (e.g. Hampel filter settings).
+    # kitchen/cold_period is not itself a provisional room profile in the
+    # current config, so no room_profiles.* path should appear.
     winter_ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    summary, row = run_and_inspect(_clean_rows(computed_ts=winter_ts), computed_ts=winter_ts)
+    assert row[0] == "OK"
+    assert summary["mode"] == "publication"
+    assert summary["provisional_parameters_used"]  # config-level PROVISIONAL params are always engaged
+    assert not any(p.startswith("room_profiles.") for p in summary["provisional_parameters_used"])
+
+
+def test_publication_mode_succeeds_for_warm_period_kitchen_run(run_and_inspect):
+    # kitchen/warm_period is sourced to DSTU B EN 15251:2011 Table A.2 (a
+    # substitute standard, explicit author decision -- DBN Table D.4 itself
+    # still has no value for this room/season). This is a confirmed
+    # (non-provisional) profile, so publication mode must produce a full
+    # A/V/M/I OK-completeness result instead of aborting.
     summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
-
-    winter_summary, winter_row = run_and_inspect(_clean_rows(computed_ts=winter_ts), computed_ts=winter_ts)
-    assert winter_row[0] == "OK"
-    assert winter_summary["provisional_parameters_used"]  # config-level PROVISIONAL params are always engaged
-    assert not any(p.startswith("room_profiles.") for p in winter_summary["provisional_parameters_used"])
-
-    summer_summary, summer_row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
-    assert summer_row[0] == "OK"
-    # Author decision (2026-07-24): kitchen/warm_period deliberately reuses
-    # general_residential/warm_period's numbers, not a placeholder -- so no
-    # room_profiles.* provisional entry is expected here either.
-    assert not any(p.startswith("room_profiles.") for p in summer_summary["provisional_parameters_used"])
-    assert set(winter_summary["provisional_parameters_used"]) == set(summer_summary["provisional_parameters_used"])
+    summary, row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
+    assert row[0] == "OK"
+    assert summary["mode"] == "publication"
+    assert not any(p.startswith("room_profiles.") for p in summary["provisional_parameters_used"])
 
 
-def test_provisional_room_profile_usage_is_tracked_in_run_summary(run_and_inspect, room_profiles):
+def test_publication_mode_blocks_still_undefined_profile(run_and_inspect, base_settings):
+    # general_residential/cold_period is genuinely absent from both DBN and
+    # DSTU citations in room_profiles.yaml. Publication mode (the default)
+    # must still abort the entire run rather than silently substituting or
+    # omitting the microclimate component for a "full" A/V/M/I result.
+    base_settings.profile_selection.room = "general_residential"
+    winter_ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    with pytest.raises(TemperatureProfileNotDefinedError) as exc_info:
+        run_and_inspect(_clean_rows(computed_ts=winter_ts), computed_ts=winter_ts)
+    err = exc_info.value
+    assert err.requested_room == "general_residential"
+    assert err.requested_season == "cold_period"
+
+
+def test_exploratory_mode_omits_microclimate_for_undefined_profile(run_and_inspect, base_settings):
+    # Exploratory mode never fabricates the microclimate component: with no
+    # DBN/DSTU profile for general_residential/cold_period (still genuinely
+    # undefined), M is structurally omitted (like a genuinely missing
+    # component), and A/V still produce a PARTIAL result.
+    base_settings.profile_selection.room = "general_residential"
+    winter_ts = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    summary, (status, index_value, index_class, missing) = run_and_inspect(
+        _clean_rows(computed_ts=winter_ts), computed_ts=winter_ts, mode="exploratory"
+    )
+    assert summary["mode"] == "exploratory"
+    assert status == "PARTIAL"
+    assert missing == ["M"]
+    assert index_value is not None
+    assert index_class is not None
+
+
+def test_provisional_room_profile_usage_is_tracked_in_run_summary(run_and_inspect, room_profiles, base_settings):
     # Exercises the tracking mechanism itself (pipeline.py:
     # RuntimeContext.provisional_profiles_used, surfaced through
     # provenance.engaged_provisional_paths) independent of which real
     # profiles happen to be provisional today. The engaged entry is reported
     # by its actual provenance path (room_profiles.<room>/<season>.transition_width),
     # not the raw internal event string -- that path is what parameter_provenance.csv
-    # and every other artifact key off of.
+    # and every other artifact key off of. Uses general_residential/warm_period
+    # (a real, currently-non-provisional profile), temporarily marking it
+    # provisional for this test, independent of which profiles are provisional
+    # by default today.
     summer_ts = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
-    profile = room_profiles.find("kitchen", "warm_period")
+    base_settings.profile_selection.room = "general_residential"
+    profile = room_profiles.find("general_residential", "warm_period")
     profile.provisional = True
 
     summary, row = run_and_inspect(_clean_rows(computed_ts=summer_ts), computed_ts=summer_ts)
     assert row[0] == "OK"
-    assert "room_profiles.kitchen/warm_period.transition_width" in summary["provisional_parameters_used"]
+    assert "room_profiles.general_residential/warm_period.transition_width" in summary["provisional_parameters_used"]
 
 
 def test_run_summary_json_validates_against_schema(run_and_inspect):

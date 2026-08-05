@@ -7,7 +7,7 @@ Strata (each contributing up to
 deterministically sampled with the run's stability seed so results are
 reproducible):
 
-- one per available air-quality class (Favorable/Acceptable/Degraded/Critical)
+- one per available air-quality class (Favourable/Acceptable/Degraded/Critical)
   among OK results;
 - PARTIAL completeness cases;
 - boundary_adjacent: aggregated values close to a control-region boundary;
@@ -114,7 +114,7 @@ def select_sensitivity_samples(
     boundary_adjacent_ts = {ts for ts, d in boundary_dist.items() if boundary_threshold is not None and d <= boundary_threshold}
 
     strata: dict[str, list[datetime]] = {}
-    for cls in ("Favorable", "Acceptable", "Degraded", "Critical"):
+    for cls in ("Favourable", "Acceptable", "Degraded", "Critical"):
         strata[f"class_{cls}"] = [ts for ts, (status, c, _) in reference.items() if status == "OK" and c == cls]
     strata["completeness_PARTIAL"] = [ts for ts, (status, _, _) in reference.items() if status == "PARTIAL"]
     strata["boundary_adjacent"] = [ts for ts in boundary_adjacent_ts if reference.get(ts, (None,))[0] == "OK"]

@@ -6,7 +6,7 @@ The engine needs class-shaped output curves (built from
 same curves are reused to give A and M a numeric ``crisp_score`` alongside
 their fuzzy class degrees — this is NOT required by the manuscript's core
 index computation (which only ever needs class degrees to feed the next
-level's rules) but is exposed now so the Phase 2 CRISP-MAX / WEIGHTED-MEAN
+level's rules) but is exposed now so the Phase 2 FUZZY_COMPONENT_MAX / WEIGHTED_MEAN
 baselines can reuse it without changes here.
 """
 
@@ -149,11 +149,11 @@ def rule_level_contributors(fired_rules: list[FiredRule]) -> list[str]:
 
 
 def classify_output(value: float) -> str:
-    """Favorable [0,25) / Acceptable [25,50) / Degraded [50,75) / Critical [75,100] —
-    boundary values map to the less-favorable class (manuscript, output scale only)."""
+    """Favourable [0,25) / Acceptable [25,50) / Degraded [50,75) / Critical [75,100] —
+    boundary values map to the less-favourable class (manuscript, output scale only)."""
     b0, b1, b2 = OUTPUT_BOUNDARIES
     if value < b0:
-        return "Favorable"
+        return "Favourable"
     if value < b1:
         return "Acceptable"
     if value < b2:

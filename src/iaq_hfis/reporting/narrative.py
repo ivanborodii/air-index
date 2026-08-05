@@ -20,13 +20,13 @@ RUN_NARRATIVE_MD = "run_narrative.md"
 WARNING_BANNER = "> **This is a reproducible, software-generated draft. Review before inclusion in a publication.**"
 
 #: Required verbatim -- an explicit list of overclaims this narrative (and
-#: any prose built from it) must never make, regardless of how favorable a
+#: any prose built from it) must never make, regardless of how favourable a
 #: given run's numbers look.
 FORBIDDEN_OVERCLAIMS: list[str] = [
     "Do not report agreement (real, unlabeled data) or stability (self-consistency under perturbation) as accuracy.",
     "Do not report reference-case or fault-injection consistency/precision/recall against synthetic, pre-labeled data as real-world empirical accuracy.",
     "Do not claim a PROVISIONAL parameter is validated because a synthetic benchmark's calibration grid favored its configured value -- that result is scoped to the benchmark, never universal.",
-    "Do not claim PROPOSED-HFIS is smoother than CRISP-MAX, or vice versa, without checking this run's own continuity smoothness_comparison -- the single-channel-perturbation design can force the two methods to coincide regardless of context (see docs/hfis_vs_crispmax_audit.md).",
+    "Do not claim PROPOSED_HFIS is smoother than FUZZY_COMPONENT_MAX, or vice versa, without checking this run's own continuity smoothness_comparison -- the single-channel-perturbation design can force the two methods to coincide regardless of context (see docs/hfis_vs_crispmax_audit.md).",
     "Do not describe a FAILED or PARTIAL-completeness computed_ts's absent index value as low or zero -- it is undefined, not low.",
     "Do not use outdoor CO as a proxy for indoor CO2, or WHO 24-hour PM reference points as a compliance assessment for a 15-minute index.",
     "Do not present sampled multi-point stability/sensitivity results as exhaustive coverage of every computed_ts.",
@@ -54,7 +54,7 @@ def _num(value: float | None, digits: int = 3) -> str:
 
 
 def _hfis_vs_crispmax_equivalence_note(ev: dict) -> list[str]:
-    """Data-driven, per the task spec: if PROPOSED-HFIS and CRISP-MAX turn
+    """Data-driven, per the task spec: if PROPOSED_HFIS and FUZZY_COMPONENT_MAX turn
     out equivalent at the classification level on THIS run's real data (or
     numerically tied on the continuity experiment), state that explicitly
     and discuss whether HFIS's remaining value is structural rather than
@@ -62,7 +62,7 @@ def _hfis_vs_crispmax_equivalence_note(ev: dict) -> list[str]:
     the two methods were shown to differ."""
     agreement_rows = ev.get("agreement") or []
     pair = next(
-        (a for a in agreement_rows if {a.get("method_a"), a.get("method_b")} == {"PROPOSED-HFIS", "CRISP-MAX"}),
+        (a for a in agreement_rows if {a.get("method_a"), a.get("method_b")} == {"PROPOSED_HFIS", "FUZZY_COMPONENT_MAX"}),
         None,
     )
     smoothness = ((ev.get("continuity") or {}).get("smoothness_comparison")) or {}
@@ -72,7 +72,7 @@ def _hfis_vs_crispmax_equivalence_note(ev: dict) -> list[str]:
     if pair is not None and pair.get("percent_agreement") is not None:
         pct, kappa = pair["percent_agreement"], pair.get("cohens_kappa")
         lines.append(
-            f"PROPOSED-HFIS and CRISP-MAX agreed on {_pct(pct)} of compared timestamps this run "
+            f"PROPOSED_HFIS and FUZZY_COMPONENT_MAX agreed on {_pct(pct)} of compared timestamps this run "
             f"(Cohen's kappa={_num(kappa)}, real unlabeled data -- agreement, not accuracy)."
         )
         near_total_agreement = pct >= 0.95
@@ -89,15 +89,15 @@ def _hfis_vs_crispmax_equivalence_note(ev: dict) -> list[str]:
 
     if near_total_agreement or continuity_fully_tied:
         lines.append(
-            "**PROPOSED-HFIS and CRISP-MAX are effectively equivalent at the classification level on this run's "
+            "**PROPOSED_HFIS and FUZZY_COMPONENT_MAX are effectively equivalent at the classification level on this run's "
             "measurements.** Stated explicitly, not minimized: where the two methods coincide numerically, "
-            "PROPOSED-HFIS's remaining value is structural, not demonstrated as an empirical advantage by this "
+            "PROPOSED_HFIS's remaining value is structural, not demonstrated as an empirical advantage by this "
             "run's results alone -- (a) continuous within-class severity via centroid defuzzification and the "
             "explicit per-component membership degrees (component_scores_timeseries.csv's membership_* columns), "
-            "which CRISP-MAX's raw max() never computes; (b) graded uncertainty representation -- simultaneous "
+            "which FUZZY_COMPONENT_MAX's raw max() never computes; (b) graded uncertainty representation -- simultaneous "
             "partial membership in more than one class per component, with no equivalent in a hard maximum; "
             "(c) extensibility -- a two-level rule base can express component-interaction logic (e.g. rules "
-            "conditioned on two components being simultaneously non-favorable) that a scalar max() cannot express "
+            "conditioned on two components being simultaneously non-favourable) that a scalar max() cannot express "
             "by construction, though the worst-of rule base actually configured here has not been extended to "
             "exercise that capability. An independent synthetic check (docs/hfis_vs_crispmax_audit.md section 2) "
             "shows the two methods DO diverge substantially (mean |difference| ~5.7 index points on a 0-100 scale) "
@@ -252,10 +252,10 @@ def build_run_narrative(summary: dict) -> str:
             lines.append(
                 f"Deterministic input grids ({continuity['grid_points_per_boundary']} points each) around "
                 f"{continuity['n_boundaries']} control-region boundaries, each swept under {continuity.get('n_contexts', 1)} "
-                f"'other components' contexts ({', '.join(continuity.get('contexts', []))}), comparing PROPOSED-HFIS, "
-                f"CRISP-MAX, and WEIGHTED-MEAN numerically (see continuity_grid.csv / continuity_summary.csv)."
+                f"'other components' contexts ({', '.join(continuity.get('contexts', []))}), comparing PROPOSED_HFIS, "
+                f"FUZZY_COMPONENT_MAX, and WEIGHTED_MEAN numerically (see continuity_grid.csv / continuity_summary.csv)."
             )
-            for method in ("PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"):
+            for method in ("PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "WEIGHTED_MEAN"):
                 rows = [r for r in by_bm if r["method"] == method and r["max_adjacent_jump"] is not None]
                 if not rows:
                     continue

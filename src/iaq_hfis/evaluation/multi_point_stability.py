@@ -1,7 +1,7 @@
 """Multi-point stability analysis: perturbation trials at a deterministic,
 stratified sample of computed_ts drawn from the whole evaluated range (not
-just the latest timestamp), for all three methods (PROPOSED-HFIS,
-CRISP-MAX, WEIGHTED-MEAN).
+just the latest timestamp), for all four methods (PROPOSED_HFIS,
+FUZZY_COMPONENT_MAX, CRISP_CLASS_MAX, WEIGHTED_MEAN).
 
 Sample selection is two-part and fully deterministic for a fixed
 (pipeline_run_id, window_minutes, from_ts, to_ts, seed):
@@ -18,9 +18,8 @@ input channel, by an amount drawn uniformly from
 [-declared_uncertainty, +declared_uncertainty] (the same per-channel
 uncertainty already used everywhere else), clipped to the channel's
 sensor technical range, with PM2.5 <= PM10 ordering re-enforced after
-perturbation. All three methods are recomputed from the *same* perturbed
-component crisp scores per trial, so their outcomes are directly
-comparable trial-for-trial.
+perturbation. All four methods are recomputed from the *same* perturbed
+values per trial, so their outcomes are directly comparable trial-for-trial.
 """
 
 from __future__ import annotations
@@ -31,13 +30,13 @@ from datetime import datetime
 
 import numpy as np
 
-from iaq_hfis.baselines import BaselineResult, crisp_max, weighted_mean
+from iaq_hfis.baselines import BaselineResult, crisp_class_max, fuzzy_component_max, weighted_mean
 from iaq_hfis.constants import CLASS_SEVERITY
 from iaq_hfis.pipeline import RuntimeContext, infer_from_values
 from iaq_hfis.schema import RAW_COLUMN_TO_SENSOR_SPEC, channel_uncertainty
 
 DIRECT_INPUT_CHANNELS = ["pm2_5", "pm10", "co2", "temperature", "humidity"]
-METHODS = ["PROPOSED-HFIS", "CRISP-MAX", "WEIGHTED-MEAN"]
+METHODS = ["PROPOSED_HFIS", "FUZZY_COMPONENT_MAX", "CRISP_CLASS_MAX", "WEIGHTED_MEAN"]
 
 
 @dataclass(frozen=True)
@@ -73,15 +72,20 @@ def _deterministic_seed(seed: int, sample_id: str) -> int:
 
 
 def boundary_targets(control_regions, room_profile) -> dict[str, list[float]]:
+    """``room_profile`` may be ``None`` (exploratory mode, no DBN profile for
+    this room/season) -- the temperature axis is simply omitted, never
+    fabricated; every other channel's boundaries are unaffected."""
     rh = control_regions.relative_humidity
-    temp = room_profile.ranges
-    return {
+    targets = {
         "pm2_5": list(control_regions.pm2_5.breakpoints),
         "pm10": list(control_regions.pm10.breakpoints),
         "co2": list(control_regions.co2.breakpoints),
-        "temperature": [temp.critical_low_max, temp.acceptable_low[1], temp.favorable[0], temp.favorable[1], temp.acceptable_high[0], temp.critical_high_min],
-        "humidity": [rh.critical_low_max, rh.acceptable_low[1], rh.favorable[0], rh.favorable[1], rh.acceptable_high[0], rh.critical_high_min],
+        "humidity": [rh.critical_low_max, rh.acceptable_low[1], rh.favourable[0], rh.favourable[1], rh.acceptable_high[0], rh.critical_high_min],
     }
+    if room_profile is not None:
+        temp = room_profile.ranges
+        targets["temperature"] = [temp.critical_low_max, temp.acceptable_low[1], temp.favourable[0], temp.favourable[1], temp.acceptable_high[0], temp.critical_high_min]
+    return targets
 
 
 def select_stability_samples(
@@ -197,12 +201,14 @@ def _perturb_once(values: dict[str, float], ctx: RuntimeContext, rng: np.random.
 def _baseline_outcomes(ctx: RuntimeContext, values: dict[str, float], available_components: set[str], profile) -> tuple[dict[str, MethodOutcome], dict[str, float]]:
     component_results, index_result = infer_from_values(ctx, values, available_components, profile)
     scores = {c: r.crisp_score for c, r in component_results.items()}
-    cm: BaselineResult = crisp_max(scores)
+    cm: BaselineResult = fuzzy_component_max(scores)
+    ccm: BaselineResult = crisp_class_max(values, ctx.settings.control_regions, profile.ranges if profile is not None else None)
     wm: BaselineResult = weighted_mean(scores)
     outcomes = {
-        "PROPOSED-HFIS": MethodOutcome(index_result.index_class if index_result else None, index_result.index_value if index_result else None),
-        "CRISP-MAX": MethodOutcome(cm.index_class, cm.index_value),
-        "WEIGHTED-MEAN": MethodOutcome(wm.index_class, wm.index_value),
+        "PROPOSED_HFIS": MethodOutcome(index_result.index_class if index_result else None, index_result.index_value if index_result else None),
+        "FUZZY_COMPONENT_MAX": MethodOutcome(cm.index_class, cm.index_value),
+        "CRISP_CLASS_MAX": MethodOutcome(ccm.index_class, ccm.index_value),
+        "WEIGHTED_MEAN": MethodOutcome(wm.index_class, wm.index_value),
     }
     return outcomes, scores
 
@@ -249,9 +255,10 @@ def _fetch_stability_rows(con, evaluation_run_id: str) -> list[tuple]:
         SELECT t.method, t.trial_class, t.changed_from_baseline, t.abs_index_change,
                s.sample_id, s.selection_reason, s.boundary_channel,
                CASE t.method
-                   WHEN 'PROPOSED-HFIS' THEN s.baseline_class_hfis
-                   WHEN 'CRISP-MAX' THEN s.baseline_class_crisp_max
-                   WHEN 'WEIGHTED-MEAN' THEN s.baseline_class_weighted_mean
+                   WHEN 'PROPOSED_HFIS' THEN s.baseline_class_hfis
+                   WHEN 'FUZZY_COMPONENT_MAX' THEN s.baseline_class_crisp_max
+                   WHEN 'CRISP_CLASS_MAX' THEN s.baseline_class_crisp_class_max
+                   WHEN 'WEIGHTED_MEAN' THEN s.baseline_class_weighted_mean
                END AS baseline_class
         FROM evaluation_stability_trials t
         JOIN evaluation_stability_samples s

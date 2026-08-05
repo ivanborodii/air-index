@@ -8,8 +8,8 @@ scoped to one `pipeline_run_id` and gets its own fresh `evaluation_run_id`
 
 ## 1. Agreement (unlabeled real data)
 
-Pairwise class agreement (% agreement, Cohen's kappa) between PROPOSED-HFIS,
-CRISP-MAX, and WEIGHTED-MEAN over every computed_ts in the evaluated range.
+Pairwise class agreement (% agreement, Cohen's kappa) between PROPOSED_HFIS,
+FUZZY_COMPONENT_MAX, and WEIGHTED_MEAN over every computed_ts in the evaluated range.
 **This is agreement, never accuracy** -- there is no ground truth for real
 observations. `evaluation/agreement.py`; `evaluation.agreement` in
 run_summary.json; `method_comparison.csv`.
@@ -18,14 +18,14 @@ run_summary.json; `method_comparison.csv`.
 
 A "masking event": a computed_ts where at least one available component's
 own class reaches `masking_severity_threshold` (default Critical) but a
-baseline's aggregated class does not. CRISP-MAX cannot mask by construction
+baseline's aggregated class does not. FUZZY_COMPONENT_MAX cannot mask by construction
 (it IS the max). `evaluation/masking.py`; `masking_summary.csv`.
 
 ## 3. Reference cases (NOT empirical ground truth)
 
 42 synthetic, deterministic, pre-labeled vectors: each perturbs exactly one
 direct-input channel to a point just below/above one of its configured
-breakpoints, holding every other channel deeply favorable. Because the rule
+breakpoints, holding every other channel deeply favourable. Because the rule
 base is worst-of, the expected class is exactly the perturbed channel's own
 crisp class. Macro-F1/Cohen's kappa here measure **consistency with a
 predefined synthetic label**, not real-world classification accuracy --
@@ -43,7 +43,7 @@ Two-part deterministic sample selection over the whole evaluated range
   `stability_seed`) of up to `stability_max_random_samples` from the rest.
 
 Each point is perturbed `stability_n_trials` times per method
-(PROPOSED-HFIS, CRISP-MAX, WEIGHTED-MEAN): every available channel
+(PROPOSED_HFIS, FUZZY_COMPONENT_MAX, WEIGHTED_MEAN): every available channel
 independently perturbed by U(-declared_uncertainty, +declared_uncertainty),
 clipped to the sensor's technical range, PM2.5<=PM10 ordering re-enforced.
 Per-sample RNG seeds are derived via SHA-256 of `(seed, sample_id)` --
@@ -69,7 +69,7 @@ CSVs: `stability_samples.csv`, `stability_trials.csv`, `stability_by_point.csv`,
 `stability_summary.csv`, `stability_summary_by_variable.csv`,
 `stability_summary_by_original_class.csv`.
 
-## 5. Boundary continuity (HFIS vs CRISP-MAX vs WEIGHTED-MEAN)
+## 5. Boundary continuity (HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN)
 
 Dense deterministic input grids (`evaluation.continuity_grid_points`,
 default 41) spanning +/-1 declared sensor uncertainty around every
@@ -77,30 +77,30 @@ control-region boundary: 3 breakpoints each for PM2.5/PM10/CO2, 6 edges for
 humidity, and 6 edges **per room/season profile** for temperature (every
 profile in `room_profiles.yaml`, not just the run's representative one --
 "every seasonal temperature boundary"). Each boundary is swept under
-THREE "other components" contexts -- **favorable**, **acceptable**,
-**degraded** -- not a single favorable-only baseline. Per boundary/context/
+THREE "other components" contexts -- **favourable**, **acceptable**,
+**degraded** -- not a single favourable-only baseline. Per boundary/context/
 method: max/mean/median/p95 adjacent-point jump, total variation, a local
 Lipschitz ratio (max \|delta index\| / \|delta input\| between adjacent
 grid points -- the discrete-grid Lipschitz constant), class transitions
 (count + positions), index range, monotonicity violations (for pollutant
-channels), whether a favorable component masked the swept channel's own
-severity, and (PROPOSED-HFIS rows only) the area between its own curve and
-CRISP-MAX's curve (trapezoidal integral of \|HFIS - CRISP-MAX\| over the
+channels), whether a favourable component masked the swept channel's own
+severity, and (PROPOSED_HFIS rows only) the area between its own curve and
+FUZZY_COMPONENT_MAX's curve (trapezoidal integral of \|HFIS - FUZZY_COMPONENT_MAX\| over the
 sweep). `evaluation/continuity.py`.
 CSVs: `continuity_grid.csv`, `continuity_summary.csv`.
 
 **Honesty note -- read `docs/hfis_vs_crispmax_audit.md` before citing this
 experiment.** When only ONE channel is swept, holding every other channel
 at a FIXED value (even under the acceptable/degraded contexts), the
-worst-of rule base can make PROPOSED-HFIS mathematically collapse to
-exactly CRISP-MAX's computation for the whole sweep -- proven and observed
+worst-of rule base can make PROPOSED_HFIS mathematically collapse to
+exactly FUZZY_COMPONENT_MAX's computation for the whole sweep -- proven and observed
 empirically on real data (`smoothness_comparison` in
 `run_summary.json:evaluation.continuity`, and the audit doc's section 3B).
 This is a property of the single-channel-perturbation experimental design,
 not evidence the two methods are equivalent in general (an independent
 multi-component synthetic check in the audit doc shows real divergence once
 more than one channel carries signal simultaneously) -- but it does mean a
-"HFIS is smoother than CRISP-MAX" claim is **not** supported by this
+"HFIS is smoother than FUZZY_COMPONENT_MAX" claim is **not** supported by this
 continuity experiment as currently designed. Always read the actual
 `smoothness_comparison.conclusion` string for the run in question; never
 assume HFIS is smoother without checking it.
@@ -197,10 +197,15 @@ tracked reference run; `src/iaq_hfis/validation.py`). Writes
 `artifact_validation.json`/`.md` (plus a plain-text rendering) -- exits
 nonzero on any violation.
 
-`assess_publication_readiness` (`src/iaq_hfis/provenance.py`) is a
-lighter, always-computable signal (pipeline/evaluation status +
-provisional-parameter disclosure) merged into
-`run_summary.json:publication_readiness` at report-generation time. The two
-are complementary, not identical: `validate-artifacts`'s result is the
-authoritative combined check, recorded in the tracked
-`research_results/final/` snapshot (see `docs/reproducibility.md`).
+`assess_readiness` (`src/iaq_hfis/provenance.py`) is a lighter,
+always-computable signal (pipeline/evaluation status + provisional-parameter
+disclosure) merged into `run_summary.json:readiness` at report-generation
+time, split into `artifact_readiness` (computational artifacts are
+internally complete and consistent) and `manuscript_readiness` (this run
+is eligible to be described as the manuscript's complete proposed method
+-- requires a DBN-supported temperature profile, `mode=publication`, and a
+full A/V/M/I OK-completeness result). The two are complementary, not
+identical: `validate-artifacts`'s result is the authoritative combined
+check, folded into both readiness signals at `finalize` time via
+`iaq_hfis.provenance.fold_late_artifact_checks`, and recorded in the
+tracked `research_results/final/` snapshot (see `docs/reproducibility.md`).

@@ -1,0 +1,99 @@
+{
+  "pipeline_run_id": "a09f711d3c0c44508cd499e12028ae17",
+  "evaluation_run_id": "81fadef3088d4f658fb1cb03ab44d47e",
+  "generation_timestamp_utc": "2026-07-29T22:57:23.264554+00:00",
+  "git_commit": "5f284166076b56f1d9b561626544cab87c3e5d4a",
+  "config_hash": "49fa03b6c0d202b58e8a533c3bd3e5febb1934234f5fbd081e99ff7a2fea31e1",
+  "input_date_range_utc": [
+    "2026-07-15T19:11:17+00:00",
+    "2026-07-29T19:11:17+00:00"
+  ],
+  "row_counts": {
+    "source_raw_row_count": 40318,
+    "derived_row_counts": {
+      "observation_quality": 201700,
+      "window_aggregates": 20160,
+      "component_scores": 12096,
+      "iaq_index_results": 4032
+    }
+  },
+  "databases": {
+    "air_monitor_db_path": {
+      "path": "air-monitor/data/air_monitor.duckdb",
+      "sha256": "0ad0bdd12c5cd618326313dd16e20280dea2dacf5e4d960593506611baa33ef3",
+      "size_bytes": 58208256
+    },
+    "weather_db_path": {
+      "path": "air-monitor/data/weather.duckdb",
+      "sha256": "a24873c208e0e94abe18685ee1841e787aaf8594692b905b65a4bcee86d0b5d8",
+      "size_bytes": 798720
+    },
+    "derived_db_path": {
+      "path": "data/iaq_hfis/iaq_hfis.duckdb",
+      "sha256": "fd1494f3e02250767f21372cc715e340dd58ea337eeae8307aa91e2a19c25b9b",
+      "size_bytes": 56897536
+    }
+  },
+  "artifact_checksums_sha256": {
+    "README.md": "4a7b55042810d11db3005cc83ba80aea5099a8b453f7797bf9013a7bdcf2e052",
+    "article_metrics.json": "cd0441d7cde94994cedf47d35dca44fc1f6104b35ed5fe721973afac8c51d652",
+    "article_results_summary.md": "5713e27509859086803ff98eb51cf55a8536ace4a25925cea2a4594ed44a2a9b",
+    "artifact_validation.json": "39791154a6f1e785e1480d570c906e8099dfe27fb95bcc60b87f95f913a16260",
+    "artifact_validation.md": "25f612688b948f75c4f02e3fc391d4e31b2098b18c18616c9be030f86358061f",
+    "artifact_validation_report.txt": "dea24df2393d68a4d9dee091104278a199cf7c96b2b55e5b8f2cd1a48cea2ec8",
+    "effective_config/iaq_hfis.yaml": "b1280dafb37df0b14e19de83c8e56abe0f8a0cfff58c487d2f4dd427b3f8b2c5",
+    "effective_config/room_profiles.yaml": "f7247e58e8fd7c033f6a996cf9b93b81e80cf8904c6b3b752f4ad0976f33c47b",
+    "effective_config/sensor_specs.yaml": "2b1d1ffdda1270f0985afea54bbe99ebdcf999f5e9fee4db38834a20d3b4e619",
+    "exports/component_scores_timeseries.csv": "c74c2183573428cda175afeecc6e9d291a5252c8c023a6f34021bc2e620b734c",
+    "exports/continuity_grid.csv": "644a9aea64cfe9f1eb68368860fbceabbe9d03b26759c81dc14d3542151747b7",
+    "exports/continuity_summary.csv": "0fc67bc054f1978e10b53ace7e45a4b77224d8e65eb27f34af2fdfd27295db7a",
+    "exports/data_quality_summary.csv": "ce6512fcbb1abe637e1948e2b7c46b77ff8f3c8a52fba71b92243d566fb7cc45",
+    "exports/fault_detection_confusion_matrix.csv": "9e0802dcb89581af7443631af19cb3d6d61d057909790b944ec34fc32b79aeed",
+    "exports/fault_detection_event_metrics.csv": "20240b9cd1a622e572f0b9cbed02d5e01ac1e733f46fe0fbdddb7ed539957cbc",
+    "exports/fault_detection_metrics.csv": "63ec519bd104f0390935eb21d07892a4b40df90a9f5d4d24f4320043b5cf9902",
+    "exports/fault_detection_predictions.csv": "c0e42f4c07cc30617c6d8eb9c38783cbf42ed5418b3275788c3b1ff0958412d7",
+    "exports/fault_injection_events.csv": "f5305d17a799e2207e52502e6b3ff8981d1508d77f138f40d3044861a3a0bff2",
+    "exports/hampel_calibration.csv": "8828a04b16a2ac8275f961cd19c0e347d8a47731d4f2451722442d910e740035",
+    "exports/index_timeseries.csv": "bc8db748b4d7a9ad60fefa76f7d4780a132c5520e939a944bb2069e68e351282",
+    "exports/masking_summary.csv": "92b9a1a6ab636b97b4d2e8563a694015831e33bcafece25a2c9cdbbffd6bda6a",
+    "exports/method_comparison.csv": "37dabad7c41cd0f3c4044b65405232bfccf98901f3e9b46b2a31f82116f3d733",
+    "exports/outdoor_context_timeseries.csv": "a9dd6bf83502e55fbeec8bc4b16f237ee0a04163a7522ff55dce98f471dcb9f6",
+    "exports/reason_code_frequency.csv": "e912ef00644affbbc5eebf8894304dda912cd3320161d2f611093d19b269a8c1",
+    "exports/reference_case_consistency.csv": "61b82b7c5d528bc661b073287e315f68345e85413a1dd82d5056a083758835ad",
+    "exports/sensitivity_coverage_by_point.csv": "bfaf3253a0ad0c50813f49f7d7c30f8662b9a45309961ea21da2c7c0aea1ada6",
+    "exports/sensitivity_coverage_summary.csv": "f6699e4a9ee03d8cb9f3800606acac48713719d8935c9e7364b88b019c778b28",
+    "exports/sensitivity_window_by_point.csv": "cbccd61e88e4bd9b57f408e4d1680a0d92ea26c9c05274522c47e72fe853f9a3",
+    "exports/sensitivity_window_summary.csv": "460f50cc7e98919aab4dca7ebc5f381db0856eff4f7e37cb2e26875ab7a7b777",
+    "exports/stability_by_point.csv": "e67b1de5006384a084ca5b7a4e3dd2e79bd5340ba42635de1df39eafdd54c05d",
+    "exports/stability_samples.csv": "575696dcca354baf75468f6846792f594bc4257537e7a19be5dc4bbc5e563eee",
+    "exports/stability_summary.csv": "fd8f837784c59996a9a89ad2ae2d38a1b36bb45929d1e07862b31f5c21129738",
+    "exports/stability_summary_by_original_class.csv": "5300221fe366f141e8d3ad50ec4f14e5bdbb5ab41e3b90ee82ee9afb0de383ad",
+    "exports/stability_summary_by_variable.csv": "996b9160e752dddc6b286d6de7cf791e263bf8e2e487ff52fb17517a41cf3d85",
+    "exports/stability_trials.csv": "a002580d2b24e1790a8727fc6046f7103fbc1cad6a82c6c0a87cbbc2db7abeae",
+    "latest_run.json": "87a559c46757e086a2e3b516426923d8b866416f8bb0075c7bbbaf14d78f6474",
+    "output_data_dictionary.csv": "b2438b91674f625cc71e7efa1e15e6dd9925e0095f78813f239211ddf1cb51e6",
+    "parameter_provenance.csv": "40053c174cbe0d191d4db3482c688da0f622da37bad90ae561e86e0e0de344a1",
+    "plot_manifest.json": "750fd7b9b7494277f64cff27a489a0ee3aaa144ae8f705827be27be844870ad1",
+    "plots/component_scores.png": "a5cd2024bfa0b8fa9e5b78dfd3b884677aa9aef1599885315d328e3e24dd64ed",
+    "plots/continuity_curves.png": "c19692b32fe4d31abcd6eb2e4a0640bb99f63489fd5fe44122c20098fa0e0f93",
+    "plots/continuity_summary.png": "a61638dd70794f64b1af0fafcd529b7eb35a92b184d3c7a4a64849006cafc3a2",
+    "plots/coverage_over_time.png": "6eec3d2cba986ffd035f48dcfb976c7af221e9c5c815dc2e558fdc08ed080f96",
+    "plots/fault_detection_metrics.png": "023753ad6e74144c2201d155998275c48f2f946bb5929972e72850a393616604",
+    "plots/index_timeseries.png": "594fff9a7054346a1f821e66b3ddfe5900e1025e321b20510270af4c89e24b25",
+    "plots/masking_rate.png": "4d8822a747c14f0c08926bdb923a481c38ea62a672aceded5ce202f6964d1d8d",
+    "plots/method_comparison.png": "43cbea4a2e04e738b217c0de72917af2a489f6255025e6663ba4528b2938e2ad",
+    "plots/reason_code_frequency.png": "6826096cb82c6704ebf89cef7849ae0a2ea5f65b4905a354cf0f861aa73991de",
+    "plots/reference_case_scores.png": "2b67104d3b5d0531b05ed87021e6dc1f674699a914738d98a5aebdaba296209e",
+    "plots/sensitivity_coverage_summary.png": "d50985dd39470732b30d69c81835451d0f1cb506b46bbef6a374153bbccb693e",
+    "plots/sensitivity_window_summary.png": "234d98bfe81d3e91cc992ac9126191a7a906961731db3411adcac55f7112eb2c",
+    "plots/stability_summary.png": "2caf7e9bb876ecfadeeca065cabf54b821ddfee199340f2bf7e0c88be12a5c1e",
+    "plots/stability_trials.png": "62f10808859f2a9d03403f800e08f1a1751fc530f3a4fffacfd7c731a520bba8",
+    "provisional_parameter_assessment.md": "24ecaa12d39c7a0a612592daa3b60cc5657792c969c22a229561a632606f77d1",
+    "run_narrative.md": "dacb8504a50b8c38c7e6621a36eff79032b07f97458b3d1ae3336acbe319ba5d",
+    "run_summary.json": "1060900c02c6b2775ad6af3eae9c4025c2a0bf9c451b5fa71d33e04a6f6e72c2",
+    "run_summary.md": "9b7bb589a0708a77d39c64ebb69b2431c1012385c086a228566815e2b650b862",
+    "run_summary_a09f711d3c0c44508cd499e12028ae17.json": "1060900c02c6b2775ad6af3eae9c4025c2a0bf9c451b5fa71d33e04a6f6e72c2",
+    "test_report.json": "c7833c32ea24e173f87487d659361fe49babfd988bff1e206b7b283081da45ac",
+    "test_report.md": "3dd9290a83da637a9adbe1fb0cda824ac323f9c6f6fb6451d1aaf3a1c322b85a"
+  }
+}

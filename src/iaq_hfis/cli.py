@@ -22,7 +22,7 @@ from pathlib import Path
 from iaq_hfis.config import ConfigError, RoomProfilesConfig, SensorSpecs, Settings, load_room_profiles, load_sensor_specs, load_settings
 from iaq_hfis.db import LegacySchemaError, rebuild_derived_database
 from iaq_hfis.evaluate import run_evaluation
-from iaq_hfis.final_snapshot import REPO_ROOT, build_final_snapshot
+from iaq_hfis.final_snapshot import REPO_ROOT, build_exploratory_snapshot, build_final_snapshot
 from iaq_hfis.pipeline import run_pipeline
 from iaq_hfis.report import generate_plots, generate_report
 from iaq_hfis.testing_report import run_full_test_suite, write_test_report
@@ -61,11 +61,23 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="Compute the index over a time range and persist results")
     _add_config_args(run_p)
     _add_range_args(run_p)
+    run_p.add_argument(
+        "--mode", choices=["publication", "exploratory"], default="publication",
+        help="publication (default, strict): a missing DBN temperature profile aborts the whole run. "
+             "exploratory: the microclimate component is omitted (never fabricated) where no profile "
+             "exists; the run is tagged exploratory and can never be finalized into research_results/final.",
+    )
 
     eval_p = sub.add_parser("evaluate", help="Run the evaluation suite over an already-computed pipeline run")
     _add_config_args(eval_p)
     _add_range_args(eval_p)
     eval_p.add_argument("--pipeline-run-id", required=True, help="Which pipeline run's persisted results to evaluate (from 'run')")
+    eval_p.add_argument(
+        "--multi-component-grid-points", type=int, default=None, dest="multi_component_grid_points",
+        help="Override evaluation.multi_component_grid_points_per_axis for this run only (e.g. 41 for the "
+             "manuscript-validation task spec's own worked example, 41^3=68,921 combinations). Defaults to "
+             "the configured value (modest, since this experiment re-runs on every evaluate call).",
+    )
 
     report_p = sub.add_parser("report", help="Generate run_summary.md, run_narrative.md, CSVs, data dictionary, and plot_manifest.json for a run")
     _add_config_args(report_p)
@@ -88,6 +100,10 @@ def main(argv: list[str] | None = None) -> int:
     _add_config_args(finalize_p)
     finalize_p.add_argument("--pipeline-run-id", required=True)
     finalize_p.add_argument("--test-report-json", help="Path to a test_report.json from 'test-report' -- embedded in the snapshot; refuses to finalize if it says ok=false")
+    finalize_p.add_argument(
+        "--exploratory", action="store_true",
+        help="Build research_results/exploratory/ instead of research_results/final/ -- required for mode=exploratory pipeline runs (never eligible for research_results/final).",
+    )
 
     test_report_p = sub.add_parser("test-report", help="Run the full pytest suite and record total/passed/failed/skipped/time/environment (required before finalize)")
     test_report_p.add_argument("--verbose", action="store_true")
@@ -125,25 +141,32 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         try:
-            summary = run_pipeline(settings, sensor_specs, room_profiles, args.from_ts, args.to_ts, args.window_minutes)
+            summary = run_pipeline(settings, sensor_specs, room_profiles, args.from_ts, args.to_ts, args.window_minutes, mode=args.mode)
         except ConfigError as exc:
             # e.g. a room/season combination with no configured profile -- a data-dependent
             # configuration gap, only discoverable once the pipeline reaches that instant.
+            # In publication mode this includes TEMPERATURE_PROFILE_NOT_DEFINED, which
+            # correctly aborts the whole run rather than producing a partial A/V/M/I result.
             print(f"Configuration error:\n{exc}", file=sys.stderr)
             return 2
         except LegacySchemaError as exc:
             print(f"Schema error:\n{exc}", file=sys.stderr)
             return 2
-        print(f"Run {summary['pipeline_run_id']}: {summary['status']}")
+        print(f"Run {summary['pipeline_run_id']} (mode={summary['mode']}): {summary['status']}")
         print(f"  processed {summary['n_timestamps_processed']} timestamps over window={summary['window_minutes']}min")
         print(f"  completeness: {summary['completeness_summary']}")
         if summary["provisional_parameters_used"]:
             print(f"  provisional parameters engaged this run: {summary['provisional_parameters_used']}")
+        if args.mode == "exploratory":
+            print("  NOTE: exploratory mode -- this run can never be promoted into research_results/final.")
         return 0
 
     if args.command == "evaluate":
         try:
-            summary = run_evaluation(settings, sensor_specs, room_profiles, args.pipeline_run_id, args.from_ts, args.to_ts, args.window_minutes)
+            summary = run_evaluation(
+                settings, sensor_specs, room_profiles, args.pipeline_run_id, args.from_ts, args.to_ts, args.window_minutes,
+                multi_component_grid_points_per_axis=args.multi_component_grid_points,
+            )
         except ConfigError as exc:
             print(f"Configuration error:\n{exc}", file=sys.stderr)
             return 2
@@ -180,6 +203,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  article results summary: {result['article_results_summary']}")
         print(f"  article metrics: {result['article_metrics']}")
         print(f"  provisional parameter assessment: {result['provisional_parameter_assessment']}")
+        print(f"  parameter selection: {result['parameter_selection']}")
+        print(f"  manuscript readiness: {result['manuscript_readiness_json']}")
+        print(f"  publication claims matrix: {result['publication_claims_matrix_csv']}")
         print(f"  generated in {result['generation_seconds']:.1f}s")
         return 0
 
@@ -220,10 +246,14 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return 1
         try:
-            result = build_final_snapshot(settings, args.pipeline_run_id, test_report_summary=test_report_summary)
+            builder = build_exploratory_snapshot if args.exploratory else build_final_snapshot
+            result = builder(settings, args.pipeline_run_id, test_report_summary=test_report_summary)
         except FileNotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 2
+        except ConfigError as exc:
+            print(f"finalize refused:\n{exc}", file=sys.stderr)
+            return 1
         print(f"Final snapshot written to {result['final_dir']}")
         vr = result["validation_report"]
         print(f"  artifact validation: {'OK' if vr.ok else 'FAILED'} ({len(vr.checks_passed)} passed, {len(vr.violations)} violations)")

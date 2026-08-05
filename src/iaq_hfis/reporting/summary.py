@@ -17,7 +17,7 @@ SECTIONS = [
     "Environment",
     "Completeness Summary",
     "Provisional Parameters Used",
-    "Publication Readiness",
+    "Artifact and Manuscript Readiness",
     "Baseline Comparison",
     "Masking",
     "Reference-Case Consistency",
@@ -78,15 +78,23 @@ def build_run_summary_markdown(summary: dict) -> str:
     lines.append("")
 
     lines += [f"## {SECTIONS[4]}", ""]
-    pr = summary.get("publication_readiness")
-    if pr is None:
+    readiness = summary.get("readiness")
+    if readiness is None:
         lines.append("Not assessed for this run -- run `iaq_hfis validate-artifacts` and regenerate the report.")
     else:
-        lines.append(f"- Ready: **{pr.get('ready')}**")
-        for issue in pr.get("blocking_issues") or []:
-            lines.append(f"- Blocking: {issue}")
-        for warning in pr.get("warnings") or []:
-            lines.append(f"- Warning: {warning}")
+        ar = readiness.get("artifact_readiness") or {}
+        mr = readiness.get("manuscript_readiness") or {}
+        lines.append(f"- Artifact ready: **{ar.get('ready')}**")
+        for issue in ar.get("blocking_issues") or []:
+            lines.append(f"  - Blocking: {issue}")
+        for warning in ar.get("warnings") or []:
+            lines.append(f"  - Warning: {warning}")
+        lines.append(f"- Manuscript ready: **{mr.get('ready')}**")
+        for issue in mr.get("blocking_issues") or []:
+            lines.append(f"  - Blocking: {issue}")
+        for claim in mr.get("unsupported_claims") or []:
+            lines.append(f"  - Unsupported claim: {claim}")
+        lines.append("- See `manuscript_readiness.md` for the standalone readiness report.")
     lines.append("")
 
     ev = summary.get("evaluation")

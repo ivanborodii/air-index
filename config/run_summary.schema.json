@@ -10,6 +10,7 @@
   ],
   "properties": {
     "pipeline_run_id": {"type": "string"},
+    "mode": {"type": "string", "enum": ["publication", "exploratory"]},
     "started_at": {"type": "string", "format": "date-time"},
     "finished_at": {"type": "string", "format": "date-time"},
     "status": {"type": "string", "enum": ["success", "failed"]},
@@ -44,6 +45,7 @@
         "processor": {"type": "string"},
         "cpu_count": {"type": ["integer", "null"]},
         "git_commit": {"type": ["string", "null"]},
+        "git_tree_dirty": {"type": ["boolean", "null"]},
         "rule_generation_version": {"type": "string"}
       }
     },
@@ -102,7 +104,7 @@
         },
         "continuity": {
           "type": "object",
-          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids, favorable/acceptable/degraded contexts).",
+          "description": "HFIS vs CRISP-MAX vs WEIGHTED-MEAN boundary continuity experiment (deterministic input grids, favourable/acceptable/degraded contexts).",
           "properties": {
             "n_boundaries": {"type": "integer"},
             "n_contexts": {"type": "integer"},
@@ -133,13 +135,29 @@
         "warnings": {"type": "array", "items": {"type": "string"}}
       }
     },
-    "publication_readiness": {
+    "readiness": {
       "type": "object",
-      "description": "Structured readiness assessment -- see iaq_hfis.provenance.",
+      "description": "Structured artifact/manuscript readiness assessment -- see iaq_hfis.provenance.assess_readiness.",
       "properties": {
-        "ready": {"type": "boolean"},
-        "blocking_issues": {"type": "array", "items": {"type": "string"}},
-        "warnings": {"type": "array", "items": {"type": "string"}},
+        "artifact_readiness": {
+          "type": "object",
+          "properties": {
+            "ready": {"type": "boolean"},
+            "blocking_issues": {"type": "array", "items": {"type": "string"}},
+            "warnings": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "manuscript_readiness": {
+          "type": "object",
+          "properties": {
+            "ready": {"type": "boolean"},
+            "blocking_issues": {"type": "array", "items": {"type": "string"}},
+            "unsupported_claims": {"type": "array", "items": {"type": "string"}},
+            "warnings": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "scientific_blockers": {"type": "array", "items": {"type": "string"}},
+        "unsupported_claims": {"type": "array", "items": {"type": "string"}},
         "provisional_parameters_used": {"type": "array", "items": {"type": "string"}},
         "parameters_covered_by_sensitivity_analysis": {"type": "array", "items": {"type": "string"}},
         "tests_executed": {"type": ["object", "null"]},

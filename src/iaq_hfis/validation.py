@@ -83,6 +83,7 @@ def validate_artifacts(settings: Settings, pipeline_run_id: str) -> ArtifactVali
         _check_continuity_consistency(csv_dir, settings, passed, violations)
         _check_fault_injection_consistency(csv_dir, passed, violations)
         _check_config_hash_consistency(con, summary, passed, violations)
+        _check_publication_claims_matrix(run_report_dir, passed, violations)
     finally:
         con.close()
 
@@ -258,37 +259,39 @@ def _check_plot_manifest(report_dir: Path, csv_dir: Path, passed: list[str], vio
 
 def _check_provisional_parameters_agree(report_dir: Path, summary: dict, passed: list[str], violations: list[str]) -> None:
     """Mandatory cross-artifact check: run_summary.json's top-level
-    provisional_parameters_used, publication_readiness's copy of it,
-    parameter_provenance.csv's engaged PROVISIONAL rows, run_summary.md,
+    provisional_parameters_used, readiness's copy of it,
+    parameter_provenance.csv's engaged provisional-like rows, run_summary.md,
     run_narrative.md, and article_results_summary.md (if present) must all
     report the exact same set of provisional parameters -- this is exactly
     the class of bug where run_summary.md said "None engaged" while
-    publication_readiness said 16."""
+    the readiness assessment said 16."""
     authoritative = sorted(summary.get("provisional_parameters_used") or [])
     n = len(authoritative)
 
-    pr = summary.get("publication_readiness")
-    if pr is not None:
-        pr_list = sorted(pr.get("provisional_parameters_used") or [])
+    readiness = summary.get("readiness")
+    if readiness is not None:
+        pr_list = sorted(readiness.get("provisional_parameters_used") or [])
         if pr_list == authoritative:
-            passed.append("publication_readiness.provisional_parameters_used matches run_summary.json's top-level provisional_parameters_used")
+            passed.append("readiness.provisional_parameters_used matches run_summary.json's top-level provisional_parameters_used")
         else:
             violations.append(
-                f"publication_readiness.provisional_parameters_used ({len(pr_list)}) != "
+                f"readiness.provisional_parameters_used ({len(pr_list)}) != "
                 f"run_summary.json top-level provisional_parameters_used ({n}): "
-                f"only-in-publication_readiness={sorted(set(pr_list) - set(authoritative))}, "
+                f"only-in-readiness={sorted(set(pr_list) - set(authoritative))}, "
                 f"only-in-top-level={sorted(set(authoritative) - set(pr_list))}"
             )
 
     provenance_csv = report_dir / "parameter_provenance.csv"
     if provenance_csv.is_file():
+        from iaq_hfis.provenance import PROVISIONAL_LIKE_STATUSES
+
         df = pd.read_csv(provenance_csv)
-        engaged_provisional = sorted(df[(df["status"] == "PROVISIONAL") & (df["engaged"] == True)]["path"].tolist())  # noqa: E712
+        engaged_provisional = sorted(df[(df["status"].isin(PROVISIONAL_LIKE_STATUSES)) & (df["engaged"] == True)]["path"].tolist())  # noqa: E712
         if engaged_provisional == authoritative:
-            passed.append("parameter_provenance.csv engaged PROVISIONAL rows match run_summary.json's provisional_parameters_used")
+            passed.append("parameter_provenance.csv engaged provisional-like rows match run_summary.json's provisional_parameters_used")
         else:
             violations.append(
-                f"parameter_provenance.csv engaged PROVISIONAL rows ({len(engaged_provisional)}) != "
+                f"parameter_provenance.csv engaged provisional-like rows ({len(engaged_provisional)}) != "
                 f"run_summary.json provisional_parameters_used ({n}): "
                 f"only-in-csv={sorted(set(engaged_provisional) - set(authoritative))}, "
                 f"only-in-summary={sorted(set(authoritative) - set(engaged_provisional))}"
@@ -340,7 +343,13 @@ def _recompute_sensitivity_summary_from_by_point(by_point: pd.DataFrame) -> dict
         n_eligible = len(g)
         evaluated = g[g["completeness_status"].notna()]
         n_evaluated = len(evaluated)
-        class_transitions = int((evaluated["index_class"] != evaluated["reference_index_class"]).sum())
+        # pandas/numpy NaN != NaN is True (unlike Python's None != None), which would
+        # wrongly count two simultaneously-FAILED (index_class both null) rows as a class
+        # transition -- exclude the both-null case explicitly, matching the production
+        # aggregation's Python-level None comparison semantics exactly.
+        idx_class, ref_class = evaluated["index_class"], evaluated["reference_index_class"]
+        both_null = idx_class.isna() & ref_class.isna()
+        class_transitions = int(((idx_class != ref_class) & ~both_null).sum())
         valid = evaluated[evaluated["index_value"].notna() & evaluated["reference_index_value"].notna()]
         diffs = (valid["index_value"] - valid["reference_index_value"]).abs()
         recomputed[value] = {
@@ -627,6 +636,68 @@ def _check_config_hash_consistency(con, summary: dict, passed: list[str], violat
             f"evaluation_runs.config_hash ({evaluation_config_hash}) != run_summary.json's config_hash ({pipeline_config_hash}) -- "
             f"evaluate may have been run after a config change without re-running the pipeline"
         )
+
+
+def check_same_commit_and_clean_tree(summary: dict, passed: list[str], violations: list[str]) -> None:
+    """Spec section 11's same-commit invariant: the final scientific result
+    set must be generated and tested from the same code state. Compares the
+    CURRENT git commit/tree-dirty status (evaluated live, at validation
+    time) against the commit recorded in run_summary.json's environment
+    block at run-time -- catches code being edited after 'iaq_hfis run' but
+    before 'iaq_hfis finalize', which would make the tracked snapshot
+    describe code that no longer matches what's on disk.
+
+    Deliberately NOT part of :func:`validate_artifacts`'s general check
+    list: a development sandbox routinely has uncommitted changes, and
+    `iaq_hfis validate-artifacts` is used throughout development, not just
+    at finalize time. Only :func:`iaq_hfis.final_snapshot.build_final_snapshot`
+    calls this -- the one place a dirty tree or commit drift is genuinely
+    disqualifying.
+    """
+    from iaq_hfis.reproducibility import get_git_commit, get_git_tree_dirty
+
+    recorded_commit = (summary.get("environment") or {}).get("git_commit")
+    current_commit = get_git_commit(REPO_ROOT)
+    if current_commit is None or recorded_commit is None:
+        violations.append("git commit could not be determined for the current tree or the recorded run -- same-commit invariant cannot be verified")
+        return
+    if current_commit != recorded_commit:
+        violations.append(
+            f"current git commit ({current_commit}) != commit recorded when this run was computed ({recorded_commit}) -- "
+            "code has changed since 'iaq_hfis run'; re-run the pipeline before finalizing"
+        )
+    else:
+        passed.append("current git commit matches the commit recorded when this run was computed (same-commit invariant holds)")
+
+    tree_dirty = get_git_tree_dirty(REPO_ROOT)
+    if tree_dirty is None:
+        violations.append("working tree clean/dirty status could not be determined -- same-commit invariant cannot be verified")
+    elif tree_dirty:
+        violations.append("working tree has uncommitted changes -- a final publication snapshot must be built from a clean, committed tree")
+    else:
+        passed.append("working tree is clean (no uncommitted changes)")
+
+
+_VALID_CLAIM_STATUSES = {"SUPPORTED", "PARTIALLY_SUPPORTED", "UNSUPPORTED", "BLOCKED"}
+
+
+def _check_publication_claims_matrix(report_dir: Path, passed: list[str], violations: list[str]) -> None:
+    """publication_claims_matrix.csv must exist, cover all 9 minimum claims
+    (spec section 13), and every status must be one of the 4 allowed
+    values -- never left blank or set to something ad hoc."""
+    csv_path = report_dir / "publication_claims_matrix.csv"
+    if not csv_path.is_file():
+        violations.append("publication_claims_matrix.csv is missing")
+        return
+    df = pd.read_csv(csv_path)
+    if len(df) < 9:
+        violations.append(f"publication_claims_matrix.csv has only {len(df)} claim(s), fewer than the required minimum of 9")
+        return
+    bad_status = df[~df["status"].isin(_VALID_CLAIM_STATUSES)]
+    if not bad_status.empty:
+        violations.append(f"publication_claims_matrix.csv has invalid status value(s): {sorted(bad_status['status'].unique().tolist())}")
+        return
+    passed.append(f"publication_claims_matrix.csv covers {len(df)} claims, all with a valid status")
 
 
 def write_artifact_validation_report(report: ArtifactValidationReport, out_dir: Path) -> tuple[Path, Path]:

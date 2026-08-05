@@ -31,7 +31,11 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     n_snapshot_retries      INTEGER,
     config_hash             VARCHAR     NOT NULL,
     engine_version          VARCHAR     NOT NULL,
-    source_git_commit       VARCHAR
+    source_git_commit       VARCHAR,
+    -- publication (strict; missing DBN temperature profile aborts the run) |
+    -- exploratory (microclimate component structurally omitted where no
+    -- profile exists; never eligible for research_results/final).
+    mode                    VARCHAR     NOT NULL DEFAULT 'publication'
 );
 
 CREATE TABLE IF NOT EXISTS observation_quality (
@@ -160,7 +164,7 @@ CREATE TABLE IF NOT EXISTS baseline_results (
     evaluation_run_id  VARCHAR     NOT NULL,
     computed_ts        TIMESTAMPTZ NOT NULL,
     window_minutes     INTEGER     NOT NULL,
-    method             VARCHAR     NOT NULL,   -- CRISP-MAX | WEIGHTED-MEAN
+    method             VARCHAR     NOT NULL,   -- FUZZY_COMPONENT_MAX | WEIGHTED_MEAN
     index_value        DOUBLE,                  -- NULL if no components available
     index_class        VARCHAR,
     n_components       INTEGER     NOT NULL,
@@ -193,6 +197,8 @@ CREATE TABLE IF NOT EXISTS evaluation_stability_samples (
     baseline_index_hfis            DOUBLE,
     baseline_class_crisp_max       VARCHAR,
     baseline_index_crisp_max       DOUBLE,
+    baseline_class_crisp_class_max VARCHAR,
+    baseline_index_crisp_class_max DOUBLE,
     baseline_class_weighted_mean   VARCHAR,
     baseline_index_weighted_mean   DOUBLE,
     PRIMARY KEY (evaluation_run_id, sample_id)
@@ -203,7 +209,7 @@ CREATE TABLE IF NOT EXISTS evaluation_stability_trials (
     evaluation_run_id      VARCHAR     NOT NULL,
     pipeline_run_id        VARCHAR     NOT NULL,
     sample_id              VARCHAR     NOT NULL,
-    method                 VARCHAR     NOT NULL,   -- PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN
+    method                 VARCHAR     NOT NULL,   -- PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN
     trial_index            INTEGER     NOT NULL,
     trial_class            VARCHAR,
     trial_index_value      DOUBLE,
@@ -220,7 +226,7 @@ CREATE TABLE IF NOT EXISTS evaluation_sensitivity (
     pipeline_run_id      VARCHAR     NOT NULL,
     sample_id            VARCHAR     NOT NULL,
     computed_ts          TIMESTAMPTZ NOT NULL,
-    stratum              VARCHAR     NOT NULL,   -- e.g. class=Favorable | boundary_adjacent | ordinary
+    stratum              VARCHAR     NOT NULL,   -- e.g. class=Favourable | boundary_adjacent | ordinary
     reference_completeness_status VARCHAR,
     reference_index_class VARCHAR,
     reference_index_value DOUBLE,
@@ -261,18 +267,18 @@ CREATE TABLE IF NOT EXISTS evaluation_reference_cases (
     PRIMARY KEY (evaluation_run_id, method)
 );
 
--- HFIS vs CRISP-MAX (vs WEIGHTED-MEAN where meaningful) boundary continuity
+-- HFIS vs FUZZY_COMPONENT_MAX (vs WEIGHTED_MEAN where meaningful) boundary continuity
 -- experiment: dense input grids around each control-region boundary.
 CREATE TABLE IF NOT EXISTS evaluation_continuity_grid (
     evaluation_run_id  VARCHAR     NOT NULL,
     pipeline_run_id    VARCHAR     NOT NULL,
     boundary_id        VARCHAR     NOT NULL,
     channel            VARCHAR     NOT NULL,
-    context             VARCHAR     NOT NULL,   -- favorable | acceptable | degraded (severity of the OTHER, non-swept channels)
+    context             VARCHAR     NOT NULL,   -- favourable | acceptable | degraded (severity of the OTHER, non-swept channels)
     boundary_value     DOUBLE      NOT NULL,
     grid_index         INTEGER     NOT NULL,
     input_value        DOUBLE      NOT NULL,
-    method             VARCHAR     NOT NULL,   -- PROPOSED-HFIS | CRISP-MAX | WEIGHTED-MEAN
+    method             VARCHAR     NOT NULL,   -- PROPOSED_HFIS | FUZZY_COMPONENT_MAX | CRISP_CLASS_MAX | WEIGHTED_MEAN
     index_value        DOUBLE,
     index_class        VARCHAR,
     PRIMARY KEY (evaluation_run_id, boundary_id, context, method, grid_index)
@@ -283,7 +289,7 @@ CREATE TABLE IF NOT EXISTS evaluation_continuity_summary (
     pipeline_run_id                    VARCHAR NOT NULL,
     boundary_id                        VARCHAR NOT NULL,
     channel                            VARCHAR NOT NULL,
-    context                            VARCHAR NOT NULL,   -- favorable | acceptable | degraded
+    context                            VARCHAR NOT NULL,   -- favourable | acceptable | degraded
     method                             VARCHAR NOT NULL,
     max_adjacent_jump                  DOUBLE,
     mean_adjacent_jump                 DOUBLE,
@@ -296,8 +302,48 @@ CREATE TABLE IF NOT EXISTS evaluation_continuity_summary (
     index_range                        DOUBLE,
     monotonicity_violations            INTEGER,
     masked_by_favorable                BOOLEAN,
-    area_between_curves_vs_crisp_max   DOUBLE,    -- only populated for method = 'PROPOSED-HFIS'
+    area_between_curves_vs_crisp_max   DOUBLE,    -- only populated for method = 'PROPOSED_HFIS'
     PRIMARY KEY (evaluation_run_id, boundary_id, context, method)
+);
+
+-- Multi-component grid experiment (manuscript-validation task spec section 7.2):
+-- independent (A, V, M) crisp-score triples across a regular grid (default 41
+-- per axis -> 68,921 combinations), all four methods' outcomes stored WIDE
+-- (one row per triple) rather than long, since every consumer wants all four
+-- side by side and a long table would be 4x the row count for no benefit.
+-- Does not depend on any pipeline run's actual data, only the effective
+-- config (rule base, membership shapes) -- deterministic and reproducible.
+CREATE TABLE IF NOT EXISTS evaluation_multi_component_grid (
+    evaluation_run_id                  VARCHAR     NOT NULL,
+    pipeline_run_id                    VARCHAR     NOT NULL,
+    a                                  DOUBLE      NOT NULL,
+    v                                  DOUBLE      NOT NULL,
+    m                                  DOUBLE      NOT NULL,
+    hfis_index_value                   DOUBLE,
+    hfis_index_class                   VARCHAR,
+    fuzzy_component_max_index_value    DOUBLE,
+    fuzzy_component_max_index_class    VARCHAR,
+    crisp_class_max_index_value        DOUBLE,
+    crisp_class_max_index_class        VARCHAR,
+    weighted_mean_index_value          DOUBLE,
+    weighted_mean_index_class          VARCHAR,
+    PRIMARY KEY (evaluation_run_id, a, v, m)
+);
+
+CREATE TABLE IF NOT EXISTS evaluation_multi_component_grid_summary (
+    evaluation_run_id       VARCHAR     NOT NULL,
+    pipeline_run_id         VARCHAR     NOT NULL,
+    method_a                VARCHAR     NOT NULL,
+    method_b                VARCHAR     NOT NULL,
+    n_points                INTEGER     NOT NULL,
+    mean_abs_diff           DOUBLE,
+    median_abs_diff         DOUBLE,
+    p95_abs_diff            DOUBLE,
+    max_abs_diff            DOUBLE,
+    mean_signed_diff        DOUBLE,
+    class_agreement_rate    DOUBLE,
+    n_class_disagreements   INTEGER,
+    PRIMARY KEY (evaluation_run_id, method_a, method_b)
 );
 
 -- Fault-injection benchmark: deterministic synthetic scenarios with known

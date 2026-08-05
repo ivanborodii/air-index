@@ -33,11 +33,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from iaq_hfis import profiles
-from iaq_hfis.baselines import crisp_max, weighted_mean
-from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings, config_hash
+from iaq_hfis.baselines import crisp_class_max, fuzzy_component_max, weighted_mean
+from iaq_hfis.config import RoomProfilesConfig, SensorSpecs, Settings, TemperatureProfileNotDefinedError, config_hash
 from iaq_hfis.db import AirMonitorSource, DerivedResultsWriter
 from iaq_hfis.evaluation.agreement import pairwise_agreement
-from iaq_hfis.evaluation.continuity import run_continuity_experiment, summarize_continuity_smoothness
+from iaq_hfis.evaluation.continuity import run_continuity_experiment, summarize_continuity_smoothness, summarize_continuity_smoothness_vs_baseline
 from iaq_hfis.evaluation.fault_injection import (
     HAMPEL_MULTIPLIER_GRID,
     HAMPEL_WINDOW_GRID,
@@ -51,6 +51,7 @@ from iaq_hfis.evaluation.fault_injection import (
 )
 from iaq_hfis.evaluation.faults import compute_reason_code_frequency, compute_status_proportions
 from iaq_hfis.evaluation.masking import evaluate_masking
+from iaq_hfis.evaluation.multi_component_grid import run_multi_component_grid, summarize_multi_component_grid, weighted_mean_masking_rate
 from iaq_hfis.evaluation.multi_point_sensitivity import compute_sensitivity_summary, select_sensitivity_samples
 from iaq_hfis.evaluation.multi_point_stability import (
     select_stability_samples,
@@ -111,6 +112,18 @@ def _fetch_weighted_means(con, pipeline_run_id: str, computed_ts: datetime, wind
     return {channel: value for channel, value in rows}
 
 
+def _fetch_room_season(con, pipeline_run_id: str, computed_ts: datetime, window_minutes: int) -> tuple[str, str] | tuple[None, None]:
+    """The room/season actually in effect for this computed_ts (persisted per-row by
+    the pipeline -- NULL/NULL when no DBN profile applied, e.g. an exploratory-mode
+    run). CRISP_CLASS_MAX needs this to hard-classify temperature/humidity with the
+    same control region PROPOSED_HFIS used, never a globally-assumed profile."""
+    row = con.execute(
+        "SELECT room, season FROM component_scores WHERE pipeline_run_id = ? AND computed_ts = ? AND window_minutes = ? LIMIT 1",
+        [pipeline_run_id, computed_ts, window_minutes],
+    ).fetchone()
+    return row if row else (None, None)
+
+
 def run_evaluation(
     settings: Settings,
     sensor_specs: SensorSpecs,
@@ -119,6 +132,7 @@ def run_evaluation(
     from_ts: datetime,
     to_ts: datetime,
     window_minutes: int | None = None,
+    multi_component_grid_points_per_axis: int | None = None,
 ) -> dict:
     """Runs the full evaluation suite over every computed_ts already
     persisted (by a prior ``iaq_hfis run``) for ``pipeline_run_id`` in
@@ -139,6 +153,9 @@ def run_evaluation(
         con = writer.connection
         now = datetime.now(timezone.utc)
 
+        mode_row = con.execute("SELECT mode FROM pipeline_runs WHERE pipeline_run_id = ?", [pipeline_run_id]).fetchone()
+        mode = mode_row[0] if mode_row else "publication"
+
         try:
             computed_timestamps = _fetch_computed_timestamps(con, pipeline_run_id, from_ts, to_ts, window_minutes)
             if not computed_timestamps:
@@ -146,39 +163,59 @@ def run_evaluation(
                 logger.warning(msg)
                 warnings.append(msg)
 
-            # --- Baselines, per computed_ts, from already-persisted component crisp scores ---
+            # --- Baselines, per computed_ts, from already-persisted component crisp scores
+            # (FUZZY_COMPONENT_MAX, WEIGHTED_MEAN) plus already-persisted raw weighted-mean
+            # channel values and the room/season actually in effect (CRISP_CLASS_MAX, the
+            # genuinely hard baseline -- see baselines.crisp_class_max). ---
             proposed_classes: list[str | None] = []
             crisp_max_classes: list[str | None] = []
             weighted_mean_classes: list[str | None] = []
+            crisp_class_max_classes: list[str | None] = []
             crisp_scores_per_ts: list[dict[str, float]] = []
             crisp_max_results = []
             weighted_mean_results = []
+            crisp_class_max_results = []
 
             for computed_ts in computed_timestamps:
                 scores = _fetch_component_crisp_scores(con, pipeline_run_id, computed_ts, window_minutes)
                 crisp_scores_per_ts.append(scores)
-                cm = crisp_max(scores)
+                cm = fuzzy_component_max(scores)
                 wm = weighted_mean(scores)
+                direct_values = _fetch_weighted_means(con, pipeline_run_id, computed_ts, window_minutes)
+                room, season = _fetch_room_season(con, pipeline_run_id, computed_ts, window_minutes)
+                ts_temperature_ranges = room_profiles.find(room, season).ranges if room and season else None
+                ccm = crisp_class_max(direct_values, settings.control_regions, ts_temperature_ranges)
                 crisp_max_results.append(cm)
                 weighted_mean_results.append(wm)
+                crisp_class_max_results.append(ccm)
                 proposed_classes.append(_fetch_proposed_class(con, pipeline_run_id, computed_ts, window_minutes))
                 crisp_max_classes.append(cm.index_class)
                 weighted_mean_classes.append(wm.index_class)
+                crisp_class_max_classes.append(ccm.index_class)
 
                 con.execute(
                     "INSERT OR REPLACE INTO baseline_results (pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, method, index_value, index_class, n_components) VALUES (?,?,?,?,?,?,?,?)",
-                    [pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, "CRISP-MAX", cm.index_value, cm.index_class, cm.n_components],
+                    [pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, "FUZZY_COMPONENT_MAX", cm.index_value, cm.index_class, cm.n_components],
                 )
                 con.execute(
                     "INSERT OR REPLACE INTO baseline_results (pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, method, index_value, index_class, n_components) VALUES (?,?,?,?,?,?,?,?)",
-                    [pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, "WEIGHTED-MEAN", wm.index_value, wm.index_class, wm.n_components],
+                    [pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, "WEIGHTED_MEAN", wm.index_value, wm.index_class, wm.n_components],
+                )
+                con.execute(
+                    "INSERT OR REPLACE INTO baseline_results (pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, method, index_value, index_class, n_components) VALUES (?,?,?,?,?,?,?,?)",
+                    [pipeline_run_id, evaluation_run_id, computed_ts, window_minutes, "CRISP_CLASS_MAX", ccm.index_value, ccm.index_class, ccm.n_components],
                 )
 
-            # --- Agreement (unlabeled real data): PROPOSED-HFIS vs each baseline ---
+            # --- Agreement (unlabeled real data): PROPOSED_HFIS vs each baseline ---
             agreement_results = []
             if computed_timestamps:
                 agreement_results = pairwise_agreement(
-                    {"PROPOSED-HFIS": proposed_classes, "CRISP-MAX": crisp_max_classes, "WEIGHTED-MEAN": weighted_mean_classes}
+                    {
+                        "PROPOSED_HFIS": proposed_classes,
+                        "FUZZY_COMPONENT_MAX": crisp_max_classes,
+                        "CRISP_CLASS_MAX": crisp_class_max_classes,
+                        "WEIGHTED_MEAN": weighted_mean_classes,
+                    }
                 )
                 for a in agreement_results:
                     con.execute(
@@ -188,7 +225,7 @@ def run_evaluation(
 
             # --- Masking ---
             masking_results = []
-            for method_name, results in (("CRISP-MAX", crisp_max_results), ("WEIGHTED-MEAN", weighted_mean_results)):
+            for method_name, results in (("FUZZY_COMPONENT_MAX", crisp_max_results), ("CRISP_CLASS_MAX", crisp_class_max_results), ("WEIGHTED_MEAN", weighted_mean_results)):
                 if not results:
                     continue
                 m = evaluate_masking(crisp_scores_per_ts, results, settings.evaluation.masking_severity_threshold)
@@ -200,17 +237,31 @@ def run_evaluation(
 
             # --- Reference cases (synthetic, pre-labeled boundary vectors -- consistency, not empirical accuracy) ---
             reference_case_results = {}
-            representative_profile = profiles.select_room_season(room_profiles, to_ts, settings.profile_selection)
+            try:
+                representative_profile = profiles.select_room_season(room_profiles, to_ts, settings.profile_selection)
+            except TemperatureProfileNotDefinedError:
+                if mode == "publication":
+                    raise
+                # Exploratory mode: the microclimate component is structurally omitted
+                # (never fabricated) wherever no DBN profile exists for this room/season.
+                representative_profile = None
+            available_components_full = {"A", "V", "M"} if representative_profile is not None else {"A", "V"}
             cases = generate_reference_cases(settings.control_regions, representative_profile)
-            rc_proposed, rc_crisp_max, rc_weighted_mean = [], [], []
+            rc_proposed, rc_crisp_max, rc_crisp_class_max, rc_weighted_mean = [], [], [], []
             for case in cases:
-                component_results, index_result = infer_from_values(ctx, case.values, {"A", "V", "M"}, representative_profile)
+                component_results, index_result = infer_from_values(ctx, case.values, available_components_full, representative_profile)
                 rc_proposed.append(index_result.index_class if index_result else None)
                 scores = {c: r.crisp_score for c, r in component_results.items()}
-                rc_crisp_max.append(crisp_max(scores).index_class)
+                rc_crisp_max.append(fuzzy_component_max(scores).index_class)
+                rc_crisp_class_max.append(crisp_class_max(case.values, settings.control_regions, representative_profile.ranges if representative_profile is not None else None).index_class)
                 rc_weighted_mean.append(weighted_mean(scores).index_class)
 
-            for method_name, predictions in (("PROPOSED-HFIS", rc_proposed), ("CRISP-MAX", rc_crisp_max), ("WEIGHTED-MEAN", rc_weighted_mean)):
+            for method_name, predictions in (
+                ("PROPOSED_HFIS", rc_proposed),
+                ("FUZZY_COMPONENT_MAX", rc_crisp_max),
+                ("CRISP_CLASS_MAX", rc_crisp_class_max),
+                ("WEIGHTED_MEAN", rc_weighted_mean),
+            ):
                 score = score_against_reference_cases(cases, predictions)
                 reference_case_results[method_name] = score
                 con.execute(
@@ -219,7 +270,7 @@ def run_evaluation(
                 )
 
             # --- Multi-point stability: deterministic boundary-adjacent + random-comparison
-            # sample across the whole evaluated range, all 3 methods, N perturbation trials each. ---
+            # sample across the whole evaluated range, all 4 methods, N perturbation trials each. ---
             stability_point_results = []
             stability_summary_overall: list[dict] = []
             stability_summary_by_variable: list[dict] = []
@@ -240,12 +291,14 @@ def run_evaluation(
                             """INSERT OR REPLACE INTO evaluation_stability_samples
                                (evaluation_run_id, pipeline_run_id, sample_id, computed_ts, selection_reason, boundary_channel,
                                 baseline_class_hfis, baseline_index_hfis, baseline_class_crisp_max, baseline_index_crisp_max,
+                                baseline_class_crisp_class_max, baseline_index_crisp_class_max,
                                 baseline_class_weighted_mean, baseline_index_weighted_mean)
-                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                             [evaluation_run_id, pipeline_run_id, s.sample_id, s.computed_ts, s.selection_reason, s.boundary_channel,
-                             r.baseline["PROPOSED-HFIS"].index_class, r.baseline["PROPOSED-HFIS"].index_value,
-                             r.baseline["CRISP-MAX"].index_class, r.baseline["CRISP-MAX"].index_value,
-                             r.baseline["WEIGHTED-MEAN"].index_class, r.baseline["WEIGHTED-MEAN"].index_value],
+                             r.baseline["PROPOSED_HFIS"].index_class, r.baseline["PROPOSED_HFIS"].index_value,
+                             r.baseline["FUZZY_COMPONENT_MAX"].index_class, r.baseline["FUZZY_COMPONENT_MAX"].index_value,
+                             r.baseline["CRISP_CLASS_MAX"].index_class, r.baseline["CRISP_CLASS_MAX"].index_value,
+                             r.baseline["WEIGHTED_MEAN"].index_class, r.baseline["WEIGHTED_MEAN"].index_value],
                         )
                         for method, trials in r.trials.items():
                             baseline_class = r.baseline[method].index_class
@@ -280,9 +333,9 @@ def run_evaluation(
                     settings.evaluation.stability_seed, settings.evaluation.sensitivity_max_samples_per_stratum,
                 )
                 for sp in sensitivity_samples:
-                    point_results = sweep_window_minutes(ctx, source, sp.computed_ts, settings.evaluation.sensitivity_window_minutes)
+                    point_results = sweep_window_minutes(ctx, source, sp.computed_ts, settings.evaluation.sensitivity_window_minutes, mode=mode)
                     point_results += sweep_coverage_thresholds(
-                        settings, sensor_specs, room_profiles, source, sp.computed_ts, window_minutes, settings.evaluation.sensitivity_coverage_thresholds
+                        settings, sensor_specs, room_profiles, source, sp.computed_ts, window_minutes, settings.evaluation.sensitivity_coverage_thresholds, mode=mode,
                     )
                     sensitivity_points.append((sp, point_results))
                     for s in point_results:
@@ -300,11 +353,11 @@ def run_evaluation(
             # reporting/exports.py's CSV export, so JSON and CSV can never numerically disagree.
             sensitivity_summary_rows = compute_sensitivity_summary(con, evaluation_run_id) if sensitivity_points else []
 
-            # --- Boundary continuity experiment: PROPOSED-HFIS vs CRISP-MAX vs WEIGHTED-MEAN,
+            # --- Boundary continuity experiment: PROPOSED_HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN,
             # dense deterministic grids around every control-region boundary, each swept under
-            # favorable/acceptable/degraded "other components" contexts (see
+            # favourable/acceptable/degraded "other components" contexts (see
             # iaq_hfis.evaluation.continuity module docstring and docs/hfis_vs_crispmax_audit.md
-            # for why a single favorable-only context cannot distinguish HFIS from CRISP-MAX). ---
+            # for why a single favourable-only context cannot distinguish HFIS from FUZZY_COMPONENT_MAX). ---
             continuity_points, continuity_summaries = run_continuity_experiment(
                 ctx, settings.control_regions, room_profiles, representative_profile, settings.evaluation.continuity_grid_points
             )
@@ -327,6 +380,40 @@ def run_evaluation(
                      ";".join(str(v) for v in s.class_transition_positions), s.index_range,
                      s.monotonicity_violations, s.masked_by_favorable, s.area_between_curves_vs_crisp_max],
                 )
+
+            # --- Multi-component grid experiment: independent (A, V, M) crisp-score triples
+            # across a regular grid (default 41^3 = 68,921 combinations), all four methods
+            # compared directly at the component level -- converts the ad-hoc audit script in
+            # docs/hfis_vs_crispmax_audit.md section 2 into a first-class, reproducible
+            # artifact. Does not depend on this pipeline_run_id's actual data. ---
+            grid_points_per_axis = multi_component_grid_points_per_axis or settings.evaluation.multi_component_grid_points_per_axis
+            grid_rows = run_multi_component_grid(ctx, grid_points_per_axis)
+            con.executemany(
+                """INSERT OR REPLACE INTO evaluation_multi_component_grid
+                   (evaluation_run_id, pipeline_run_id, a, v, m, hfis_index_value, hfis_index_class,
+                    fuzzy_component_max_index_value, fuzzy_component_max_index_class,
+                    crisp_class_max_index_value, crisp_class_max_index_class,
+                    weighted_mean_index_value, weighted_mean_index_class)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                [
+                    [evaluation_run_id, pipeline_run_id, r.a, r.v, r.m, r.hfis_index_value, r.hfis_index_class,
+                     r.fuzzy_component_max_index_value, r.fuzzy_component_max_index_class,
+                     r.crisp_class_max_index_value, r.crisp_class_max_index_class,
+                     r.weighted_mean_index_value, r.weighted_mean_index_class]
+                    for r in grid_rows
+                ],
+            )
+            grid_summaries = summarize_multi_component_grid(grid_rows)
+            for s in grid_summaries:
+                con.execute(
+                    """INSERT OR REPLACE INTO evaluation_multi_component_grid_summary
+                       (evaluation_run_id, pipeline_run_id, method_a, method_b, n_points, mean_abs_diff, median_abs_diff,
+                        p95_abs_diff, max_abs_diff, mean_signed_diff, class_agreement_rate, n_class_disagreements)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    [evaluation_run_id, pipeline_run_id, s.method_a, s.method_b, s.n_points, s.mean_abs_diff, s.median_abs_diff,
+                     s.p95_abs_diff, s.max_abs_diff, s.mean_signed_diff, s.class_agreement_rate, s.n_class_disagreements],
+                )
+            grid_masking = weighted_mean_masking_rate(grid_rows, settings.evaluation.masking_severity_threshold)
 
             # --- Fault-injection benchmark: deterministic, labeled synthetic scenarios,
             # fully separate from the unlabeled real-data reason-code frequency below.
@@ -488,6 +575,22 @@ def run_evaluation(
                 for s in continuity_summaries
             ],
             "smoothness_comparison": summarize_continuity_smoothness(continuity_summaries),
+            "smoothness_comparison_vs_crisp_class_max": summarize_continuity_smoothness_vs_baseline(continuity_summaries, "CRISP_CLASS_MAX"),
+        },
+        "multi_component_grid": {
+            "n_points_per_axis": grid_points_per_axis,
+            "n_combinations": len(grid_rows),
+            "pairwise_summary": [
+                {
+                    "method_a": s.method_a, "method_b": s.method_b, "n_points": s.n_points,
+                    "mean_abs_diff": s.mean_abs_diff, "median_abs_diff": s.median_abs_diff,
+                    "p95_abs_diff": s.p95_abs_diff, "max_abs_diff": s.max_abs_diff,
+                    "mean_signed_diff": s.mean_signed_diff, "class_agreement_rate": s.class_agreement_rate,
+                    "n_class_disagreements": s.n_class_disagreements,
+                }
+                for s in grid_summaries
+            ],
+            "weighted_mean_masking": grid_masking,
         },
         "fault_injection": {
             "n_scenarios": len({e.scenario_id for e in fault_events}),

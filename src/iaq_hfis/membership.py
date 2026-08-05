@@ -44,7 +44,7 @@ def build_monotonic_classes(breakpoints: list[float], widths: list[float]) -> di
     w0, w1, w2 = widths
     inf = math.inf
     return {
-        "Favorable": [(-inf, -inf, bp0 - w0 / 2, bp0 + w0 / 2)],
+        "Favourable": [(-inf, -inf, bp0 - w0 / 2, bp0 + w0 / 2)],
         "Acceptable": [(bp0 - w0 / 2, bp0 + w0 / 2, bp1 - w1 / 2, bp1 + w1 / 2)],
         "Degraded": [(bp1 - w1 / 2, bp1 + w1 / 2, bp2 - w2 / 2, bp2 + w2 / 2)],
         "Critical": [(bp2 - w2 / 2, bp2 + w2 / 2, inf, inf)],
@@ -57,9 +57,9 @@ def _band_shape(lo: float, hi: float, width: float) -> Shape:
 
 def build_two_sided_classes(ranges: TwoSidedRanges, width: float) -> dict[str, list[Shape]]:
     """Two-sided classes for temperature or relative humidity: both low and
-    high deviations from the favorable band are unfavorable. Critical,
+    high deviations from the favourable band are unfavorable. Critical,
     Degraded and Acceptable each cover a low-side and a high-side band;
-    Favorable is the single central band.
+    Favourable is the single central band.
 
     Each class's shape is built from its own band edges, so two adjacent
     classes that share a numeric boundary (as every manuscript profile
@@ -69,7 +69,7 @@ def build_two_sided_classes(ranges: TwoSidedRanges, width: float) -> dict[str, l
     low_tail = (-inf, -inf, ranges.critical_low_max - width / 2, ranges.critical_low_max + width / 2)
     high_tail = (ranges.critical_high_min - width / 2, ranges.critical_high_min + width / 2, inf, inf)
     return {
-        "Favorable": [_band_shape(ranges.favorable[0], ranges.favorable[1], width)],
+        "Favourable": [_band_shape(ranges.favourable[0], ranges.favourable[1], width)],
         "Acceptable": [
             _band_shape(ranges.acceptable_low[0], ranges.acceptable_low[1], width),
             _band_shape(ranges.acceptable_high[0], ranges.acceptable_high[1], width),

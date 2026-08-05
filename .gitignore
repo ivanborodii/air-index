@@ -13,3 +13,20 @@ __pycache__/
 
 # air-monitor secrets (mirrors air-monitor/.gitignore)
 air-monitor/config/email_credentials.env
+
+# air-monitor/ is its own nested git repo (separate project), not tracked here
+air-monitor/
+
+# legacy pre-air-monitor sensor scripts, superseded by air-monitor/scripts/run_pipeline.py
+main.py
+run_bme.py
+run_scd.py
+run_sps.py
+
+# local Claude Code settings
+.claude/
+
+# scratch copy from 'iaq_hfis test-report'; the canonical copy is embedded by
+# 'iaq_hfis finalize' into research_results/{exploratory,final}/test_report.*
+/test_report.json
+/test_report.md
