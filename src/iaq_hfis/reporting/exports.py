@@ -22,6 +22,8 @@ import duckdb
 import numpy as np
 import pandas as pd
 
+from iaq_hfis.reporting.figure2_export import export_figure2_boundary_curves
+
 
 @dataclass(frozen=True)
 class ColumnSpec:
@@ -51,6 +53,7 @@ REFERENCE_CASE_SUMMARY = "reference_case_consistency.csv"
 OUTDOOR_CONTEXT_TIMESERIES = "outdoor_context_timeseries.csv"
 CONTINUITY_GRID = "continuity_grid.csv"
 CONTINUITY_SUMMARY = "continuity_summary.csv"
+FIGURE2_BOUNDARY_CURVES = "figure2_boundary_curves.csv"
 MULTI_COMPONENT_GRID = "multi_component_grid.csv"
 MULTI_COMPONENT_GRID_SUMMARY = "multi_component_grid_summary.csv"
 FAULT_INJECTION_EVENTS = "fault_injection_events.csv"
@@ -296,6 +299,21 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("monotonicity_violations", "int", "count", "Adjacent-point decreases for a monotonic (higher-is-worse) pollutant channel."),
         ColumnSpec("masked_by_favorable", "bool", "-", "Whether a favourable component prevented the adverse channel from dominating the aggregated result."),
         ColumnSpec("area_between_curves_vs_crisp_max", "float", "index points x channel units", "Trapezoidal integral of |PROPOSED_HFIS - FUZZY_COMPONENT_MAX| over the swept input; only populated for method=PROPOSED_HFIS."),
+    ],
+    FIGURE2_BOUNDARY_CURVES: [
+        ColumnSpec("panel", "str", "-", "Manuscript Figure 2 panel: a | b | c."),
+        ColumnSpec("component", "str", "-", "Aerosol | Ventilation | Microclimate -- the first-level component this panel illustrates."),
+        ColumnSpec("channel", "str", "-", "Direct-input channel swept for this panel: pm2_5 | co2 | humidity."),
+        ColumnSpec("boundary_id", "str", "-", "Resolved evaluation_continuity_grid boundary_id actually used (see figure2_boundary_curves_metadata.json for whether it matched the preferred ID or a documented fallback)."),
+        ColumnSpec("context", "str", "-", "favourable for every row in this export -- same background context across all three panels."),
+        ColumnSpec("boundary_value", "float", "channel units", "The control-region breakpoint this panel's grid straddles; constant within a panel."),
+        ColumnSpec("boundary_unit", "str", "-", "Real-world unit of boundary_value/input_value (ug/m3, ppm, or %)."),
+        ColumnSpec("grid_point", "int", "-", "1-based position within the boundary-continuity experiment's dense input grid."),
+        ColumnSpec("input_value", "float", "channel units", "The perturbed channel's value at this grid point (from evaluation_continuity_grid.input_value, unmodified)."),
+        ColumnSpec("distance_from_boundary", "float", "channel units", "input_value - boundary_value."),
+        ColumnSpec("method", "str", "-", "PROPOSED-HFIS | CRISP-CLASS-MAX (manuscript-facing labels for PROPOSED_HFIS / CRISP_CLASS_MAX)."),
+        ColumnSpec("integrated_index", "float", "0-100", "Final integrated IAQ index I at this grid point, from evaluation_continuity_grid.index_value, unmodified."),
+        ColumnSpec("output_class", "str", "-", "FAVOURABLE | ACCEPTABLE | DEGRADED | CRITICAL."),
     ],
     MULTI_COMPONENT_GRID: [
         ColumnSpec("a", "float", "0-100", "Aerosol (A) component crisp score at this grid point."),
@@ -767,6 +785,7 @@ def export_all(
             MULTI_COMPONENT_GRID, MULTI_COMPONENT_GRID_SUMMARY,
             FAULT_INJECTION_EVENTS, FAULT_DETECTION_PREDICTIONS, FAULT_DETECTION_METRICS,
             FAULT_DETECTION_EVENT_METRICS, FAULT_DETECTION_CONFUSION_MATRIX, HAMPEL_CALIBRATION,
+            FIGURE2_BOUNDARY_CURVES,
         ):
             result[name] = None
         return result
@@ -796,6 +815,7 @@ def export_all(
             FAULT_DETECTION_EVENT_METRICS: export_fault_detection_event_metrics(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_CONFUSION_MATRIX: export_fault_detection_confusion_matrix(con, out_dir, evaluation_run_id),
             HAMPEL_CALIBRATION: export_hampel_calibration(con, out_dir, evaluation_run_id),
+            FIGURE2_BOUNDARY_CURVES: export_figure2_boundary_curves(con, out_dir, evaluation_run_id),
         }
     )
     return result

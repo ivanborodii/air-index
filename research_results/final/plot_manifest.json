@@ -176,6 +176,21 @@
     }
   },
   {
+    "id": "figure2_boundary_curves",
+    "title": "Representative behavior of PROPOSED-HFIS and CRISP-CLASS-MAX near selected input control boundaries",
+    "source_csv": "figure2_boundary_curves.csv",
+    "plot_type": "line",
+    "x": "input_value",
+    "y": [
+      "integrated_index"
+    ],
+    "group_by": "method",
+    "description": "Manuscript Figure 2: one representative favourable-context boundary per first-level component (PM2.5->Aerosol, CO2->Ventilation, humidity->Microclimate), PROPOSED-HFIS vs CRISP-CLASS-MAX only; render as small multiples faceted by panel/channel/boundary_id -- see figure2_boundary_curves_metadata.json for exact scenario selection and validation.",
+    "filter_equals": {
+      "context": "favourable"
+    }
+  },
+  {
     "id": "fault_detection_metrics",
     "title": "Fault-Injection Detection Performance by Reason Code (validation split)",
     "source_csv": "fault_detection_metrics.csv",

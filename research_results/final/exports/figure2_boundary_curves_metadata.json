@@ -1,0 +1,93 @@
+{
+  "figure": "Figure 2",
+  "purpose": "Illustrate PROPOSED_HFIS vs CRISP_CLASS_MAX behavior near representative direct-input control boundaries for the three first-level IAQ components: (a) PM2.5 -> Aerosol, (b) CO2 -> Ventilation, (c) Relative humidity -> Microclimate.",
+  "selection_rule": "One deterministic, pre-declared boundary per component, all under the same favourable background context, using the exact boundary_id from the previous publication run if it still exists; otherwise the first favourable lower/control boundary for that channel (lowest breakpoint for monotonic channels; lowest 'favor*low*' edge for two-sided channels). No scenario was chosen or changed based on which one produced the largest difference between methods.",
+  "pipeline_run_id": "2bb2374fbdcc4fbda817178b3b07eb4c",
+  "evaluation_run_id": "410c40df13524947a383b8aaecacf887",
+  "git_commit": "79daa4fff9626b11c56d5b4a4c32160fcbdc2645",
+  "config_hash": "ebb05ee097084ab880c7c6671bb92bf891d467d1321d08429c6d6133b63101dc",
+  "grid_points_per_boundary": 21,
+  "selected_scenarios": [
+    {
+      "panel": "a",
+      "component": "Aerosol",
+      "channel": "pm2_5",
+      "context": "favourable",
+      "preferred_boundary_id": "pm2_5_breakpoint0",
+      "resolved_boundary_id": "pm2_5_breakpoint0",
+      "boundary_value": 15.0,
+      "selection_note": "preferred_id_matched"
+    },
+    {
+      "panel": "b",
+      "component": "Ventilation",
+      "channel": "co2",
+      "context": "favourable",
+      "preferred_boundary_id": "co2_breakpoint0",
+      "resolved_boundary_id": "co2_breakpoint0",
+      "boundary_value": 800.0,
+      "selection_note": "preferred_id_matched"
+    },
+    {
+      "panel": "c",
+      "component": "Microclimate",
+      "channel": "humidity",
+      "context": "favourable",
+      "preferred_boundary_id": "humidity_favorable_low_edge_all_seasons",
+      "resolved_boundary_id": "humidity_favorable_low_edge_all_seasons",
+      "boundary_value": 30.0,
+      "selection_note": "preferred_id_matched"
+    }
+  ],
+  "methods": [
+    "PROPOSED-HFIS",
+    "CRISP-CLASS-MAX"
+  ],
+  "csv_path": "research_results/final/exports/figure2_boundary_curves.csv",
+  "validation": {
+    "row_count": 126,
+    "passed": true,
+    "checks": [
+      {
+        "name": "input_value_monotonic_per_panel_and_method",
+        "passed": true,
+        "detail": "input_value strictly non-decreasing in grid_point order, per (panel, method)."
+      },
+      {
+        "name": "same_input_grid_across_methods_per_panel",
+        "passed": true,
+        "detail": "Both methods share an identical input_value sequence within each panel."
+      },
+      {
+        "name": "integrated_index_in_0_100",
+        "passed": true,
+        "detail": "126 defined integrated_index values checked, all in [0, 100]: True."
+      },
+      {
+        "name": "boundary_value_constant_per_panel",
+        "passed": true,
+        "detail": "Exactly one distinct boundary_value per panel."
+      },
+      {
+        "name": "exactly_three_scenarios",
+        "passed": true,
+        "detail": "panels present: ['a', 'b', 'c']."
+      },
+      {
+        "name": "only_required_methods_present",
+        "passed": true,
+        "detail": "methods present: ['CRISP-CLASS-MAX', 'PROPOSED-HFIS']."
+      },
+      {
+        "name": "expected_points_per_panel_and_method",
+        "passed": true,
+        "detail": "expected 21 points/panel/method; counts={('a', 'CRISP-CLASS-MAX'): 21, ('a', 'PROPOSED-HFIS'): 21, ('b', 'CRISP-CLASS-MAX'): 21, ('b', 'PROPOSED-HFIS'): 21, ('c', 'CRISP-CLASS-MAX'): 21, ('c', 'PROPOSED-HFIS'): 21}."
+      },
+      {
+        "name": "recomputed_metrics_match_continuity_summary",
+        "passed": true,
+        "detail": "pm2_5_breakpoint0/PROPOSED_HFIS: recomputed={'max_adjacent_jump': 2.6152459429045223, 'mean_adjacent_jump': 1.2527985074626866, 'n_class_transitions': 1, 'monotonicity_violations': 0, 'n_points': 21}, summary=(max_jump=2.6152459429045223, mean_jump=1.2527985074626866, transitions=1, mono=0), match=True; pm2_5_breakpoint0/CRISP_CLASS_MAX: recomputed={'max_adjacent_jump': 25.0, 'mean_adjacent_jump': 1.25, 'n_class_transitions': 1, 'monotonicity_violations': 0, 'n_points': 21}, summary=(max_jump=25.0, mean_jump=1.25, transitions=1, mono=0), match=True; co2_breakpoint0/PROPOSED_HFIS: recomputed={'max_adjacent_jump': 2.6152459429045223, 'mean_adjacent_jump': 1.2527985074626866, 'n_class_transitions': 1, 'monotonicity_violations': 0, 'n_points': 21}, summary=(max_jump=2.6152459429045223, mean_jump=1.2527985074626866, transitions=1, mono=0), match=True; co2_breakpoint0/CRISP_CLASS_MAX: recomputed={'max_adjacent_jump': 25.0, 'mean_adjacent_jump': 1.25, 'n_class_transitions': 1, 'monotonicity_violations': 0, 'n_points': 21}, summary=(max_jump=25.0, mean_jump=1.25, transitions=1, mono=0), match=True; humidity_favorable_low_edge_all_seasons/PROPOSED_HFIS: recomputed={'max_adjacent_jump': 2.6152459429045294, 'mean_adjacent_jump': 1.2527985074626866, 'n_class_transitions': 1, 'monotonicity_violations': 0, 'n_points': 21}, summary=(max_jump=2.6152459429045294, mean_jump=1.2527985074626866, transitions=1, mono=0), match=True; humidity_favorable_low_edge_all_seasons/CRISP_CLASS_MAX: recomputed={'max_adjacent_jump': 25.0, 'mean_adjacent_jump': 1.25, 'n_class_transitions': 1, 'monotonicity_violations': 0, 'n_points': 21}, summary=(max_jump=25.0, mean_jump=1.25, transitions=1, mono=0), match=True"
+      }
+    ]
+  }
+}

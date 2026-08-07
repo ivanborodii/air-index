@@ -153,6 +153,17 @@ PLOTS: list[PlotSpec] = [
         description="Largest single-step index change across each boundary's grid, grouped by method, restricted to the favourable other-components context for readability -- smaller is smoother.",
     ),
     PlotSpec(
+        id="figure2_boundary_curves",
+        title="Representative behavior of PROPOSED-HFIS and CRISP-CLASS-MAX near selected input control boundaries",
+        source_csv=exports.FIGURE2_BOUNDARY_CURVES,
+        plot_type="line",
+        x="input_value",
+        y=["integrated_index"],
+        group_by="method",
+        filter_equals={"context": "favourable"},
+        description="Manuscript Figure 2: one representative favourable-context boundary per first-level component (PM2.5->Aerosol, CO2->Ventilation, humidity->Microclimate), PROPOSED-HFIS vs CRISP-CLASS-MAX only; render as small multiples faceted by panel/channel/boundary_id -- see figure2_boundary_curves_metadata.json for exact scenario selection and validation.",
+    ),
+    PlotSpec(
         id="fault_detection_metrics",
         title="Fault-Injection Detection Performance by Reason Code (validation split)",
         source_csv=exports.FAULT_DETECTION_METRICS,
