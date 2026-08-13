@@ -28,17 +28,26 @@ coverage:
   min_ratio: 0.80    # manuscript: rho_i(t) >= 0.80 (24/30 slots passes, 23/30 fails)
 
 hampel:
-  # PROVISIONAL, but now literature-grounded rather than a guess: these are
-  # the exact illustrative-example parameters (K=5 -> 2K+1=11 point window,
-  # t=1) used by Pearson, Neuvo, Astola, Gabbouj, "Generalized Hampel
-  # Filters" (2016) -- the exact paper the manuscript cites for this filter
-  # -- verified 2026-07-24 against its EUSIPCO 2015 conference precursor
-  # (same authors/definition, Sec. 2 and Figs. 3/5). The paper presents
-  # this as a worked example, not a formal general recommendation, so this
-  # remains provisional. Verified empirically against live data: no
-  # completeness/coverage regression vs the prior window=5/t=3 guess.
+  # window_size=11 (CAUSAL: the current sample + the 10 immediately
+  # preceding samples -- see iaq_hfis.quality.hampel's module docstring)
+  # matches the manuscript's own stated causal window. The point count (11)
+  # is still sourced from Pearson, Neuvo, Astola, Gabbouj, "Generalized
+  # Hampel Filters" (2016, Sec. 2, K=5 -> 11 points) -- the paper the
+  # manuscript cites for this filter -- but that paper's own illustrative
+  # example uses a CENTERED window shape, which is NOT what's implemented
+  # here; only the point count carries over, not the shape.
+  #
+  # mad_multiplier=3.0 is CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT (see
+  # iaq_hfis.provenance.STATUS_VALUES), not literature-informed: selected
+  # 2026-08-13 by comparing h in {1.0, 2.0, 3.0} at window_size=11 on the
+  # deterministic synthetic fault-injection calibration split only (never
+  # the validation split), maximizing the objective
+  # S = (single_spike recall + genuine-event preservation + (1 - single_spike FPR)) / 3
+  # -- see iaq_hfis.evaluation.fault_injection.select_hampel_multiplier and
+  # research_results/hampel_causal_revision_report.md for the full
+  # calibration table and the validation-split result for this value.
   window_size: 11
-  mad_multiplier: 1.0
+  mad_multiplier: 3.0
 
 confirmation:           # PROVISIONAL — tolerances not given numerically in the manuscript
   pm_cross_channel_tolerance_pct: 20.0

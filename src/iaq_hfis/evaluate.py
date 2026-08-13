@@ -40,13 +40,16 @@ from iaq_hfis.evaluation.agreement import pairwise_agreement
 from iaq_hfis.evaluation.continuity import run_continuity_experiment, summarize_continuity_smoothness, summarize_continuity_smoothness_vs_baseline
 from iaq_hfis.evaluation.fault_injection import (
     HAMPEL_MULTIPLIER_GRID,
+    HAMPEL_SELECTION_WINDOW_SIZE,
     HAMPEL_WINDOW_GRID,
     build_confusion_matrix,
     confirmation_recovery_rate,
     false_rejection_rate_for_genuine_events,
     run_benchmark,
     run_hampel_calibration,
+    select_hampel_multiplier,
     score_events,
+    score_final_exclusion,
     score_predictions,
 )
 from iaq_hfis.evaluation.faults import compute_reason_code_frequency, compute_status_proportions
@@ -458,6 +461,17 @@ def run_evaluation(
                          m.precision, m.recall, m.f1, m.specificity, m.false_positive_rate, m.mean_detection_delay],
                     )
 
+                split_final_exclusion_metrics = score_final_exclusion(fault_predictions, dataset_split=split)
+                for m in split_final_exclusion_metrics:
+                    con.execute(
+                        """INSERT OR REPLACE INTO fault_final_exclusion_metrics
+                           (evaluation_run_id, pipeline_run_id, dataset_split, reason_code, tp, fp, fn, tn,
+                            precision, recall, f1, specificity, false_positive_rate)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        [evaluation_run_id, pipeline_run_id, split, m.reason_code, m.tp, m.fp, m.fn, m.tn,
+                         m.precision, m.recall, m.f1, m.specificity, m.false_positive_rate],
+                    )
+
                 split_event_metrics = score_events(fault_events, fault_predictions, split, temporal_tolerance_samples=1)
                 fault_event_metrics_by_split[split] = split_event_metrics
                 for m in split_event_metrics:
@@ -489,16 +503,22 @@ def run_evaluation(
 
             hampel_calibration_rows = run_hampel_calibration(
                 settings.schema_mapping, sensor_specs, settings.confirmation, settings.confirmation.pm_cross_channel_tolerance_pct,
-                settings.cadence.sample_cadence_seconds, settings.hampel.window_size, settings.hampel.mad_multiplier,
+                settings.cadence.sample_cadence_seconds,
             )
+            # Selected purely from the calibration split (task spec section 6) --
+            # independent of whatever settings.hampel.mad_multiplier is currently
+            # configured to. If this differs from the configured value, the config
+            # is out of date and should be updated to match (see
+            # docs/reproducibility.md / research_results/hampel_causal_revision_report.md).
+            selected_hampel_multiplier = select_hampel_multiplier(hampel_calibration_rows)
             for c in hampel_calibration_rows:
                 con.execute(
                     """INSERT OR REPLACE INTO hampel_calibration
                        (evaluation_run_id, pipeline_run_id, dataset_split, window_size, mad_multiplier, fault_recall,
-                        genuine_event_preservation_rate, objective_score, selected)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                        genuine_event_preservation_rate, single_spike_false_positive_rate, objective_score, selected)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
                     [evaluation_run_id, pipeline_run_id, c.dataset_split, c.window_size, c.mad_multiplier, c.fault_recall,
-                     c.genuine_event_preservation_rate, c.objective_score, c.selected],
+                     c.genuine_event_preservation_rate, c.single_spike_false_positive_rate, c.objective_score, c.selected],
                 )
 
             # --- Status proportions + fault reason-code frequency over the whole range, this pipeline_run_id only ---
@@ -630,16 +650,21 @@ def run_evaluation(
             "hampel_calibration": {
                 "current_window_size": settings.hampel.window_size,
                 "current_mad_multiplier": settings.hampel.mad_multiplier,
+                "selected_window_size": HAMPEL_SELECTION_WINDOW_SIZE,
+                "selected_mad_multiplier": selected_hampel_multiplier,
+                "configured_value_matches_selection": (
+                    settings.hampel.window_size == HAMPEL_SELECTION_WINDOW_SIZE and settings.hampel.mad_multiplier == selected_hampel_multiplier
+                ),
                 "candidate_grid": {"window_size": HAMPEL_WINDOW_GRID, "mad_multiplier": HAMPEL_MULTIPLIER_GRID},
-                "validation_objective_score_for_current_config": next(
+                "validation_objective_score_for_selected_value": next(
                     (c.objective_score for c in hampel_calibration_rows if c.selected and c.dataset_split == "validation"), None
                 ),
                 "best_calibration_objective_score": max(
                     (c.objective_score for c in hampel_calibration_rows if c.dataset_split == "calibration" and c.objective_score is not None), default=None
                 ),
-                "note": "Current configured (window_size, mad_multiplier) is retained regardless of this grid's outcome -- "
-                        "a change is only adopted after separate empirical verification against real live data, not from "
-                        "synthetic-benchmark evidence alone. See hampel_calibration.csv for the full grid.",
+                "note": "mad_multiplier is selected purely from the calibration split at window_size=11 -- see "
+                        "parameter_selection.json for the full deterministic selection procedure and "
+                        "hampel_calibration.csv for the full diagnostic grid.",
             },
         },
         "status_proportions": {"n_total": status_proportions.n_total, "OK": status_proportions.ok, "PARTIAL": status_proportions.partial, "FAILED": status_proportions.failed},

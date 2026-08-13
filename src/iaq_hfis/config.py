@@ -122,26 +122,33 @@ class CoverageConfig(BaseModel):
 
 
 class HampelConfig(BaseModel):
-    """PROVISIONAL: the manuscript names the Hampel filter (citing Pearson,
-    Neuvo, Astola, Gabbouj, "Generalized Hampel Filters", 2016) but gives no
-    numeric window/threshold. window_size=11, mad_multiplier=1.0 are that
-    exact paper's own illustrative-example parameters (K=5, i.e. j in
-    [-K,K] = 11 points, and t=1 -- see its Sec. 2 and Figs. 3/5), verified
-    2026-07-24 against the paper's EUSIPCO 2015 conference precursor
-    (same authors, same Hampel filter definition). The paper does not state
-    these as a general recommendation ("results ... preliminary, based on
-    limited experimentation with a single example") -- still provisional,
-    but now grounded in the manuscript's own cited source rather than an
-    unsourced guess. Verified empirically against live data: relative to a
-    window=5/mad_multiplier=3.0 guess, this roughly doubles the SUSPECT
-    candidate rate (6.0%->12.5% in one test run) but confirmation still
-    validates ~98% of them as usable either way -- no completeness regression.
+    """The manuscript describes a CAUSAL Hampel window: for measurement
+    x_i, the window is {x_{i-window_size+1}, ..., x_i} -- x_i and the
+    window_size-1 samples immediately preceding it, never a later one (see
+    :mod:`iaq_hfis.quality.hampel`). This is NOT the same shape as the
+    centered window (j in [-K,K]) used in the illustrative example of
+    Pearson, Neuvo, Astola, Gabbouj, "Generalized Hampel Filters" (2016) --
+    the paper the manuscript cites for this filter, and the source of the
+    point count window_size=11 (K=5 -> 11 points, Sec. 2 / Figs. 3-5) -- but
+    the window's SHAPE follows the manuscript's own causal definition, not
+    that paper's centered one. A centered window is not equivalent to this
+    causal one and must never be described as such.
+
+    mad_multiplier=3.0 is CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT (see
+    :mod:`iaq_hfis.provenance`'s STATUS_VALUES) -- selected by comparing
+    h in {1.0, 2.0, 3.0} at window_size=11 on the deterministic synthetic
+    fault-injection calibration split only (never the validation split),
+    maximizing S = (single_spike recall + genuine-event preservation +
+    (1 - single_spike false-positive rate)) / 3. See
+    :func:`iaq_hfis.evaluation.fault_injection.select_hampel_multiplier` and
+    research_results/hampel_causal_revision_report.md for the full
+    calibration table and the frozen validation-split result.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     window_size: int = Field(ge=3, default=11)
-    mad_multiplier: float = Field(gt=0, default=1.0)
+    mad_multiplier: float = Field(gt=0, default=3.0)
 
 
 class ConfirmationConfig(BaseModel):

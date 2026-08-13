@@ -75,3 +75,64 @@ def test_detect_gradual_drift_not_flagged_on_flat_series():
     series = pd.Series([700.0] * 10)
     flagged = detect_gradual_drift(series, min_consecutive_same_direction=5)
     assert not flagged.any()
+
+
+def test_detect_gradual_drift_is_causal_not_retrospective():
+    """Mandatory regression test: a real drift run must not retroactively
+    flag earlier points once a later point confirms the run reached
+    min_consecutive_same_direction -- each flagged point's status must
+    depend only on itself and points strictly before it."""
+    base = list(range(700, 720))  # 20-point monotonic ramp
+    series = pd.Series([float(v) for v in base])
+    flagged = detect_gradual_drift(series, min_consecutive_same_direction=5, min_magnitude=0.0)
+    first_flagged = flagged[flagged].index.min()
+    # The run starts at index 0; it cannot reach a 5-step run before index
+    # 4 (0->1->2->3->4 is 4 steps from the start, run_length=5 first holds
+    # at index 4). The first flag must be AT or AFTER that point, never
+    # earlier -- if it were retrospective, index 0/1 would also be flagged.
+    assert first_flagged >= 4
+    assert not flagged.iloc[0]
+    assert not flagged.iloc[1]
+    assert not flagged.iloc[2]
+
+
+def test_detect_gradual_drift_changing_a_later_value_never_changes_an_earlier_flag():
+    """Prefix invariance for gradual drift, same principle as the causal
+    Hampel filter: mutating everything from some index onward must not
+    change any earlier point's flag."""
+    base = [700.0 + i for i in range(20)]
+    series_a = pd.Series(base)
+    series_b = pd.Series(base)
+    for i in range(12, 20):
+        series_b.iloc[i] = 50.0 - i  # completely different continuation from index 12 onward
+
+    flagged_a = detect_gradual_drift(series_a, min_consecutive_same_direction=5, min_magnitude=0.0)
+    flagged_b = detect_gradual_drift(series_b, min_consecutive_same_direction=5, min_magnitude=0.0)
+    for i in range(12):
+        assert bool(flagged_a.iloc[i]) == bool(flagged_b.iloc[i])
+
+
+def test_detect_gradual_drift_detection_delay_is_honest_for_a_short_injected_run():
+    """An injected drift run exactly min_consecutive_same_direction samples
+    long is only flagged from the point the run condition is first met
+    onward -- never for its full duration, and the detector must not claim
+    otherwise (detection delay = min_consecutive_same_direction - 1 samples,
+    not zero)."""
+    # Flat baseline, then a monotonic run of exactly 5 steps (6 points incl. the pivot).
+    values = [700.0] * 5 + [701.0, 702.0, 703.0, 704.0, 705.0]
+    series = pd.Series(values)
+    flagged = detect_gradual_drift(series, min_consecutive_same_direction=5, min_magnitude=0.0)
+    # Run starts at index 4 (the last flat point, value just before the rise).
+    # 5-step run_length is first reached at index 9 (4 -> 9 is 5 steps).
+    assert not flagged.iloc[:9].any()
+    assert bool(flagged.iloc[9]) is True
+
+
+def test_detect_gradual_drift_still_detects_a_real_persistent_change_event_level():
+    """Event-level detection (was the run flagged at all) must survive the
+    causal fix even though row-level recall for the run's own first samples
+    necessarily does not (see the docstring's tradeoff)."""
+    values = [700.0 + i * 2.0 for i in range(15)]  # long, unambiguous drift
+    series = pd.Series(values)
+    flagged = detect_gradual_drift(series, min_consecutive_same_direction=5, min_magnitude=0.0)
+    assert flagged.any()  # the event is still detected somewhere in the run

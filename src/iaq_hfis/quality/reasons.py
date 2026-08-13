@@ -33,12 +33,29 @@ def detect_stuck_value(series: pd.Series, min_repeats: int) -> pd.Series:
 
 
 def detect_gradual_drift(series: pd.Series, min_consecutive_same_direction: int, min_magnitude: float = 0.0) -> pd.Series:
-    """PROVISIONAL heuristic: flags a run of >= ``min_consecutive_same_direction``
-    consecutive same-direction (monotonic) steps whose cumulative change
-    (from the value just before the run started) also reaches
-    ``min_magnitude`` — the signature the manuscript describes for a slow
-    sensor-level shift, as distinct from a single reverting spike or a
-    value stuck flat.
+    """CAUSAL: flags point i once it is the LATEST point of a run of >=
+    ``min_consecutive_same_direction`` consecutive same-direction
+    (monotonic) steps whose cumulative change (from the value just before
+    the run started) also reaches ``min_magnitude`` — the signature the
+    manuscript describes for a slow sensor-level shift, as distinct from a
+    single reverting spike or a value stuck flat. PROVISIONAL heuristic
+    (the manuscript names the fault category but not an algorithm).
+
+    Causal, not retrospective: point i's flag depends only on i and points
+    strictly before it. A real drift run therefore first becomes flaggable
+    only once it has actually accumulated ``min_consecutive_same_direction``
+    steps -- points earlier in the same run, before that threshold was
+    reached, are never retroactively marked once a later point confirms the
+    run (an earlier bug: this function used to backfill
+    ``flags[run_start+1:i+1]`` the moment the threshold was reached at i,
+    which changed earlier points' status based on data that didn't exist
+    yet at their own time -- not causal). This means row-level recall for a
+    drift run of exactly ``min_consecutive_same_direction`` samples is
+    necessarily bounded by the detector's own minimum detection delay (it
+    cannot flag a run shorter than its own minimum length); event-level
+    recall (was the event detected at all) is unaffected as long as the run
+    reaches the full threshold, which every genuinely-injected drift here
+    does by construction.
 
     ``min_magnitude`` matters: run-length alone is a weak signal, since any
     real, physically ordinary environmental trend (a room's CO2 slowly
@@ -77,6 +94,6 @@ def detect_gradual_drift(series: pd.Series, min_consecutive_same_direction: int,
         if run_start is not None and run_length >= min_consecutive_same_direction:
             magnitude = abs(values[i] - values[run_start])
             if magnitude >= min_magnitude:
-                flags[run_start + 1 : i + 1] = True
+                flags[i] = True  # causal: flag only i itself, never points strictly before it
 
     return pd.Series(flags, index=series.index)

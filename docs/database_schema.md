@@ -71,10 +71,11 @@ this file, never the raw/weather sources).
 |---|---|---|
 | `fault_injection_events` | `(evaluation_run_id, scenario_id, channel, injected_at_index)` | One injected fault's ground truth: type, position, duration. `dataset_split` (calibration/validation) is a stored column, always derivable from `scenario_id`'s suffix too (`fault_injection.dataset_split_of`). |
 | `fault_detection_predictions` | `(evaluation_run_id, scenario_id, channel, sample_index)` | Row-level prediction: true label, predicted reason codes, stage2 state, usable. |
-| `fault_detection_metrics` | `(evaluation_run_id, dataset_split, reason_code)` | Row-level TP/FP/FN/TN, precision/recall/F1/specificity/FPR, mean detection delay. |
+| `fault_detection_metrics` | `(evaluation_run_id, dataset_split, reason_code)` | PRIMARY reason-code screening: row-level TP/FP/FN/TN, precision/recall/F1/specificity/FPR, mean detection delay, scored against `predicted_reason_codes`. |
+| `fault_final_exclusion_metrics` | `(evaluation_run_id, dataset_split, reason_code)` | FINAL usable/not-usable decision (post-confirmation) -- same shape as `fault_detection_metrics` but scored against `usable`, not `predicted_reason_codes`; a primary candidate later confirmed usable is a false negative here, never a true positive. |
 | `fault_detection_event_metrics` | `(evaluation_run_id, dataset_split, reason_code)` | Event-level: one-to-one matched TP/FP/FN (never double-counts a multi-sample fault), `temporal_tolerance_samples`, true/predicted event counts. |
 | `fault_detection_confusion_matrix` | `(evaluation_run_id, dataset_split, true_label, predicted_label)` | Row-level confusion matrix, including "none" for genuinely clean/unflagged samples. |
-| `hampel_calibration` | `(evaluation_run_id, dataset_split, window_size, mad_multiplier)` | Grid-search diagnostic; `dataset_split` is calibration/validation (renamed from an earlier development/holdout terminology). `selected=TRUE` always marks the currently *configured* value, never a value chosen by this grid alone. |
+| `hampel_calibration` | `(evaluation_run_id, dataset_split, window_size, mad_multiplier)` | Full diagnostic grid (7/11/15 x 1.0/2.0/3.0), both splits, plus `single_spike_false_positive_rate`. `selected=TRUE` marks the (window_size=11, mad_multiplier) combination actually chosen by `select_hampel_multiplier` from the calibration split only -- not merely the pre-existing configured value. |
 
 ## Miscellaneous
 

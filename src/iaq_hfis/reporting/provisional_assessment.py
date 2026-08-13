@@ -182,10 +182,11 @@ def _sensitivity_result_for(path: str, summary: dict) -> str:
             return f"Swept directly by the multi-point sensitivity experiment: {len(window_rows)} window sizes tested; see sensitivity_window_summary.csv."
     if path in ("hampel.window_size", "hampel.mad_multiplier"):
         hc = (ev.get("fault_injection") or {}).get("hampel_calibration") or {}
-        validation_score = hc.get("validation_objective_score_for_current_config")
+        validation_score = hc.get("validation_objective_score_for_selected_value")
         if validation_score is not None:
             return (
-                f"Fault-injection calibration grid objective score for the currently configured value, "
+                f"Fault-injection calibration grid objective score for the selected value "
+                f"(mad_multiplier={hc.get('selected_mad_multiplier')}, selected purely from the calibration split), "
                 f"on the VALIDATION split (disjoint from the split used to search the grid): {validation_score:.3f} "
                 f"(1.0 = perfect single_spike recall + perfect genuine-event preservation + zero single_spike FPR). "
                 f"See hampel_calibration.csv for the full grid on both splits."
@@ -243,7 +244,7 @@ def build_provisional_parameter_assessment_markdown(provenance: list[ParameterPr
             f"- **Engaged this run**: {'yes' if engaged else 'no -- config-level default not exercised by this run’s data'}",
             f"- **Why provisional**: {row.scientific_rationale}",
             f"- **Where used**: pipeline stage `{row.pipeline_stage}`; source `{row.source_file}` (`{row.source_key_path}`)",
-            f"- **Diagnostic calibration grid exists**: {'yes -- see parameter_selection.json (diagnostic only; the configured value is NOT selected from this grid, see below)' if _is_calibrated(row.path) else 'no'}",
+            f"- **Diagnostic calibration grid exists**: {'yes -- see parameter_selection.json; mad_multiplier is selected from this grid (calibration split only), window_size is literature-informed and held fixed' if _is_calibrated(row.path) else 'no'}",
             f"- **Calibration/validation dataset**: {_calibration_dataset_for(row.path)}",
             f"- **Sensitivity result**: {_sensitivity_result_for(row.path, summary)}",
             f"- **Do conclusions depend strongly on it?**: {meta.depends_strongly}",

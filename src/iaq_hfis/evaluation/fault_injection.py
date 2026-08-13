@@ -115,15 +115,19 @@ def build_channel_scenarios(
     across channels so their detection performance is directly comparable.
 
     ``dual_channel=True`` (temperature, humidity) populates a synthetic
-    secondary-sensor reading that exactly tracks the primary value, so the
-    real dual-channel confirmation logic (:func:`iaq_hfis.quality.confirmation.confirm_dual_channel_event`)
-    has something to corroborate against. Without this, a genuine sustained
-    event can NEVER reach "confirmed usable" for these two channels -- their
-    confirmation requires agreement with a duplicate sensor OR a
-    corroborating outdoor trend (neither available in a synthetic, isolated
-    scenario), so omitting secondary_values entirely would silently and
-    permanently fail every genuine-event scenario for these channels
-    regardless of the fault-detection logic's actual correctness.
+    secondary-sensor reading that CORROBORATES the primary value (moves with
+    it, within dual-channel tolerance) but is NOT an exact copy -- a real
+    duplicate sensor never reads bit-for-bit identical to another, and an
+    exact copy would also make a genuine sustained event's plateau
+    indistinguishable from a deliberately injected stuck_value run (see
+    ``secondary_for``/``_ripple`` below). Without a secondary channel at
+    all, a genuine sustained event can NEVER reach "confirmed usable" for
+    these two channels -- their confirmation requires agreement with a
+    duplicate sensor OR a corroborating outdoor trend (neither available in
+    a synthetic, isolated scenario), so omitting secondary_values entirely
+    would silently and permanently fail every genuine-event scenario for
+    these channels regardless of the fault-detection logic's actual
+    correctness.
 
     ``variant`` selects a deterministic parameter set: "calibration" for
     grid-search/development, "validation" for a structurally similar but
@@ -146,11 +150,32 @@ def build_channel_scenarios(
     def osc() -> list[float]:
         return [base + amplitude * math.sin(2 * math.pi * (i + phase) / 7.0) for i in range(n)]
 
+    #: Amplitude of the small, deterministic ripple superimposed on the
+    #: dual-channel secondary signal and on genuine-event plateaus (task
+    #: spec section 7): a fraction of the channel's own normal ambient
+    #: variation amplitude (``amplitude``, already chosen per channel for
+    #: physical plausibility -- see build_co2/temperature/humidity/pm10
+    #: _scenarios), so it stays within a scientifically defensible range
+    #: without inventing a new unrelated magic number. 30% keeps the
+    #: secondary well inside any real dual-channel tolerance (sum of two
+    #: sensors' declared uncertainties, always >= either sensor's own
+    #: uncertainty) while still being large enough to never repeat a bit-
+    #: for-bit identical consecutive value in float64 (deterministic, no
+    #: possibility of an accidental exact tie).
+    _ripple_amplitude = 0.3 * amplitude
+
+    def _ripple(step_index: int, phase: float = 0.0) -> float:
+        return _ripple_amplitude * math.sin(2 * math.pi * step_index / 5.0 + phase)
+
     def secondary_for(values: list[float | None]) -> list[float | None] | None:
-        # Synthetic secondary sensor that exactly tracks the primary -- see the
-        # dual_channel docstring above for why this is necessary, not optional,
-        # for temperature/humidity's confirmation logic to ever succeed here.
-        return list(values) if dual_channel else None
+        # Deterministic secondary sensor that CORROBORATES the primary
+        # (moves with it) without being an exact copy -- a real duplicate
+        # sensor never reads bit-for-bit identical to another. Phase-shifted
+        # relative to the primary's own ripple (see genuine-event scenarios
+        # below) so the two channels' noise is independent, not identical.
+        if not dual_channel:
+            return None
+        return [None if v is None else v + _ripple(i, phase=1.7) for i, v in enumerate(values)]
 
     def add_spike(suffix: str, magnitude: float) -> None:
         values = osc()
@@ -222,24 +247,30 @@ def build_channel_scenarios(
     if include_genuine_events:
         # genuine_rapid_event: a large but PERSISTENT step change (e.g. window opened) -- a real
         # environmental event, not a sensor fault. Must remain usable after persistence confirmation.
+        # A perfectly constant plateau would be logically indistinguishable from a deliberately
+        # injected stuck_value run -- see the plateau_ripple docstring above -- so a small
+        # deterministic ripple is superimposed on the sustained level (never removing the sustained
+        # change itself, since |ripple| << genuine_step_magnitude).
         values = osc()
         labels = [None] * n
         step_start = n // 2
         for i in range(step_start, n):
-            values[i] = base + genuine_step_magnitude * scale
+            values[i] = base + genuine_step_magnitude * scale + _ripple(i - step_start)
             labels[i] = "genuine_event"
         sid = f"{channel}_genuine_rapid_event_{variant}"
         scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
-                                   [FaultEvent(sid, channel, "genuine_event", step_start, n - step_start, "Sustained step change -- must remain usable, not be discarded as a fault.")],
+                                   [FaultEvent(sid, channel, "genuine_event", step_start, n - step_start, "Sustained step change (with small deterministic measurement variation, not a perfectly flat plateau) -- must remain usable, not be discarded as a fault.")],
                                    secondary_values=secondary_for(values)))
 
         # persistent_real_change: similar but a gradual (not instant) sustained rise that holds --
-        # must not be discarded as gradual_drift once it has persisted past the drift window.
+        # must not be discarded as gradual_drift once it has persisted past the drift window. Same
+        # ripple rationale as genuine_rapid_event once the rise reaches its plateau.
         values = osc()
         labels = [None] * n
         rise_start = n // 2
         for j, i in enumerate(range(rise_start, n)):
-            values[i] = base + min(genuine_step_magnitude * scale * 2.0 / 3.0, (genuine_step_magnitude * scale / 10.0) * (j + 1))
+            ramp_target = min(genuine_step_magnitude * scale * 2.0 / 3.0, (genuine_step_magnitude * scale / 10.0) * (j + 1))
+            values[i] = base + ramp_target + _ripple(j)
             labels[i] = "genuine_event"
         sid = f"{channel}_persistent_real_change_{variant}"
         scenarios.append(Scenario(sid, channel, _timestamps(n, cadence_seconds), values, labels,
@@ -456,6 +487,50 @@ def score_predictions(predictions: list[SamplePrediction], dataset_split: str | 
     return metrics
 
 
+def score_final_exclusion(predictions: list[SamplePrediction], dataset_split: str | None = None) -> list[FaultDetectionMetric]:
+    """Task spec section 9: a primary SUSPECT candidate (:func:`score_predictions`)
+    may later be CONFIRMED as usable -- primary reason-code screening and the
+    final usable/not-usable decision are different questions and must be
+    reported separately, never conflated under the same metric name.
+
+    Row-level TP/FP/FN/TN per true fault type, but the PREDICTION signal
+    here is the final decision (``not usable``), not the primary
+    ``predicted_reason_codes``. A true positive is a genuinely faulty sample
+    (``true_fault_type`` in REASON_CODES) that ended up excluded
+    (``usable=False``); a false positive is a clean/genuine-event sample
+    that ended up excluded (a real, final false rejection -- see
+    :func:`false_rejection_rate_for_genuine_events` for the same concern
+    scoped to genuine events specifically); a false negative is a genuinely
+    faulty sample that was recovered (confirmed usable) -- not necessarily
+    a defect, since some faults (e.g. a brief single_spike) are expected to
+    revert and may legitimately end up usable again after confirmation
+    logic, but must be counted honestly, not hidden.
+    """
+    if dataset_split is not None:
+        predictions = [p for p in predictions if p.dataset_split == dataset_split]
+    metrics = []
+    for code in REASON_CODES:
+        tp = fp = fn = tn = 0
+        for p in predictions:
+            is_true_fault = p.true_fault_type == code
+            excluded = not p.usable
+            if is_true_fault and excluded:
+                tp += 1
+            elif not is_true_fault and excluded:
+                fp += 1
+            elif is_true_fault and not excluded:
+                fn += 1
+            else:
+                tn += 1
+        precision = tp / (tp + fp) if (tp + fp) > 0 else None
+        recall = tp / (tp + fn) if (tp + fn) > 0 else None
+        f1 = (2 * precision * recall / (precision + recall)) if precision and recall and (precision + recall) > 0 else None
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else None
+        specificity = 1.0 - fpr if fpr is not None else None
+        metrics.append(FaultDetectionMetric(code, tp, fp, fn, tn, precision, recall, f1, specificity, fpr, None))
+    return metrics
+
+
 @dataclass(frozen=True)
 class EventDetectionMetric:
     reason_code: str
@@ -640,13 +715,19 @@ def confirmation_recovery_rate(predictions: list[SamplePrediction], dataset_spli
     return sum(1 for p in suspect if p.usable) / len(suspect)
 
 
-#: Candidate grid for Hampel calibration. Only single_spike detection and
-#: genuine-event preservation depend on these parameters -- stuck_value,
-#: data_loss, and gradual_drift use separate, Hampel-independent detectors.
-#: Deliberately small (bounded runtime: this grid re-runs the full quality
-#: layer on every 'iaq_hfis evaluate' call, not just once).
+#: Broader diagnostic grid (window shape x multiplier) -- only single_spike
+#: detection and genuine-event preservation depend on these parameters;
+#: stuck_value, data_loss, and gradual_drift use separate, Hampel-independent
+#: detectors. Deliberately small (bounded runtime: this grid re-runs the
+#: full quality layer on every 'iaq_hfis evaluate' call, not just once).
 HAMPEL_WINDOW_GRID = [7, 11, 15]
 HAMPEL_MULTIPLIER_GRID = [1.0, 2.0, 3.0]
+
+#: The MAIN comparison (task spec section 6): window size held fixed at the
+#: manuscript's own causal-window size, multiplier is the only thing
+#: actually selected from this procedure.
+HAMPEL_SELECTION_WINDOW_SIZE = 11
+HAMPEL_SELECTION_MULTIPLIER_GRID = [1.0, 2.0, 3.0]
 
 
 @dataclass(frozen=True)
@@ -654,9 +735,10 @@ class HampelCalibrationRow:
     dataset_split: str  # "calibration" | "validation"
     window_size: int
     mad_multiplier: float
-    fault_recall: float | None
-    genuine_event_preservation_rate: float | None
-    objective_score: float | None
+    fault_recall: float | None  # R_spike: isolated-anomaly (single_spike) recall
+    genuine_event_preservation_rate: float | None  # P_event
+    single_spike_false_positive_rate: float | None  # FPR_spike
+    objective_score: float | None  # S = (R_spike + P_event + (1 - FPR_spike)) / 3
     selected: bool
 
 
@@ -666,14 +748,55 @@ def _hampel_affected_scenarios(cadence_seconds: int, variant: str) -> list[Scena
 
 
 def _objective(fault_recall: float | None, preservation_rate: float | None, single_spike_fpr: float | None) -> float | None:
-    """Balances 3 concerns: catching real spikes (recall), not discarding
-    genuine sustained events (preservation), and not over-labeling ordinary
-    points near a real transition as single_spike even when they remain
-    usable (1 - false_positive_rate) -- the concern that originally
-    motivated this calibration (a very high real-data single_spike count)."""
+    """S = (R_spike + P_event + (1 - FPR_spike)) / 3 -- balances 3 concerns:
+    catching real spikes (recall), not discarding genuine sustained events
+    (preservation), and not over-labeling ordinary points near a real
+    transition as single_spike even when they remain usable
+    (1 - false_positive_rate)."""
     if fault_recall is None or preservation_rate is None or single_spike_fpr is None:
         return None
     return (fault_recall + preservation_rate + (1.0 - single_spike_fpr)) / 3.0
+
+
+def select_hampel_multiplier(calibration_rows: list[HampelCalibrationRow]) -> float:
+    """Task spec section 6's deterministic selection procedure. Takes ONLY
+    calibration-split rows -- structurally cannot see validation data, so
+    validation metrics cannot influence the selected multiplier (see
+    ``tests/unit/test_hampel_selection.py``). Restricted internally to
+    ``HAMPEL_SELECTION_WINDOW_SIZE``/``HAMPEL_SELECTION_MULTIPLIER_GRID``
+    (any other rows passed in are ignored, in case a broader diagnostic
+    grid was passed by mistake).
+
+    Selection order (each step breaks ties from the previous one):
+    1. highest calibration objective_score (S);
+    2. highest isolated-anomaly (single_spike) recall;
+    3. highest genuine-event preservation rate;
+    4. lowest isolated-anomaly (single_spike) false-positive rate;
+    5. smallest multiplier, if still exactly tied.
+    """
+    candidates = [
+        r for r in calibration_rows
+        if r.dataset_split == "calibration" and r.window_size == HAMPEL_SELECTION_WINDOW_SIZE
+        and r.mad_multiplier in HAMPEL_SELECTION_MULTIPLIER_GRID
+    ]
+    if not candidates:
+        raise ValueError(
+            f"no calibration-split rows found for window_size={HAMPEL_SELECTION_WINDOW_SIZE} "
+            f"and multiplier in {HAMPEL_SELECTION_MULTIPLIER_GRID} -- cannot select a Hampel multiplier."
+        )
+
+    def sort_key(r: HampelCalibrationRow) -> tuple:
+        # Python sorts ascending; negate "higher is better" fields, keep
+        # "lower is better"/"smaller is better" fields as-is, so min() over
+        # this key implements the exact 5-step order above.
+        s = r.objective_score if r.objective_score is not None else float("-inf")
+        recall = r.fault_recall if r.fault_recall is not None else float("-inf")
+        preservation = r.genuine_event_preservation_rate if r.genuine_event_preservation_rate is not None else float("-inf")
+        fpr = r.single_spike_false_positive_rate if r.single_spike_false_positive_rate is not None else float("inf")
+        return (-s, -recall, -preservation, fpr, r.mad_multiplier)
+
+    best = min(candidates, key=sort_key)
+    return best.mad_multiplier
 
 
 def run_hampel_calibration(
@@ -682,27 +805,26 @@ def run_hampel_calibration(
     confirmation_cfg: ConfirmationConfig,
     pm_ordering_tolerance_pct: float,
     cadence_seconds: int,
-    current_window_size: int,
-    current_mad_multiplier: float,
 ) -> list[HampelCalibrationRow]:
-    """Documented calibration protocol (task spec section 10.3):
+    """Documented calibration protocol (task spec section 6):
 
-    1. Grid-search ``HAMPEL_WINDOW_GRID`` x ``HAMPEL_MULTIPLIER_GRID`` on the
-       *calibration* scenario split only.
-    2. Score each combination by a balanced objective: single_spike recall
-       (fault_recall) and the fraction of genuine sustained events NOT
-       falsely rejected (genuine_event_preservation_rate), averaged.
-    3. Report the *validation* split's performance for the config actually
-       kept in use -- computed once, not used to pick the parameters. The
+    1. Grid-search ``HAMPEL_WINDOW_GRID`` x ``HAMPEL_MULTIPLIER_GRID`` on both
+       the *calibration* and *validation* scenario splits (the broader
+       window-size sweep is diagnostic context; the actual selection below
+       only ever reads the window=11 x calibration-split subset).
+    2. Score each combination with the objective S (see :func:`_objective`).
+    3. Select the multiplier with :func:`select_hampel_multiplier`, reading
+       *only* ``dataset_split == "calibration"`` rows at
+       ``window_size == HAMPEL_SELECTION_WINDOW_SIZE`` -- the validation
+       split is never inspected for selection purposes.
+    4. Report the *validation* split's performance for the config actually
+       selected -- computed once, never used to pick the parameter. The
        calibration and validation splits use disjoint scenario_ids AND a
        different deterministic scale/phase (see build_channel_scenarios),
        so no scenario or timestamp is shared between them -- no leakage.
-    4. The originally configured (window_size, mad_multiplier) is always
-       marked ``selected`` here: per the calibration policy, a change is
-       only adopted after separate empirical verification against real
-       live data (see config/iaq_hfis.yaml's hampel section for that
-       history), not from synthetic-benchmark evidence alone. This grid is
-       diagnostic, not a proposal to silently override the configured value.
+    5. ``selected=True`` is set on exactly the two rows (calibration and
+       validation) matching the selected (window_size=11, mad_multiplier)
+       combination.
     """
     rows: list[HampelCalibrationRow] = []
     calibration_scenarios = _hampel_affected_scenarios(cadence_seconds, "calibration")
@@ -718,6 +840,14 @@ def run_hampel_calibration(
                 single_spike_fpr = metrics["single_spike"].false_positive_rate
                 preservation = 1.0 - fr if (fr := false_rejection_rate_for_genuine_events(predictions)) is not None else None
                 objective = _objective(fault_recall, preservation, single_spike_fpr)
-                selected = window_size == current_window_size and mad_multiplier == current_mad_multiplier
-                rows.append(HampelCalibrationRow(split, window_size, mad_multiplier, fault_recall, preservation, objective, selected))
-    return rows
+                rows.append(HampelCalibrationRow(split, window_size, mad_multiplier, fault_recall, preservation, single_spike_fpr, objective, False))
+
+    selected_multiplier = select_hampel_multiplier(rows)
+    return [
+        HampelCalibrationRow(
+            r.dataset_split, r.window_size, r.mad_multiplier, r.fault_recall, r.genuine_event_preservation_rate,
+            r.single_spike_false_positive_rate, r.objective_score,
+            selected=(r.window_size == HAMPEL_SELECTION_WINDOW_SIZE and r.mad_multiplier == selected_multiplier),
+        )
+        for r in rows
+    ]

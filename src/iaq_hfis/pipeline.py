@@ -14,7 +14,7 @@ import resource
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -182,8 +182,24 @@ def compute_index_at(
     window_start = computed_ts - _minutes(window_minutes)
     now = datetime.now(timezone.utc)
 
+    # Historical context: the causal Hampel filter needs window_size-1 valid
+    # samples STRICTLY BEFORE a point to classify it, so the very first
+    # slots inside [window_start, computed_ts] need history from before
+    # window_start too -- otherwise they could never accumulate a full
+    # causal window and would always be left unflagged (not a completeness
+    # regression, just a blind spot at every window's start). This history
+    # is used ONLY to determine the quality state of in-window measurements;
+    # it is sliced away before aggregation/coverage/persistence below, so it
+    # can never inflate n_expected, n_usable, coverage, or the weighted mean,
+    # and it never reads past computed_ts.
+    step = timedelta(seconds=settings.cadence.sample_cadence_seconds)
+    history_slots_needed = max(settings.hampel.window_size - 1, 0)
+    history_start = window_start - history_slots_needed * step
+    historical_expected = [window_start - i * step for i in range(history_slots_needed - 1, -1, -1)]
+
     expected = timegrid.expected_slots(computed_ts, window_minutes, settings.cadence.sample_cadence_seconds)
-    raw_df = source.fetch_raw_window(window_start, computed_ts)
+    expected_extended = historical_expected + expected
+    raw_df = source.fetch_raw_window(history_start, computed_ts)
     outdoor_ctx = fetch_outdoor_context(source, computed_ts, settings.confirmation.outdoor_context_max_age_minutes)
 
     coverage: dict[str, CoverageResult] = {}
@@ -191,18 +207,26 @@ def compute_index_at(
 
     for channel in DIRECT_INPUT_CHANNELS:
         channel_map = settings.schema_mapping.channel(channel)
-        matched_slots = timegrid.match_actual_to_slots(expected, raw_df["ts"] if "ts" in raw_df.columns else raw_df, settings.cadence.slot_match_tolerance_seconds)
+        matched_slots_extended = timegrid.match_actual_to_slots(
+            expected_extended, raw_df["ts"] if "ts" in raw_df.columns else raw_df, settings.cadence.slot_match_tolerance_seconds
+        )
 
-        stage1_df = run_hard_checks(
-            raw_df, matched_slots, channel, channel_map, ctx.sensor_specs, settings.device_status_state_map,
+        stage1_df_extended = run_hard_checks(
+            raw_df, matched_slots_extended, channel, channel_map, ctx.sensor_specs, settings.device_status_state_map,
             pm_ordering_tolerance_pct=settings.confirmation.pm_cross_channel_tolerance_pct,
         )
-        aligned_raw = timegrid.align_columns_to_slots(raw_df, matched_slots, list(raw_df.columns))
+        aligned_raw_extended = timegrid.align_columns_to_slots(raw_df, matched_slots_extended, list(raw_df.columns))
         outdoor_trend_sign = _compute_outdoor_trend_sign(outdoor_ctx, channel)
 
         drift_min_magnitude = channel_uncertainty(channel, settings.schema_mapping, ctx.sensor_specs) * settings.confirmation.gradual_drift_magnitude_multiplier
         dual_tolerance = dual_channel_tolerance(channel, settings.schema_mapping, ctx.sensor_specs) if channel in ("temperature", "humidity") else 0.0
-        stage2_df = run_soft_checks(stage1_df, channel, channel_map, aligned_raw, outdoor_trend_sign, settings.hampel, settings.confirmation, drift_min_magnitude, dual_tolerance)
+        stage2_df_extended = run_soft_checks(
+            stage1_df_extended, channel, channel_map, aligned_raw_extended, outdoor_trend_sign, settings.hampel, settings.confirmation, drift_min_magnitude, dual_tolerance
+        )
+        # Restrict to the requested aggregation interval only -- historical
+        # context (above) may influence these rows' quality STATE, but must
+        # never itself become part of the aggregation interval.
+        stage2_df = stage2_df_extended[stage2_df_extended["ts"].isin(expected)].reset_index(drop=True)
         stage2_df["channel"] = channel
 
         aggregate = aggregate_channel(stage2_df, channel, window_start, computed_ts, settings.coverage.min_ratio)

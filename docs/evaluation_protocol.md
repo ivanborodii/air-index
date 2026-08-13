@@ -155,31 +155,52 @@ precision, recall, F1, mean detection delay. Plus a full row-level
 confusion matrix (`fault_detection_confusion_matrix.csv`, true label vs.
 every reason code actually predicted, including "none"), false-rejection
 rate for genuine events (must be zero), and confirmation-recovery rate.
-**Weak results are disclosed, never hidden**: single_spike and stuck_value
-both reach recall 1.0 but have materially lower precision than the other
-three reason codes (visible in the confusion matrix's off-diagonal cells);
-`run_narrative.md`/`article_results_summary.md` automatically flag any
-reason code with row-level F1 below 0.5 as a "Disclosed limitation."
+**Weak results are disclosed, never hidden**: single_spike still has
+materially lower row-level precision than the other reason codes (stuck_value
+now reaches precision 1.0 after the 2026-08-13 benchmark fix -- see
+`docs/fault_injection_audit.md` section 5); `run_narrative.md`/
+`article_results_summary.md` automatically flag any reason code with
+row-level F1 below 0.5 as a "Disclosed limitation."
 Tables: `fault_injection_events`, `fault_detection_predictions`,
 `fault_detection_metrics`, `fault_detection_event_metrics`,
 `fault_detection_confusion_matrix`. CSVs of the same names.
 
+**Primary screening vs. final exclusion** (section 9 of the manuscript-
+validation task spec): `fault_detection_metrics`/`fault_detection_event_metrics`
+score the PRIMARY reason-code candidate (`predicted_reason_codes`) against
+the true label. A primary SUSPECT candidate can later be CONFIRMED usable
+by the confirmation stage -- `fault_final_exclusion_metrics` scores the
+separate, final question (was the sample ultimately excluded, `usable=False`)
+instead: a confirmed-usable primary candidate is a false negative there, not
+a true positive. The two tables/metrics are never conflated under the same
+name; see `iaq_hfis.evaluation.fault_injection.score_final_exclusion`.
+
 ### Hampel calibration
 
-Only `single_spike` detection depends on the Hampel `window_size`/
-`mad_multiplier` (stuck-value/data-loss/gradual-drift use separate,
-Hampel-independent detectors). Grid search (`HAMPEL_WINDOW_GRID` x
-`HAMPEL_MULTIPLIER_GRID`) over the **calibration** scenario split, scored by
-`(fault_recall + genuine_event_preservation_rate + (1 - single_spike_FPR)) / 3`;
-**validation** split scored once, never used to pick parameters. The
-configured `hampel.window_size`/`mad_multiplier` are **always retained**
-regardless of this grid's outcome -- a change is only adopted after
-separate empirical verification against real live data (see
-`config/iaq_hfis.yaml`'s hampel section for that history), never from
-synthetic-benchmark evidence alone. `hampel_calibration.csv`. See
-`docs/result_interpretation.md`'s provisional-parameter section, or the
-generated `provisional_parameter_assessment.md`, for the calibration
-objective score of the currently configured value.
+Only `single_spike` detection and genuine-event preservation depend on the
+Hampel `window_size`/`mad_multiplier` (stuck-value/data-loss/gradual-drift
+use separate, Hampel-independent detectors). Two grids exist:
+
+- **Diagnostic**: `HAMPEL_WINDOW_GRID` (7/11/15) x `HAMPEL_MULTIPLIER_GRID`
+  (1.0/2.0/3.0), both splits, for context (`hampel_calibration.csv` has all
+  18 rows per split).
+- **Selection** (task spec section 6): window size held fixed at
+  `HAMPEL_SELECTION_WINDOW_SIZE=11` (the manuscript's causal-window point
+  count); `iaq_hfis.evaluation.fault_injection.select_hampel_multiplier`
+  reads *only* `dataset_split == "calibration"` rows at that window size and
+  picks the multiplier maximizing
+  `S = (fault_recall + genuine_event_preservation_rate + (1 - single_spike_FPR)) / 3`,
+  with a deterministic tie-break (highest S, then recall, then preservation,
+  then lowest FPR, then smallest multiplier). The **validation** split is
+  scored once for the selected value and reported separately -- never
+  inspected while selecting, and changing it cannot change the selection
+  (see `tests/unit/test_fault_injection.py::test_select_hampel_multiplier_ignores_validation_rows_entirely`).
+  `config/iaq_hfis.yaml`'s configured `mad_multiplier` is kept in sync with
+  this selection (`selected=true` rows in `hampel_calibration.csv`); status
+  is `CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT`, not literature-informed --
+  see `parameter_selection.json` and
+  `research_results/hampel_causal_revision_report.md` for the full
+  calibration table and the frozen validation-split result.
 
 ## 8. Publication readiness
 

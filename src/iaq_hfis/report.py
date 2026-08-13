@@ -105,7 +105,8 @@ def generate_report(settings: Settings, pipeline_run_id: str, sensor_specs: Sens
             [
                 HampelCalibrationRow(*row)
                 for row in con.execute(
-                    "SELECT dataset_split, window_size, mad_multiplier, fault_recall, genuine_event_preservation_rate, objective_score, selected "
+                    "SELECT dataset_split, window_size, mad_multiplier, fault_recall, genuine_event_preservation_rate, "
+                    "single_spike_false_positive_rate, objective_score, selected "
                     "FROM hampel_calibration WHERE evaluation_run_id = ?",
                     [evaluation_run_id],
                 ).fetchall()

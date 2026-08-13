@@ -138,15 +138,17 @@ def collect_parameter_provenance(settings: Settings, sensor_specs: SensorSpecs, 
         manuscript_reference="Materials and Methods: coverage ratio", sensitivity_coverage="swept directly by the sensitivity experiment (coverage_threshold)")
 
     add("hampel.window_size", settings.hampel.window_size, "samples", "LITERATURE_INFORMED",
-        "Pearson, Neuvo, Astola, Gabbouj, \"Generalized Hampel Filters\" (2016) -- the manuscript's own cited source's "
-        "illustrative-example parameters (K=5 -> 11-point window); the paper states this as a worked example, not a "
-        "general recommendation, and it has not been independently calibrated for this deployment -- see "
-        "parameter_selection.json for the separate (diagnostic-only) synthetic calibration-split grid search, which "
-        "does NOT replace this literature-informed choice.", pipeline_stage="validation",
-        manuscript_reference="Cited: Pearson et al. 2016, Hampel filter")
-    add("hampel.mad_multiplier", settings.hampel.mad_multiplier, None, "LITERATURE_INFORMED",
-        "Same source as hampel.window_size (t=1 in the cited paper's example); see parameter_selection.json.",
-        pipeline_stage="validation", manuscript_reference="Cited: Pearson et al. 2016, Hampel filter")
+        "Point count (11) sourced from Pearson, Neuvo, Astola, Gabbouj, \"Generalized Hampel Filters\" (2016) -- the "
+        "manuscript's own cited source's illustrative example (K=5 -> 11-point window) -- but the WINDOW SHAPE is "
+        "causal (x_i and the 10 samples strictly before it), per the manuscript's own definition, not the cited "
+        "paper's centered shape; see iaq_hfis.quality.hampel's module docstring.", pipeline_stage="validation",
+        manuscript_reference="Cited: Pearson et al. 2016, Hampel filter (point count only, not window shape)")
+    add("hampel.mad_multiplier", settings.hampel.mad_multiplier, None, "CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT",
+        "Selected by comparing h in {1.0, 2.0, 3.0} at window_size=11 on the deterministic synthetic fault-injection "
+        "calibration split only (never validation), maximizing S = (single_spike recall + genuine-event preservation "
+        "+ (1 - single_spike FPR)) / 3 -- see iaq_hfis.evaluation.fault_injection.select_hampel_multiplier, "
+        "parameter_selection.json, and research_results/hampel_causal_revision_report.md.",
+        pipeline_stage="validation", manuscript_reference="Cited: Pearson et al. 2016, Hampel filter (point count only; multiplier is calibrated, not literature-sourced)")
 
     add("confirmation.persistence_min_consecutive_samples", settings.confirmation.persistence_min_consecutive_samples, "samples", "PROVISIONAL",
         "Not given numerically in the manuscript.", pipeline_stage="validation")

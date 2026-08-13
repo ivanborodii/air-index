@@ -398,6 +398,29 @@ CREATE TABLE IF NOT EXISTS fault_detection_metrics (
     PRIMARY KEY (evaluation_run_id, dataset_split, reason_code)
 );
 
+-- Final-decision counterpart to fault_detection_metrics (task spec section
+-- 9): same row-level TP/FP/FN/TN shape, but scored against the FINAL
+-- usable/not-usable decision (post-confirmation), not the primary
+-- predicted_reason_codes. A primary SUSPECT candidate later confirmed
+-- usable is a false negative here, not a true positive -- never conflated
+-- with primary screening under the same table/metric name.
+CREATE TABLE IF NOT EXISTS fault_final_exclusion_metrics (
+    evaluation_run_id      VARCHAR NOT NULL,
+    pipeline_run_id        VARCHAR NOT NULL,
+    dataset_split           VARCHAR NOT NULL,  -- calibration | validation
+    reason_code            VARCHAR NOT NULL,
+    tp                     INTEGER NOT NULL,
+    fp                     INTEGER NOT NULL,
+    fn                     INTEGER NOT NULL,
+    tn                     INTEGER NOT NULL,
+    precision               DOUBLE,
+    recall                  DOUBLE,
+    f1                      DOUBLE,
+    specificity              DOUBLE,
+    false_positive_rate     DOUBLE,
+    PRIMARY KEY (evaluation_run_id, dataset_split, reason_code)
+);
+
 -- Event-level: one-to-one matching of each injected fault (regardless of
 -- its sample duration) against predicted detection intervals, within a
 -- configurable temporal tolerance. Prevents a single multi-sample fault
@@ -441,6 +464,7 @@ CREATE TABLE IF NOT EXISTS hampel_calibration (
     mad_multiplier         DOUBLE  NOT NULL,
     fault_recall             DOUBLE,
     genuine_event_preservation_rate DOUBLE,
+    single_spike_false_positive_rate DOUBLE,
     objective_score            DOUBLE,
     selected                    BOOLEAN NOT NULL,
     PRIMARY KEY (evaluation_run_id, dataset_split, window_size, mad_multiplier)

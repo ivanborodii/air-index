@@ -458,9 +458,20 @@ Two sequential stages, per direct-input channel, per expected time slot
 5. PM ordering (PM1 ≤ PM2.5 ≤ PM4 ≤ PM10, with tolerance → INVALID if violated)
 
 **Stage 2 (soft), only for stage-1-VALID points:**
-1. Hampel filter (median + MAD) flags local outlier candidates as SUSPECT
+1. Hampel filter (median + MAD) flags local outlier candidates as SUSPECT.
+   **Causal window**: for point x_i, the window is x_i and the
+   `window_size - 1` samples immediately preceding it — never a later one
+   (see `iaq_hfis.quality.hampel`'s module docstring). Because the primary
+   15-minute window alone doesn't contain enough preceding samples for its
+   own earliest points to ever reach a full causal window, `iaq_hfis run`
+   fetches `window_size - 1` extra raw samples of **historical context**
+   before `window_start` for every computed_ts (never after `computed_ts`)
+   — used only to classify in-window points' quality state, then discarded
+   before aggregation/coverage/completeness, which are always scoped to the
+   requested window only. This is what lets the 5-minute sensitivity window
+   (only 10 slots) still use an 11-point causal filter.
 2. Stuck-value detector (run of ≥N identical values)
-3. Gradual-drift detector (run of ≥N same-direction steps **and** cumulative magnitude ≥ a multiple of declared uncertainty — see §29 for why the magnitude gate matters)
+3. Gradual-drift detector (run of ≥N same-direction steps **and** cumulative magnitude ≥ a multiple of declared uncertainty — see §29 for why the magnitude gate matters). Also causal: a point is flagged only once IT is the latest point of a qualifying run, never retroactively once a later point confirms the run.
 4. Confirmation: PM channels via auxiliary-channel/outdoor-trend corroboration + persistence; T/RH via dual-channel agreement + persistence; CO2 via persistence only (no cross-channel signal exists for it)
 5. Only VALID or confirmed-SUSPECT points are `usable` (count toward coverage and the time-weighted mean)
 
@@ -747,9 +758,10 @@ written empty as if it were real data.
 | `outdoor_context_timeseries.csv` | one row per computed_ts | Outdoor PM/temperature context (never a direct index input) |
 | `continuity_grid.csv` / `continuity_summary.csv` | grid point / (boundary, context, method) | HFIS vs FUZZY_COMPONENT_MAX vs WEIGHTED_MEAN numerical behavior across every control-region boundary, under favourable/acceptable/degraded "other components" contexts; see `docs/hfis_vs_crispmax_audit.md` |
 | `fault_injection_events.csv` / `fault_detection_predictions.csv` | event / sample | The labeled synthetic fault-injection benchmark (separate from real, unlabeled data); dataset_split = calibration or validation |
-| `fault_detection_metrics.csv` / `fault_detection_event_metrics.csv` | (dataset_split, reason_code) | Row-level vs event-level (one-to-one matched) precision/recall/F1; validation split is the headline, publication-facing number |
+| `fault_detection_metrics.csv` / `fault_detection_event_metrics.csv` | (dataset_split, reason_code) | Primary reason-code screening: row-level vs event-level (one-to-one matched) precision/recall/F1; validation split is the headline, publication-facing number |
+| `fault_final_exclusion_metrics.csv` | (dataset_split, reason_code) | Final usable/not-usable decision (post-confirmation) -- distinct from primary screening above: a primary SUSPECT candidate later confirmed usable is a false negative here, not a true positive |
 | `fault_detection_confusion_matrix.csv` | (dataset_split, true_label, predicted_label) | Full row-level confusion matrix, including "none" |
-| `hampel_calibration.csv` | one row per (dataset_split, window_size, mad_multiplier) | Diagnostic Hampel parameter grid; configured value always retained regardless |
+| `hampel_calibration.csv` | one row per (dataset_split, window_size, mad_multiplier) | Full diagnostic Hampel grid (window_size x mad_multiplier); `selected=true` marks the (window_size=11, mad_multiplier) combination chosen by `select_hampel_multiplier` from the calibration split only -- see `parameter_selection.json` |
 | `parameter_provenance.csv` | one row per parameter | Machine-readable status/source/engaged for every scientific/operational parameter |
 
 ## 25. Plotting instructions
@@ -891,10 +903,16 @@ sampling is bounded separately by `stability_max_*`/
   the inference method behave as designed on known, deterministic inputs;
   they don't measure performance on the actual live sensor deployment's
   full range of conditions.
-- **Hampel calibration is diagnostic, not adopted automatically** — the
-  configured `window_size`/`mad_multiplier` are retained regardless of the
-  synthetic calibration grid's outcome; a change requires separate
-  verification against real live data (§9, `hampel_calibration.csv`).
+- **`mad_multiplier` is calibrated on synthetic data, not real faults.**
+  `window_size=11` is literature-informed (point count only, per the
+  manuscript's own cited source) and held fixed; `mad_multiplier=3.0` IS
+  actually selected from the synthetic calibration split (never
+  validation) via `select_hampel_multiplier` — see
+  `research_results/hampel_causal_revision_report.md`,
+  `parameter_selection.json`, `hampel_calibration.csv` (§9). This is a real
+  selection procedure, not a diagnostic-only cross-check, but it is still
+  calibrated against synthetic fault-injection scenarios, not manually
+  labelled real faults (see `SYNTHETIC_CALIBRATION_DISCLAIMER`).
 - **Single-device validation.** Everything above was developed and tested
   against one Raspberry Pi 5 with one set of SPS30/SCD41/BME688 units —
   generalization to other sensor batches/models is untested.
@@ -959,7 +977,8 @@ sampling is bounded separately by `stability_max_*`/
 | BME688 pressure uncertainty (±0.6 hPa) | Same datasheet, Table 9 p.13 | **Verified against the official datasheet** — corrected from an approximate ±1.0 hPa guess |
 | SPS30 PM1/PM2.5 uncertainty (±5 µg/m³) | Sensirion SPS30 Datasheet v2.0 D1 (Jun 2023), Table 1 p.2 | **Verified against the official datasheet** — exact match to prior guessed value |
 | SPS30 PM4/PM10 uncertainty (±25 µg/m³) | Same datasheet, Table 1 p.2 | **Verified against the official datasheet** — a real correction: previously used the PM2.5 figure (5× too tight) for PM10 too, which also meant `pm10`'s membership transition width was undersized |
-| Hampel window/threshold (window=11, t=1) | Pearson, Neuvo, Astola, Gabbouj, "Generalized Hampel Filters" (2016) -- the exact paper the manuscript cites; verified against its EUSIPCO 2015 conference precursor (same authors/definition), Sec. 2, Figs. 3/5, K=5 (→11-point window), t=1 | **Fetched and read directly** (2026-07-24) — the paper's own worked-example parameters, not a formal general recommendation ("preliminary ... single example"), so still provisional; empirically verified against live data to cause no completeness/coverage regression vs the prior unsourced guess |
+| Hampel window point count (11) | Pearson, Neuvo, Astola, Gabbouj, "Generalized Hampel Filters" (2016) -- the exact paper the manuscript cites; verified against its EUSIPCO 2015 conference precursor (same authors/definition), Sec. 2, Figs. 3/5, K=5 -> 11 points | **Fetched and read directly** (2026-07-24) — the paper's own worked-example point count, not a formal general recommendation; the window SHAPE is causal (manuscript's own definition), not that paper's centered illustrative shape -- see `iaq_hfis.quality.hampel`'s module docstring |
+| Hampel mad_multiplier (3.0) | `iaq_hfis.evaluation.fault_injection.select_hampel_multiplier`, calibration split only | **Calibrated 2026-08-13**: h=3.0 scored highest S among {1.0, 2.0, 3.0} at window_size=11 on the deterministic synthetic calibration split -- status `CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT`, not literature-informed; see `research_results/hampel_causal_revision_report.md` |
 | Confirmation/drift-run-length parameters (persistence samples, stuck-value repeats, drift step count) | Not in the manuscript or its cited references | Still provisional, literature-typical defaults |
 
 ## 32. Worked example

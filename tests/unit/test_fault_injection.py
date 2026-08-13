@@ -1,5 +1,7 @@
 from iaq_hfis.evaluation.fault_injection import (
+    HAMPEL_SELECTION_WINDOW_SIZE,
     REASON_CODES,
+    HampelCalibrationRow,
     build_confusion_matrix,
     confirmation_recovery_rate,
     dataset_split_of,
@@ -8,8 +10,79 @@ from iaq_hfis.evaluation.fault_injection import (
     run_benchmark,
     run_hampel_calibration,
     score_events,
+    score_final_exclusion,
     score_predictions,
+    select_hampel_multiplier,
 )
+
+
+def _row(split, mad_multiplier, recall, preservation, fpr, objective, window_size=HAMPEL_SELECTION_WINDOW_SIZE):
+    return HampelCalibrationRow(split, window_size, mad_multiplier, recall, preservation, fpr, objective, False)
+
+
+def test_select_hampel_multiplier_picks_highest_calibration_objective():
+    rows = [
+        _row("calibration", 1.0, 1.0, 1.0, 0.20, 0.933),
+        _row("calibration", 2.0, 1.0, 1.0, 0.05, 0.983),
+        _row("calibration", 3.0, 1.0, 1.0, 0.02, 0.993),
+    ]
+    assert select_hampel_multiplier(rows) == 3.0
+
+
+def test_select_hampel_multiplier_ignores_validation_rows_entirely():
+    """Mandatory regression test (task spec section 6): changing validation
+    metrics must never change the selected multiplier -- the selection
+    function only ever reads dataset_split == 'calibration' rows."""
+    calibration_rows = [
+        _row("calibration", 1.0, 1.0, 1.0, 0.20, 0.933),
+        _row("calibration", 2.0, 1.0, 1.0, 0.05, 0.983),
+        _row("calibration", 3.0, 1.0, 1.0, 0.02, 0.993),
+    ]
+    # Validation rows deliberately favor h=1.0 overwhelmingly -- if this
+    # changed the selection, this test would fail.
+    validation_rows_favoring_h1 = [
+        _row("validation", 1.0, 1.0, 1.0, 0.0, 1.0),
+        _row("validation", 2.0, 0.0, 0.0, 1.0, 0.0),
+        _row("validation", 3.0, 0.0, 0.0, 1.0, 0.0),
+    ]
+    selected_without_validation = select_hampel_multiplier(calibration_rows)
+    selected_with_adverse_validation = select_hampel_multiplier(calibration_rows + validation_rows_favoring_h1)
+    assert selected_without_validation == selected_with_adverse_validation == 3.0
+
+
+def test_select_hampel_multiplier_tiebreak_order():
+    # Tied objective_score -> break on recall -> break on preservation -> break on fpr -> break on smallest multiplier.
+    tied_objective = [
+        _row("calibration", 1.0, 0.5, 1.0, 0.1, 0.9),
+        _row("calibration", 2.0, 1.0, 1.0, 0.1, 0.9),  # higher recall wins despite identical objective_score
+    ]
+    assert select_hampel_multiplier(tied_objective) == 2.0
+
+    tied_objective_and_recall = [
+        _row("calibration", 1.0, 1.0, 0.5, 0.1, 0.9),
+        _row("calibration", 2.0, 1.0, 0.9, 0.1, 0.9),  # higher preservation wins
+    ]
+    assert select_hampel_multiplier(tied_objective_and_recall) == 2.0
+
+    tied_through_preservation = [
+        _row("calibration", 1.0, 1.0, 1.0, 0.3, 0.9),
+        _row("calibration", 2.0, 1.0, 1.0, 0.1, 0.9),  # lower fpr wins
+    ]
+    assert select_hampel_multiplier(tied_through_preservation) == 2.0
+
+    fully_tied = [
+        _row("calibration", 2.0, 1.0, 1.0, 0.1, 0.9),
+        _row("calibration", 1.0, 1.0, 1.0, 0.1, 0.9),  # smallest multiplier wins when everything else ties
+    ]
+    assert select_hampel_multiplier(fully_tied) == 1.0
+
+
+def test_select_hampel_multiplier_ignores_other_window_sizes():
+    rows = [
+        _row("calibration", 1.0, 0.0, 0.0, 1.0, 0.0, window_size=7),  # wrong window size, must be ignored
+        _row("calibration", 2.0, 1.0, 1.0, 0.0, 1.0, window_size=HAMPEL_SELECTION_WINDOW_SIZE),
+    ]
+    assert select_hampel_multiplier(rows) == 2.0
 
 
 def test_dataset_split_of_derives_from_scenario_id_suffix():
@@ -33,9 +106,19 @@ def test_fault_injection_recovers_known_expected_outcomes(base_settings, sensor_
 
     for split in ("calibration", "validation"):
         metrics = {m.reason_code: m for m in score_predictions(predictions, dataset_split=split)}
+        event_metrics = {m.reason_code: m for m in score_events(events, predictions, split)}
         # Every fault type must be detected at least once (recall > 0) at its injected location, on both splits.
         for code in REASON_CODES:
-            assert metrics[code].recall == 1.0, f"{code} was not detected at its known injected location ({split})"
+            if code == "gradual_drift":
+                # Causal detection (task spec section 8): a run is only flaggable once it has
+                # actually accumulated min_consecutive_same_direction steps, so row-level recall
+                # for a run of exactly that length is necessarily < 1.0 -- never forced back to
+                # 1.0 by retroactively marking earlier points. Event-level recall (was the event
+                # detected at all) is what must stay 1.0.
+                assert 0.0 < metrics[code].recall < 1.0, f"{code} row-level recall should be reduced but nonzero under causal detection ({split})"
+                assert event_metrics[code].recall == 1.0, f"{code} event-level recall must still be 1.0 under causal detection ({split})"
+            else:
+                assert metrics[code].recall == 1.0, f"{code} was not detected at its known injected location ({split})"
             assert metrics[code].tp >= 1
             assert metrics[code].tn >= 0
             assert metrics[code].specificity is not None
@@ -89,13 +172,58 @@ def test_pm_order_violation_correctly_labeled_out_of_range(base_settings, sensor
 def test_hampel_calibration_grid_covers_calibration_and_validation(base_settings, sensor_specs):
     rows = run_hampel_calibration(
         base_settings.schema_mapping, sensor_specs, base_settings.confirmation, base_settings.confirmation.pm_cross_channel_tolerance_pct,
-        base_settings.cadence.sample_cadence_seconds, base_settings.hampel.window_size, base_settings.hampel.mad_multiplier,
+        base_settings.cadence.sample_cadence_seconds,
     )
     splits = {r.dataset_split for r in rows}
     assert splits == {"calibration", "validation"}
     selected = [r for r in rows if r.selected]
-    assert len(selected) == 2  # exactly one per split: the currently configured combination
-    assert all(r.window_size == base_settings.hampel.window_size and r.mad_multiplier == base_settings.hampel.mad_multiplier for r in selected)
+    assert len(selected) == 2  # exactly one per split: the selected (window_size=11, mad_multiplier) combination
+    selected_multipliers = {r.mad_multiplier for r in selected}
+    assert len(selected_multipliers) == 1  # calibration and validation rows agree on which multiplier was selected
+    assert all(r.window_size == 11 for r in selected)
+
+
+# --- Final exclusion (task spec section 9): a primary SUSPECT candidate may
+# later be confirmed usable -- primary screening and the final usable/not
+# decision must be scored (and reported) separately. ---
+
+
+def test_score_final_exclusion_counts_a_confirmed_suspect_as_a_false_negative_not_a_true_positive():
+    from iaq_hfis.evaluation.fault_injection import SamplePrediction
+
+    predictions = [
+        # A genuine fault (single_spike) that was flagged SUSPECT as a primary
+        # candidate but ultimately CONFIRMED usable (recovered) -- must count
+        # against final-exclusion recall (fn), never as a tp.
+        SamplePrediction("s1_calibration", "co2", 0, "single_spike", ["single_spike"], "SUSPECT", usable=True),
+        # A genuine fault that stayed excluded -- a true positive here.
+        SamplePrediction("s1_calibration", "co2", 1, "single_spike", ["single_spike"], "SUSPECT", usable=False),
+        # A clean sample, correctly left usable.
+        SamplePrediction("s1_calibration", "co2", 2, None, [], "VALID", usable=True),
+        # A clean sample incorrectly excluded -- a final false rejection (fp).
+        SamplePrediction("s1_calibration", "co2", 3, None, [], "SUSPECT", usable=False),
+    ]
+    metrics = {m.reason_code: m for m in score_final_exclusion(predictions)}
+    single_spike = metrics["single_spike"]
+    assert single_spike.tp == 1
+    assert single_spike.fn == 1  # the confirmed-usable one -- recovered, not a final exclusion
+    assert single_spike.fp == 1  # the wrongly-excluded clean sample
+    assert single_spike.tn == 1
+
+
+def test_score_final_exclusion_and_score_predictions_disagree_on_a_recovered_candidate():
+    """Direct demonstration that primary screening and final exclusion are
+    NOT the same metric: a sample that was a primary SUSPECT candidate for
+    single_spike but was confirmed usable is a primary true positive
+    (score_predictions) yet a final-exclusion false negative
+    (score_final_exclusion)."""
+    from iaq_hfis.evaluation.fault_injection import SamplePrediction
+
+    predictions = [SamplePrediction("s1_calibration", "co2", 0, "single_spike", ["single_spike"], "SUSPECT", usable=True)]
+    primary = {m.reason_code: m for m in score_predictions(predictions)}["single_spike"]
+    final = {m.reason_code: m for m in score_final_exclusion(predictions)}["single_spike"]
+    assert primary.tp == 1 and primary.fn == 0
+    assert final.tp == 0 and final.fn == 1
 
 
 # --- Event-level matching: prevents a single multi-sample fault from being

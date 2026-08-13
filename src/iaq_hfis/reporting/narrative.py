@@ -302,9 +302,11 @@ def build_run_narrative(summary: dict) -> str:
             if hc:
                 lines.append(
                     f"- Hampel calibration grid (window_size x mad_multiplier) evaluated on calibration and validation "
-                    f"scenario splits; current configuration (window_size={hc.get('current_window_size')}, "
-                    f"mad_multiplier={hc.get('current_mad_multiplier')}) is retained regardless of this synthetic grid's "
-                    f"outcome -- see hampel_calibration.csv and 'Provisional parameters engaged' above."
+                    f"scenario splits; mad_multiplier={hc.get('selected_mad_multiplier')} was selected purely from the "
+                    f"calibration split at window_size={hc.get('selected_window_size')} (configured value matches "
+                    f"selection: {hc.get('configured_value_matches_selection')}) -- see parameter_selection.json for the "
+                    f"full deterministic procedure, hampel_calibration.csv for the full grid, and 'Provisional parameters "
+                    f"engaged' above."
                 )
         else:
             lines.append("Fault-injection benchmark was not computed this run.")

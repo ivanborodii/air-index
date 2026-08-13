@@ -96,15 +96,49 @@ claims about the detector's real-world behavior outside what was tested.
 
 ## 5. Weak results, disclosed not hidden
 
-Single_spike and stuck_value both reach **recall = 1.0** (every injected
-occurrence is detected, both row- and event-level, both splits) but have
-materially lower **precision** than the other three fault types (row-level
-precision on the validation split: single_spike ≈0.02, stuck_value ≈0.24,
-vs. ≥0.49 for gradual_drift/data_loss/out_of_range) -- both fall below F1
-0.5. This means these two reason codes fire on many samples across *other*
-scenarios that were not actually single_spike/stuck_value faults (a real,
-disclosed false-positive rate, visible in `fault_detection_confusion_matrix.csv`'s
-off-diagonal cells). `run_narrative.md`/`article_results_summary.md`
-surface this automatically (any reason code with row-level F1 < 0.5 is
-listed under "Disclosed limitation") rather than only reporting the
-flattering aggregate.
+**Resolved 2026-08-13 (stuck_value):** stuck_value's row-level precision was
+previously ≈0.24 on the validation split. Root cause, found by auditing the
+benchmark itself (not the detector): the synthetic `genuine_rapid_event` and
+`persistent_real_change` scenarios modeled a sustained real environmental
+change as a **perfectly constant plateau** for many consecutive samples --
+logically indistinguishable from a deliberately injected stuck sensor,
+since `detect_stuck_value` is (correctly) an exact-equality run-length
+check. Fixed by superimposing a small, deterministic ripple (30% of the
+channel's own normal ambient-variation amplitude, phase-shifted from the
+baseline oscillation) on genuine-event plateaus, and by making the
+temperature/humidity dual-channel secondary signal a corroborating-but-
+independently-varying signal rather than an exact copy of the primary (see
+`iaq_hfis.evaluation.fault_injection.build_channel_scenarios`'s
+`_ripple`/`secondary_for`). Deliberately injected stuck_value scenarios
+remain exactly constant, unchanged. Result: stuck_value row-level precision
+is now 1.0 on both splits (verified 2026-08-13) -- this was a benchmark
+construction defect, not a detector defect; the label was never changed to
+manufacture the improvement.
+
+single_spike still has low precision (validation ≈0.10) -- this reason code
+fires on many samples across *other* scenarios that were not actually
+single_spike faults (visible in `fault_detection_confusion_matrix.csv`'s
+off-diagonal cells; the Hampel calibration in section 6 below is CO2-scoped
+per the manuscript's original concern, so other channels' single_spike
+behavior at `mad_multiplier=3.0` was not independently tuned).
+`run_narrative.md`/`article_results_summary.md` surface any reason code
+with row-level F1 < 0.5 under "Disclosed limitation" rather than only
+reporting the flattering aggregate. Exact current numbers (both splits, all
+five reason codes, plus the section-9 primary-vs-final-exclusion split) are
+in `fault_detection_metrics.csv` / `fault_final_exclusion_metrics.csv` for
+each run -- see `research_results/hampel_causal_revision_report.md` for the
+before/after comparison from this revision.
+
+**gradual_drift causality (2026-08-13):** the detector previously
+retroactively marked a run's earlier points as `gradual_drift` once a LATER
+point confirmed the run had reached `gradual_drift_min_consecutive_steps` --
+changing an earlier measurement's status based on data that didn't exist
+yet at that measurement's own time, which is not causal. Fixed in
+`iaq_hfis.quality.reasons.detect_gradual_drift`: a point is now flagged only
+once IT is the latest point of a qualifying run. This necessarily lowers
+row-level recall for short drift runs (a run cannot be flagged before it has
+actually accumulated the minimum run length) while preserving event-level
+recall (the event is still detected, just with an honest, nonzero minimum
+detection delay instead of an artifactual zero-delay retroactive flag) --
+both row-level and event-level metrics, plus mean detection delay, are
+reported separately and honestly, not collapsed into one number.

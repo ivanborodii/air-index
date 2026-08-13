@@ -59,6 +59,7 @@ MULTI_COMPONENT_GRID_SUMMARY = "multi_component_grid_summary.csv"
 FAULT_INJECTION_EVENTS = "fault_injection_events.csv"
 FAULT_DETECTION_PREDICTIONS = "fault_detection_predictions.csv"
 FAULT_DETECTION_METRICS = "fault_detection_metrics.csv"
+FAULT_FINAL_EXCLUSION_METRICS = "fault_final_exclusion_metrics.csv"
 FAULT_DETECTION_EVENT_METRICS = "fault_detection_event_metrics.csv"
 FAULT_DETECTION_CONFUSION_MATRIX = "fault_detection_confusion_matrix.csv"
 HAMPEL_CALIBRATION = "hampel_calibration.csv"
@@ -373,6 +374,19 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("false_positive_rate", "float", "0-1", "fp / (fp + tn); 1 - specificity."),
         ColumnSpec("mean_detection_delay", "float", "samples", "Mean number of samples between fault onset and first detection, for sequential faults."),
     ],
+    FAULT_FINAL_EXCLUSION_METRICS: [
+        ColumnSpec("dataset_split", "str", "-", "calibration | validation -- validation is the headline, publication-facing split."),
+        ColumnSpec("reason_code", "str", "-", "The TRUE fault type being scored (single_spike | stuck_value | data_loss | gradual_drift | out_of_range)."),
+        ColumnSpec("tp", "int", "count", "Genuinely faulty sample that ended up excluded (usable=False) -- correctly discarded."),
+        ColumnSpec("fp", "int", "count", "Clean/genuine-event sample that ended up excluded -- a real final false rejection."),
+        ColumnSpec("fn", "int", "count", "Genuinely faulty sample that was recovered (confirmed usable) -- a primary candidate that did NOT end in final exclusion; not automatically a defect (e.g. some faults legitimately revert), but never hidden."),
+        ColumnSpec("tn", "int", "count", "Clean/genuine-event sample correctly left usable."),
+        ColumnSpec("precision", "float", "0-1", "tp / (tp + fp), scored against the FINAL usable/not-usable decision (not primary reason-code screening -- see fault_detection_metrics.csv for that)."),
+        ColumnSpec("recall", "float", "0-1", "tp / (tp + fn)."),
+        ColumnSpec("f1", "float", "0-1", "Harmonic mean of precision and recall."),
+        ColumnSpec("specificity", "float", "0-1", "tn / (tn + fp)."),
+        ColumnSpec("false_positive_rate", "float", "0-1", "fp / (fp + tn); 1 - specificity."),
+    ],
     FAULT_DETECTION_EVENT_METRICS: [
         ColumnSpec("dataset_split", "str", "-", "calibration | validation -- validation is the headline, publication-facing split."),
         ColumnSpec("reason_code", "str", "-", "single_spike | stuck_value | data_loss | gradual_drift | out_of_range."),
@@ -397,10 +411,11 @@ COLUMNS: dict[str, list[ColumnSpec]] = {
         ColumnSpec("dataset_split", "str", "-", "calibration | validation."),
         ColumnSpec("window_size", "int", "samples", "Hampel filter window size tested."),
         ColumnSpec("mad_multiplier", "float", "-", "Hampel filter MAD multiplier tested."),
-        ColumnSpec("fault_recall", "float", "0-1", "Recall for single_spike detection on this split."),
-        ColumnSpec("genuine_event_preservation_rate", "float", "0-1", "Fraction of genuine rapid environmental events not falsely flagged."),
-        ColumnSpec("objective_score", "float", "-", "Balanced objective combining fault_recall and genuine_event_preservation_rate."),
-        ColumnSpec("selected", "bool", "-", "Whether this configuration was the one selected from calibration results."),
+        ColumnSpec("fault_recall", "float", "0-1", "R_spike: recall for single_spike detection on this split."),
+        ColumnSpec("genuine_event_preservation_rate", "float", "0-1", "P_event: fraction of genuine rapid environmental events not falsely flagged."),
+        ColumnSpec("single_spike_false_positive_rate", "float", "0-1", "FPR_spike: single_spike false-positive rate on this split."),
+        ColumnSpec("objective_score", "float", "-", "S = (R_spike + P_event + (1 - FPR_spike)) / 3."),
+        ColumnSpec("selected", "bool", "-", "True for exactly the (window_size=11, mad_multiplier) combination selected by iaq_hfis.evaluation.fault_injection.select_hampel_multiplier from the calibration split only."),
     ],
 }
 
@@ -720,6 +735,17 @@ def export_fault_detection_metrics(con: duckdb.DuckDBPyConnection, out_dir: Path
     return _write(df, COLUMNS[FAULT_DETECTION_METRICS], out_dir, FAULT_DETECTION_METRICS)
 
 
+def export_fault_final_exclusion_metrics(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
+    df = con.execute(
+        "SELECT dataset_split, reason_code, tp, fp, fn, tn, precision, recall, f1, specificity, false_positive_rate "
+        "FROM fault_final_exclusion_metrics WHERE evaluation_run_id = ? ORDER BY dataset_split, reason_code",
+        [evaluation_run_id],
+    ).df()
+    if df.empty:
+        return None
+    return _write(df, COLUMNS[FAULT_FINAL_EXCLUSION_METRICS], out_dir, FAULT_FINAL_EXCLUSION_METRICS)
+
+
 def export_fault_detection_event_metrics(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
         "SELECT dataset_split, reason_code, temporal_tolerance_samples, n_true_events, n_predicted_events, "
@@ -745,7 +771,8 @@ def export_fault_detection_confusion_matrix(con: duckdb.DuckDBPyConnection, out_
 
 def export_hampel_calibration(con: duckdb.DuckDBPyConnection, out_dir: Path, evaluation_run_id: str) -> Path | None:
     df = con.execute(
-        "SELECT dataset_split, window_size, mad_multiplier, fault_recall, genuine_event_preservation_rate, objective_score, selected "
+        "SELECT dataset_split, window_size, mad_multiplier, fault_recall, genuine_event_preservation_rate, "
+        "single_spike_false_positive_rate, objective_score, selected "
         "FROM hampel_calibration WHERE evaluation_run_id = ? ORDER BY dataset_split, window_size, mad_multiplier",
         [evaluation_run_id],
     ).df()
@@ -783,7 +810,7 @@ def export_all(
             SENSITIVITY_WINDOW_BY_POINT, SENSITIVITY_WINDOW_SUMMARY, SENSITIVITY_COVERAGE_BY_POINT, SENSITIVITY_COVERAGE_SUMMARY,
             MASKING_SUMMARY, REFERENCE_CASE_SUMMARY, CONTINUITY_GRID, CONTINUITY_SUMMARY,
             MULTI_COMPONENT_GRID, MULTI_COMPONENT_GRID_SUMMARY,
-            FAULT_INJECTION_EVENTS, FAULT_DETECTION_PREDICTIONS, FAULT_DETECTION_METRICS,
+            FAULT_INJECTION_EVENTS, FAULT_DETECTION_PREDICTIONS, FAULT_DETECTION_METRICS, FAULT_FINAL_EXCLUSION_METRICS,
             FAULT_DETECTION_EVENT_METRICS, FAULT_DETECTION_CONFUSION_MATRIX, HAMPEL_CALIBRATION,
             FIGURE2_BOUNDARY_CURVES,
         ):
@@ -812,6 +839,7 @@ def export_all(
             FAULT_INJECTION_EVENTS: export_fault_injection_events(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_PREDICTIONS: export_fault_detection_predictions(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_METRICS: export_fault_detection_metrics(con, out_dir, evaluation_run_id),
+            FAULT_FINAL_EXCLUSION_METRICS: export_fault_final_exclusion_metrics(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_EVENT_METRICS: export_fault_detection_event_metrics(con, out_dir, evaluation_run_id),
             FAULT_DETECTION_CONFUSION_MATRIX: export_fault_detection_confusion_matrix(con, out_dir, evaluation_run_id),
             HAMPEL_CALIBRATION: export_hampel_calibration(con, out_dir, evaluation_run_id),

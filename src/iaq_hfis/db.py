@@ -55,7 +55,13 @@ logger = logging.getLogger(__name__)
 #: baseline_index_crisp_class_max columns.
 #: Version 8: new evaluation_multi_component_grid /
 #: evaluation_multi_component_grid_summary tables (spec section 7.2).
-SCHEMA_VERSION = 8
+#: Version 9: hampel_calibration gained single_spike_false_positive_rate
+#: (task spec section 6's objective S is now fully reconstructible from the
+#: table, not just its opaque objective_score); new
+#: fault_final_exclusion_metrics table, the final-decision counterpart to
+#: fault_detection_metrics (spec section 9: primary screening vs final
+#: confirmed-usable decision must never be conflated under one metric).
+SCHEMA_VERSION = 9
 
 #: Tables whose presence with a pre-isolation column set indicates a legacy
 #: (schema version 1) derived database.
