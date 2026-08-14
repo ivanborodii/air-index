@@ -326,7 +326,7 @@ typo'd key fails loudly rather than being silently ignored.
 | | `recompute_interval_minutes` (5) | How often the index is recomputed | manuscript |
 | | `slot_match_tolerance_seconds` (15.0) | Max jitter before a slot counts MISSING | **yes** — half the cadence, chosen because `computed_ts` has an arbitrary phase offset from the sensor's own cadence |
 | `coverage` | `min_ratio` (0.80) | Minimum ρ for a channel to be usable | manuscript |
-| `hampel` | `window_size` (11), `mad_multiplier` (1.0) | Outlier-candidate detection | **yes** — but grounded in the manuscript's own cited paper's worked example (Pearson et al. 2016, K=5→11-point window, t=1), not an unsourced guess; see §31 |
+| `hampel` | `window_size` (11), `mad_multiplier` (3.0) | Outlier-candidate detection (causal window: x_i + 10 preceding samples) | `window_size`: **yes** — point count grounded in the manuscript's own cited paper's worked example (Pearson et al. 2016, K=5→11 points), but window SHAPE is causal, not that paper's centered example; `mad_multiplier`: **yes** — but genuinely selected via calibration (CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT), not literature-sourced; see §31 |
 | `confirmation` | `pm_cross_channel_tolerance_pct` (20.0) | PM ordering/cross-check tolerance | **yes** |
 | | *(dual-channel T/RH tolerance)* | NOT a config key — derived at runtime as `declared_uncertainty(primary) + declared_uncertainty(secondary)` from `sensor_specs.yaml` (`schema.dual_channel_tolerance`), so it can't drift out of sync | sensor_specification |
 | | `persistence_min_consecutive_samples` (2) | Min run length for confirmation | **yes** |
