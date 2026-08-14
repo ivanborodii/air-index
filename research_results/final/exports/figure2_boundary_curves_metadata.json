@@ -2,10 +2,10 @@
   "figure": "Figure 2",
   "purpose": "Illustrate PROPOSED_HFIS vs CRISP_CLASS_MAX behavior near representative direct-input control boundaries for the three first-level IAQ components: (a) PM2.5 -> Aerosol, (b) CO2 -> Ventilation, (c) Relative humidity -> Microclimate.",
   "selection_rule": "One deterministic, pre-declared boundary per component, all under the same favourable background context, using the exact boundary_id from the previous publication run if it still exists; otherwise the first favourable lower/control boundary for that channel (lowest breakpoint for monotonic channels; lowest 'favor*low*' edge for two-sided channels). No scenario was chosen or changed based on which one produced the largest difference between methods.",
-  "pipeline_run_id": "2bb2374fbdcc4fbda817178b3b07eb4c",
-  "evaluation_run_id": "410c40df13524947a383b8aaecacf887",
-  "git_commit": "79daa4fff9626b11c56d5b4a4c32160fcbdc2645",
-  "config_hash": "ebb05ee097084ab880c7c6671bb92bf891d467d1321d08429c6d6133b63101dc",
+  "pipeline_run_id": "7e71d6bc86f142cf87a26b0e314bcb5b",
+  "evaluation_run_id": "0bc42ce1129e45b78e8cfcfc3912baea",
+  "git_commit": "46035981d66485193757873d5581c5e0f76127b2",
+  "config_hash": "f878f1eed7d5342cff2ca15d2b266d67a4782e3c413eab7b218c437f2f11b086",
   "grid_points_per_boundary": 21,
   "selected_scenarios": [
     {

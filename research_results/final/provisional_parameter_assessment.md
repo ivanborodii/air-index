@@ -164,14 +164,14 @@
 
 ## `hampel.mad_multiplier`
 
-- **Status**: `LITERATURE_INFORMED`
-- **Current value**: `1.0`
+- **Status**: `CALIBRATED_ON_SYNTHETIC_CALIBRATION_SPLIT`
+- **Current value**: `3.0`
 - **Engaged this run**: yes
-- **Why provisional**: Same source as hampel.window_size (t=1 in the cited paper's example); see parameter_selection.json.
+- **Why provisional**: Selected by comparing h in {1.0, 2.0, 3.0} at window_size=11 on the deterministic synthetic fault-injection calibration split only (never validation), maximizing S = (single_spike recall + genuine-event preservation + (1 - single_spike FPR)) / 3 -- see iaq_hfis.evaluation.fault_injection.select_hampel_multiplier, parameter_selection.json, and research_results/hampel_causal_revision_report.md.
 - **Where used**: pipeline stage `validation`; source `config/iaq_hfis.yaml` (`hampel.mad_multiplier`)
-- **Diagnostic calibration grid exists**: yes -- see parameter_selection.json (diagnostic only; the configured value is NOT selected from this grid, see below)
+- **Diagnostic calibration grid exists**: yes -- see parameter_selection.json; mad_multiplier is selected from this grid (calibration split only), window_size is literature-informed and held fixed
 - **Calibration/validation dataset**: Fault-injection benchmark's calibration split (single_spike + genuine-event scenarios, CO2 channel) for the grid search; validation split (disjoint scenario_ids and a numerically distinct scale/phase) for the reported objective score -- see docs/fault_injection_audit.md.
-- **Sensitivity result**: Fault-injection calibration grid objective score for the currently configured value, on the VALIDATION split (disjoint from the split used to search the grid): 0.899 (1.0 = perfect single_spike recall + perfect genuine-event preservation + zero single_spike FPR). See hampel_calibration.csv for the full grid on both splits.
+- **Sensitivity result**: Fault-injection calibration grid objective score for the selected value (mad_multiplier=3.0, selected purely from the calibration split), on the VALIDATION split (disjoint from the split used to search the grid): 0.981 (1.0 = perfect single_spike recall + perfect genuine-event preservation + zero single_spike FPR). See hampel_calibration.csv for the full grid on both splits.
 - **Do conclusions depend strongly on it?**: Direct but scoped: same as hampel.window_size (paired parameter of the same filter).
 - **Recommended future validation**: Same as hampel.window_size -- verify jointly, not independently, since they interact.
 
@@ -180,11 +180,11 @@
 - **Status**: `LITERATURE_INFORMED`
 - **Current value**: `11` samples
 - **Engaged this run**: yes
-- **Why provisional**: Pearson, Neuvo, Astola, Gabbouj, "Generalized Hampel Filters" (2016) -- the manuscript's own cited source's illustrative-example parameters (K=5 -> 11-point window); the paper states this as a worked example, not a general recommendation, and it has not been independently calibrated for this deployment -- see parameter_selection.json for the separate (diagnostic-only) synthetic calibration-split grid search, which does NOT replace this literature-informed choice.
+- **Why provisional**: Point count (11) sourced from Pearson, Neuvo, Astola, Gabbouj, "Generalized Hampel Filters" (2016) -- the manuscript's own cited source's illustrative example (K=5 -> 11-point window) -- but the WINDOW SHAPE is causal (x_i and the 10 samples strictly before it), per the manuscript's own definition, not the cited paper's centered shape; see iaq_hfis.quality.hampel's module docstring.
 - **Where used**: pipeline stage `validation`; source `config/iaq_hfis.yaml` (`hampel.window_size`)
-- **Diagnostic calibration grid exists**: yes -- see parameter_selection.json (diagnostic only; the configured value is NOT selected from this grid, see below)
+- **Diagnostic calibration grid exists**: yes -- see parameter_selection.json; mad_multiplier is selected from this grid (calibration split only), window_size is literature-informed and held fixed
 - **Calibration/validation dataset**: Fault-injection benchmark's calibration split (single_spike + genuine-event scenarios, CO2 channel) for the grid search; validation split (disjoint scenario_ids and a numerically distinct scale/phase) for the reported objective score -- see docs/fault_injection_audit.md.
-- **Sensitivity result**: Fault-injection calibration grid objective score for the currently configured value, on the VALIDATION split (disjoint from the split used to search the grid): 0.899 (1.0 = perfect single_spike recall + perfect genuine-event preservation + zero single_spike FPR). See hampel_calibration.csv for the full grid on both splits.
+- **Sensitivity result**: Fault-injection calibration grid objective score for the selected value (mad_multiplier=3.0, selected purely from the calibration split), on the VALIDATION split (disjoint from the split used to search the grid): 0.981 (1.0 = perfect single_spike recall + perfect genuine-event preservation + zero single_spike FPR). See hampel_calibration.csv for the full grid on both splits.
 - **Do conclusions depend strongly on it?**: Direct but scoped: affects which raw samples are flagged single_spike and therefore excluded before aggregation -- changes here can shift window completeness and, rarely, which OK/PARTIAL/FAILED status a timestamp receives. Does not affect the fuzzy inference/HFIS-vs-baseline comparison logic itself.
 - **Recommended future validation**: The synthetic fault-injection calibration grid (see below) is diagnostic only; any change to the configured value must be separately verified against a real live-data deployment period showing fewer false single_spike flags without missing genuine spikes, per the existing calibration policy.
 

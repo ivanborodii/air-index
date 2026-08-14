@@ -7,7 +7,7 @@
 - **Status**: **SUPPORTED**
 - **Required evidence**: FAILED-completeness computed_ts have a null index_value/index_class.
 - **Artifact**: `exports/index_timeseries.csv`
-- **Metric**: `FAILED count` = `731`
+- **Metric**: `FAILED count` = `745`
 - **Limitation**: FAILED-status rows are structurally guaranteed to carry a null index_value/index_class (see tests/integration/test_mandatory_regressions.py::test_failed_results_have_null_index_class_and_no_dominant_component), not merely usually null.
 - **Recommended wording**: The pipeline never reports an index value or class when fewer than two components have sufficient data (FAILED status); it is left null rather than approximated.
 
@@ -17,7 +17,7 @@
 - **Required evidence**: Low false-rejection rate for genuine events on the validation split; per-reason-code precision/recall.
 - **Artifact**: `exports/fault_detection_metrics.csv`
 - **Metric**: `false_rejection_rate_for_genuine_events (validation)` = `0.000`
-- **Limitation**: False rejection of genuine events is low (0.000), but validation-split precision is weak for: single_spike, stuck_value, gradual_drift (see fault_detection_metrics.csv) -- separation is real but not equally reliable across every fault type.
+- **Limitation**: False rejection of genuine events is low (0.000), but validation-split precision is weak for: single_spike (see fault_detection_metrics.csv) -- separation is real but not equally reliable across every fault type.
 - **Recommended wording**: The validation split showed a low false-rejection rate for genuine events, though precision for isolated-spike detection specifically remains limited (see Limitations).
 
 ## `claim_03`: Weighted averaging can mask an adverse component.
@@ -26,7 +26,7 @@
 - **Required evidence**: WEIGHTED_MEAN masking_rate > 0 for at least one critical-severity event.
 - **Artifact**: `exports/masking_summary.csv`
 - **Metric**: `masking_rate` = `0.984`
-- **Limitation**: 4993/5074 critical-component events were masked by WEIGHTED_MEAN this run.
+- **Limitation**: 4978/5059 critical-component events were masked by WEIGHTED_MEAN this run.
 - **Recommended wording**: WEIGHTED_MEAN can classify a result as less severe than its most adverse component when other components are favourable, diluting the signal.
 
 ## `claim_04`: The proposed HFIS preserves adverse-component priority.
@@ -34,7 +34,7 @@
 - **Status**: **SUPPORTED**
 - **Required evidence**: A deterministic dominant-component attribution exists and is non-trivial across real computed_ts.
 - **Artifact**: `exports/index_timeseries.csv`
-- **Metric**: `dominant_component_frequency` = `{'A': 4268, 'M': 7888, 'V': 845}`
+- **Metric**: `dominant_component_frequency` = `{'A': 4282, 'M': 7859, 'V': 846}`
 - **Limitation**: Structural guarantee (the 2nd-level Mamdani rule base's worst-of consequent, see fuzzy_engine.determine_dominance and tests/unit/test_dominance.py) verified per-timestamp by a non-trivial, real dominant-component distribution this run.
 - **Recommended wording**: PROPOSED_HFIS's worst-of rule base structurally prevents a favourable component from suppressing a critical component's severity in the aggregated class.
 
@@ -52,8 +52,8 @@
 - **Status**: **SUPPORTED**
 - **Required evidence**: Lower class-change rate than CRISP_CLASS_MAX under identical perturbation trials.
 - **Artifact**: `exports/stability_summary.csv`
-- **Metric**: `class_change_rate (PROPOSED_HFIS vs CRISP_CLASS_MAX)` = `0.3377777777777778 vs 0.35`
-- **Limitation**: PROPOSED_HFIS class-change rate 0.338 < CRISP_CLASS_MAX's 0.350 under the same perturbation trials.
+- **Metric**: `class_change_rate (PROPOSED_HFIS vs CRISP_CLASS_MAX)` = `0.34 vs 0.34555555555555556`
+- **Limitation**: PROPOSED_HFIS class-change rate 0.340 < CRISP_CLASS_MAX's 0.346 under the same perturbation trials.
 - **Recommended wording**: Under bounded sensor-uncertainty perturbation, PROPOSED_HFIS's smooth membership functions change output class less often than the hard-threshold CRISP_CLASS_MAX baseline.
 
 ## `claim_07`: The system is computationally feasible on Raspberry Pi 5.
@@ -61,8 +61,8 @@
 - **Status**: **SUPPORTED**
 - **Required evidence**: Per-timestamp latency and peak memory measured on the actual RPi5 deployment hardware.
 - **Artifact**: `run_summary.json:performance`
-- **Metric**: `per_timestamp_latency_ms.mean, peak_memory_mb` = `1934.661978993576 ms`
-- **Limitation**: Measured on Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41: mean per-timestamp latency 1934.7 ms, peak memory 826.453125 MB.
+- **Metric**: `per_timestamp_latency_ms.mean, peak_memory_mb` = `1735.441430464428 ms`
+- **Limitation**: Measured on Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41: mean per-timestamp latency 1735.4 ms, peak memory 570.25 MB.
 - **Recommended wording**: Measured runtime and peak memory on the deployment Raspberry Pi 5 stay well within the 5-minute recompute interval.
 
 ## `claim_08`: Outdoor data improve confirmation/explanation without directly entering the index.

@@ -240,6 +240,19 @@ continuity_summary.csv,index_range,float,index points,max(index_value) - min(ind
 continuity_summary.csv,monotonicity_violations,int,count,Adjacent-point decreases for a monotonic (higher-is-worse) pollutant channel.
 continuity_summary.csv,masked_by_favorable,bool,-,Whether a favourable component prevented the adverse channel from dominating the aggregated result.
 continuity_summary.csv,area_between_curves_vs_crisp_max,float,index points x channel units,Trapezoidal integral of |PROPOSED_HFIS - FUZZY_COMPONENT_MAX| over the swept input; only populated for method=PROPOSED_HFIS.
+figure2_boundary_curves.csv,panel,str,-,Manuscript Figure 2 panel: a | b | c.
+figure2_boundary_curves.csv,component,str,-,Aerosol | Ventilation | Microclimate -- the first-level component this panel illustrates.
+figure2_boundary_curves.csv,channel,str,-,Direct-input channel swept for this panel: pm2_5 | co2 | humidity.
+figure2_boundary_curves.csv,boundary_id,str,-,Resolved evaluation_continuity_grid boundary_id actually used (see figure2_boundary_curves_metadata.json for whether it matched the preferred ID or a documented fallback).
+figure2_boundary_curves.csv,context,str,-,favourable for every row in this export -- same background context across all three panels.
+figure2_boundary_curves.csv,boundary_value,float,channel units,The control-region breakpoint this panel's grid straddles; constant within a panel.
+figure2_boundary_curves.csv,boundary_unit,str,-,"Real-world unit of boundary_value/input_value (ug/m3, ppm, or %)."
+figure2_boundary_curves.csv,grid_point,int,-,1-based position within the boundary-continuity experiment's dense input grid.
+figure2_boundary_curves.csv,input_value,float,channel units,"The perturbed channel's value at this grid point (from evaluation_continuity_grid.input_value, unmodified)."
+figure2_boundary_curves.csv,distance_from_boundary,float,channel units,input_value - boundary_value.
+figure2_boundary_curves.csv,method,str,-,PROPOSED-HFIS | CRISP-CLASS-MAX (manuscript-facing labels for PROPOSED_HFIS / CRISP_CLASS_MAX).
+figure2_boundary_curves.csv,integrated_index,float,0-100,"Final integrated IAQ index I at this grid point, from evaluation_continuity_grid.index_value, unmodified."
+figure2_boundary_curves.csv,output_class,str,-,FAVOURABLE | ACCEPTABLE | DEGRADED | CRITICAL.
 multi_component_grid.csv,a,float,0-100,Aerosol (A) component crisp score at this grid point.
 multi_component_grid.csv,v,float,0-100,Ventilation (V) component crisp score at this grid point.
 multi_component_grid.csv,m,float,0-100,Microclimate (M) component crisp score at this grid point.
@@ -288,6 +301,17 @@ fault_detection_metrics.csv,f1,float,0-1,Harmonic mean of precision and recall.
 fault_detection_metrics.csv,specificity,float,0-1,tn / (tn + fp).
 fault_detection_metrics.csv,false_positive_rate,float,0-1,fp / (fp + tn); 1 - specificity.
 fault_detection_metrics.csv,mean_detection_delay,float,samples,"Mean number of samples between fault onset and first detection, for sequential faults."
+fault_final_exclusion_metrics.csv,dataset_split,str,-,"calibration | validation -- validation is the headline, publication-facing split."
+fault_final_exclusion_metrics.csv,reason_code,str,-,The TRUE fault type being scored (single_spike | stuck_value | data_loss | gradual_drift | out_of_range).
+fault_final_exclusion_metrics.csv,tp,int,count,Genuinely faulty sample that ended up excluded (usable=False) -- correctly discarded.
+fault_final_exclusion_metrics.csv,fp,int,count,Clean/genuine-event sample that ended up excluded -- a real final false rejection.
+fault_final_exclusion_metrics.csv,fn,int,count,"Genuinely faulty sample that was recovered (confirmed usable) -- a primary candidate that did NOT end in final exclusion; not automatically a defect (e.g. some faults legitimately revert), but never hidden."
+fault_final_exclusion_metrics.csv,tn,int,count,Clean/genuine-event sample correctly left usable.
+fault_final_exclusion_metrics.csv,precision,float,0-1,"tp / (tp + fp), scored against the FINAL usable/not-usable decision (not primary reason-code screening -- see fault_detection_metrics.csv for that)."
+fault_final_exclusion_metrics.csv,recall,float,0-1,tp / (tp + fn).
+fault_final_exclusion_metrics.csv,f1,float,0-1,Harmonic mean of precision and recall.
+fault_final_exclusion_metrics.csv,specificity,float,0-1,tn / (tn + fp).
+fault_final_exclusion_metrics.csv,false_positive_rate,float,0-1,fp / (fp + tn); 1 - specificity.
 fault_detection_event_metrics.csv,dataset_split,str,-,"calibration | validation -- validation is the headline, publication-facing split."
 fault_detection_event_metrics.csv,reason_code,str,-,single_spike | stuck_value | data_loss | gradual_drift | out_of_range.
 fault_detection_event_metrics.csv,temporal_tolerance_samples,int,samples,Matching tolerance used: a predicted detection interval and a true event match if they overlap or are within this many samples.
@@ -307,7 +331,8 @@ fault_detection_confusion_matrix.csv,count,int,count,"Number of samples with thi
 hampel_calibration.csv,dataset_split,str,-,calibration | validation.
 hampel_calibration.csv,window_size,int,samples,Hampel filter window size tested.
 hampel_calibration.csv,mad_multiplier,float,-,Hampel filter MAD multiplier tested.
-hampel_calibration.csv,fault_recall,float,0-1,Recall for single_spike detection on this split.
-hampel_calibration.csv,genuine_event_preservation_rate,float,0-1,Fraction of genuine rapid environmental events not falsely flagged.
-hampel_calibration.csv,objective_score,float,-,Balanced objective combining fault_recall and genuine_event_preservation_rate.
-hampel_calibration.csv,selected,bool,-,Whether this configuration was the one selected from calibration results.
+hampel_calibration.csv,fault_recall,float,0-1,R_spike: recall for single_spike detection on this split.
+hampel_calibration.csv,genuine_event_preservation_rate,float,0-1,P_event: fraction of genuine rapid environmental events not falsely flagged.
+hampel_calibration.csv,single_spike_false_positive_rate,float,0-1,FPR_spike: single_spike false-positive rate on this split.
+hampel_calibration.csv,objective_score,float,-,S = (R_spike + P_event + (1 - FPR_spike)) / 3.
+hampel_calibration.csv,selected,bool,-,"True for exactly the (window_size=11, mad_multiplier) combination selected by iaq_hfis.evaluation.fault_injection.select_hampel_multiplier from the calibration split only."
