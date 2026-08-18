@@ -1,0 +1,12 @@
+metric,value
+completeness_status_count__OK,15242.0
+completeness_status_count__PARTIAL,1004.0
+completeness_status_count__FAILED,746.0
+completeness_status_share__OK,0.8970103578154426
+completeness_status_share__PARTIAL,0.05908662900188324
+completeness_status_share__FAILED,0.0439030131826742
+reason_code_total_count__data_loss,2988.0
+reason_code_total_count__gradual_drift,1275.0
+reason_code_total_count__out_of_range,34495.0
+reason_code_total_count__single_spike,59545.0
+reason_code_total_count__stuck_value,23784.0

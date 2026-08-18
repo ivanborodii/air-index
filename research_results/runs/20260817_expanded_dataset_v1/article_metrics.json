@@ -1,0 +1,29 @@
+{
+  "run_id": "20260817_expanded_dataset_v1",
+  "baseline": {
+    "pipeline_run_id": "7f04698725dd4f35a432ba4a0de2934f",
+    "n_timestamps_processed": 16992,
+    "completeness_counts": {
+      "OK": 15242,
+      "PARTIAL": 1004,
+      "FAILED": 746
+    }
+  },
+  "dataset": {
+    "selected_row_count": 169331,
+    "selected_unique_ts_count": 169331,
+    "dataset_csv_sha256": "6286fc8bc2d459533d7e552e67db477c82ebd925295f7cae5551df1e84a90061"
+  },
+  "hampel": {
+    "selected_multiplier_calibration": 5.0,
+    "production_multiplier_unchanged": 3.0,
+    "boundary_effect_found": true
+  },
+  "second_level_equivalence": {
+    "real_timestamps_class_agreement_rate": 1.0,
+    "synthetic_grid_class_agreement_rate": 0.9595043600644216,
+    "grid_n_points_per_axis": 41,
+    "rule_level_worst_of_proof": true
+  },
+  "source_note": "This file is a compact rollup for quick reference. Every number here is traceable to the detailed per-section artifacts listed in run_manifest.json and article_results_summary.md; those are authoritative if any discrepancy is ever found."
+}

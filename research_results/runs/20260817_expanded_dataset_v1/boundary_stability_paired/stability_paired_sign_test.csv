@@ -1,0 +1,4 @@
+method_a,method_b,n_paired_trials,n_a_changed_b_not,n_b_changed_a_not,mcnemar_p_value,n_a_changed,n_b_changed
+PROPOSED_HFIS,CRISP_CLASS_MAX,900,88,93,0.7663200944429479,237,242
+PROPOSED_HFIS,FUZZY_COMPONENT_MAX,900,0,0,1.0,237,237
+PROPOSED_HFIS,WEIGHTED_MEAN,900,212,22,3.440016276319106e-40,237,47

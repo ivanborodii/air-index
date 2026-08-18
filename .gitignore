@@ -30,3 +30,15 @@ run_sps.py
 # 'iaq_hfis finalize' into research_results/{exploratory,final}/test_report.*
 /test_report.json
 /test_report.md
+
+# 2026-08 research run (task section 3/16): the frozen dataset snapshot itself
+# (a full DuckDB copy + a CSV export of the interval-filtered rows) is raw
+# sensor data, not a research artifact -- never committed. Its SHA256
+# (dataset_sha256.txt) and the verification JSON alongside it ARE committed,
+# so every downstream artifact can still cite exactly what data produced it.
+research_results/runs/*/snapshot/*.duckdb
+research_results/runs/*/snapshot/*.csv
+# Per-masking-case resumability checkpoints for the missing-data-strategy
+# experiment (task section 1/6) -- intermediate working state, not a result;
+# the finished CSVs/plots under missing_data_strategy/ are the real artifacts.
+research_results/runs/*/missing_data_strategy/_checkpoints/

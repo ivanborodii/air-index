@@ -1,0 +1,4 @@
+Run 7f04698725dd4f35a432ba4a0de2934f (mode=publication): success
+  processed 16992 timestamps over window=15min
+  completeness: {'OK': 15242, 'PARTIAL': 1004, 'FAILED': 746}
+  provisional parameters engaged this run: ['cadence.slot_match_tolerance_seconds', 'confirmation.gradual_drift_magnitude_multiplier', 'confirmation.gradual_drift_min_consecutive_steps', 'confirmation.persistence_min_consecutive_samples', 'confirmation.pm_cross_channel_tolerance_pct', 'confirmation.stuck_value_min_repeats', 'control_regions.output.transition_widths', 'control_regions.relative_humidity.transition_width', 'evaluation.masking_severity_threshold', 'evaluation.stability_n_trials', 'evaluation.stability_seed', 'fuzzy_engine.partial_mode_inference_rule', 'hampel.mad_multiplier', 'hampel.window_size', 'membership.output_transition_width', 'profile_selection.season_month_ranges']

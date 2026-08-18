@@ -1,0 +1,6 @@
+reason_codes,n,primary_associated_channel
+data_loss,2988,pm10
+gradual_drift,1275,co2
+out_of_range,34495,co2
+single_spike,59545,temperature
+stuck_value,23784,temperature

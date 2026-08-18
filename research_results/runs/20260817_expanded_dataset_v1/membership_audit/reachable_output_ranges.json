@@ -1,0 +1,37 @@
+{
+  "A": {
+    "empirical_min_crisp_score": 12.444029850746269,
+    "empirical_max_crisp_score": 87.55597014925372,
+    "n_samples": 256,
+    "method": "sampled own real input domain through ctx.engine.infer_component"
+  },
+  "V": {
+    "empirical_min_crisp_score": 12.444029850746269,
+    "empirical_max_crisp_score": 87.55597014925372,
+    "n_samples": 61,
+    "method": "sampled own real input domain through ctx.engine.infer_component"
+  },
+  "M": {
+    "kitchen/cold_period": {
+      "empirical_min_crisp_score": 12.444029850746269,
+      "empirical_max_crisp_score": 87.55597014925372,
+      "n_samples": 961
+    },
+    "general_residential/warm_period": {
+      "empirical_min_crisp_score": 12.444029850746269,
+      "empirical_max_crisp_score": 87.55597014925372,
+      "n_samples": 961
+    },
+    "kitchen/warm_period": {
+      "empirical_min_crisp_score": 12.444029850746269,
+      "empirical_max_crisp_score": 87.55597014925372,
+      "n_samples": 961
+    }
+  },
+  "final_index": {
+    "empirical_min": 12.444029850746269,
+    "empirical_max": 87.55597014925372,
+    "n_samples": 71583,
+    "source": "evaluation_multi_component_grid (iaq_hfis evaluate)"
+  }
+}

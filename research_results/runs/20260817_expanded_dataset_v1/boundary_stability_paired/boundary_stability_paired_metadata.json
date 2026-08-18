@@ -1,0 +1,15 @@
+{
+  "evaluation_run_id": "7722c4963c344fa687cafe3deb5fa107",
+  "methods": [
+    "CRISP_CLASS_MAX",
+    "FUZZY_COMPONENT_MAX",
+    "PROPOSED_HFIS",
+    "WEIGHTED_MEAN"
+  ],
+  "primary_method": "PROPOSED_HFIS",
+  "n_samples": 30,
+  "n_trials_total": 3600,
+  "bootstrap_seed": 20260815,
+  "bootstrap_reps": 10000,
+  "note": "Pairing key is (sample_id, trial_index): run_multi_point_stability perturbs inputs once per trial_index and scores all methods against that same perturbed input, so this pairing is exact, not approximate."
+}

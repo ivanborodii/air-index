@@ -1,0 +1,339 @@
+{
+  "run_id": "20260817_expanded_dataset_v1",
+  "utc_data_interval": {
+    "start_inclusive": "2026-06-18T00:00:00+00:00",
+    "end_exclusive": "2026-08-16T00:00:00+00:00"
+  },
+  "selected_row_count": 169331,
+  "selected_unique_ts_count": 169331,
+  "dataset_csv_sha256": "6286fc8bc2d459533d7e552e67db477c82ebd925295f7cae5551df1e84a90061",
+  "frozen_full_db_snapshot_sha256": "d1068cf1f7a20b701c512cab56b03454663615687b8cb64c5f840a39031d809b",
+  "git_commit_used_for_baseline_pipeline_run": "3916a5717a85e86903fc99183f0882ec913c4a36",
+  "current_git_head_at_manifest_build_time": "3916a5717a85e86903fc99183f0882ec913c4a36",
+  "config_hash": "f878f1eed7d5342cff2ca15d2b266d67a4782e3c413eab7b218c437f2f11b086",
+  "random_seeds_used": {
+    "hampel_calibration_validation_split_seed": 20260815,
+    "missing_data_strategy_subsample_and_bootstrap_seed": 20260815,
+    "evaluation_stability_seed": 42
+  },
+  "dependency_versions": {
+    "duckdb": "1.5.2",
+    "pandas": "3.0.2",
+    "numpy": "2.4.4",
+    "pydantic": "2.13.4",
+    "jsonschema": "4.26.0",
+    "matplotlib": "3.11.0",
+    "pytest": "9.1.1"
+  },
+  "python_version": "3.13.5",
+  "raspberry_pi_model": "Raspberry Pi 5 Model B Rev 1.0",
+  "os_release": {
+    "PRETTY_NAME": "Debian GNU/Linux 13 (trixie)",
+    "NAME": "Debian GNU/Linux",
+    "VERSION_ID": "13",
+    "VERSION": "13 (trixie)",
+    "VERSION_CODENAME": "trixie",
+    "DEBIAN_VERSION_FULL": "13.3",
+    "ID": "debian",
+    "HOME_URL": "https://www.debian.org/",
+    "SUPPORT_URL": "https://www.debian.org/support",
+    "BUG_REPORT_URL": "https://bugs.debian.org/"
+  },
+  "reproduce_commands": [
+    "# 1. Baseline pipeline (already persisted as pipeline_run_id=7f04698725dd4f35a432ba4a0de2934f; do not rerun unless git HEAD differs from git_commit_used_for_baseline_pipeline_run above):",
+    "iaq_hfis run --from 2026-06-18T00:00:00+00:00 --to 2026-08-16T00:00:00+00:00 --window-minutes 15 --mode publication",
+    "# 2. Section 3 snapshot + interval verification:",
+    "python scripts/research/data_snapshot_and_interval_verification.py",
+    "# 3. Section 4 baseline manifest:",
+    "python scripts/research/baseline_run_manifest.py",
+    "# 4. Section 5 Hampel sweep:",
+    "python scripts/research/hampel_threshold_sweep.py",
+    "# 5. Section 6 missing-data strategy comparison (resumable via _checkpoints/):",
+    "python scripts/research/missing_data_strategy_comparison.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 6. Section 7 pollution/microclimate decomposition:",
+    "python scripts/research/pollution_microclimate_decomposition.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 7. Evaluation run (needed for sections 8, 9):",
+    "python -m iaq_hfis.cli evaluate --from 2026-06-18T00:00:00+00:00 --to 2026-08-16T00:00:00+00:00 --window-minutes 15 --pipeline-run-id 7f04698725dd4f35a432ba4a0de2934f --multi-component-grid-points 101",
+    "# 8. Section 8 second-level equivalence (needs the evaluation_run_id printed by step 7):",
+    "python scripts/research/second_level_equivalence.py 7f04698725dd4f35a432ba4a0de2934f <EVALUATION_RUN_ID>",
+    "# 9. Section 9 boundary/stability paired analysis (same evaluation_run_id):",
+    "python scripts/research/boundary_stability_paired_analysis.py <EVALUATION_RUN_ID>",
+    "# 10. Section 10 data-quality reason analysis:",
+    "python scripts/research/data_quality_reason_analysis.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 11. Section 11 membership-function audit:",
+    "python scripts/research/membership_function_audit.py",
+    "# 12. Section 12 runtime profiling:",
+    "python scripts/research/runtime_profiling.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 13. Tests:",
+    "python -m pytest tests/ -q",
+    "# 14. This manifest:",
+    "python scripts/research/build_run_manifest.py"
+  ],
+  "generated_artifacts": {
+    "article_metrics.json": {
+      "sha256": "426a824ef915d59214cbd9e208200e512bab925e8db491b84d7befe338f08faa",
+      "size_bytes": 1067
+    },
+    "article_results_summary.md": {
+      "sha256": "b16e7502c7ddf34e7d3dff133fb2df38f85460abee755a94c8a7f6eb73e10c79",
+      "size_bytes": 9667
+    },
+    "baseline/01_run.log": {
+      "sha256": "795c85508b46bdbc7e29b2adbd88b54250ba540ed70c77f0e63a9ecad072e519",
+      "size_bytes": 871
+    },
+    "baseline/baseline_run_manifest.json": {
+      "sha256": "c7c91477736a543c33f9c4edae1312ec10076e9bbf02c79d9638a476c2eeabae",
+      "size_bytes": 3513
+    },
+    "boundary_stability_paired/boundary_stability_paired_metadata.json": {
+      "sha256": "824f9202efd99e33dd4c473f206cbd9ccb54c286543e2a9188c06dca6fdd73a0",
+      "size_bytes": 529
+    },
+    "boundary_stability_paired/stability_activity_summary.csv": {
+      "sha256": "7a55e91c941ac3a2457a391873d9bda9e0e8297c909b5ae0526ba5f8bb1cb8e6",
+      "size_bytes": 435
+    },
+    "boundary_stability_paired/stability_class_flapping_by_point.csv": {
+      "sha256": "f8f6ae60d6dfaf52169b0b8ae6ebcdc857d410ee0ad2f9cf6b467f016ba2f6f9",
+      "size_bytes": 9040
+    },
+    "boundary_stability_paired/stability_class_flapping_summary.csv": {
+      "sha256": "9d1954d40410328c7b3fe224952fde52be469a5c6719b4773bb7d5a23a06fbee",
+      "size_bytes": 320
+    },
+    "boundary_stability_paired/stability_paired_bootstrap_ci.csv": {
+      "sha256": "3917310c9b30ec75debee757e479a89899757f4e8cf6056498e1349434852ae9",
+      "size_bytes": 295
+    },
+    "boundary_stability_paired/stability_paired_sign_test.csv": {
+      "sha256": "0014b9577c9aad90f8bf65ec30a133e4df9eb6cc7369c2c07b627daf8aed79ab",
+      "size_bytes": 299
+    },
+    "data_interval_verification.json": {
+      "sha256": "3d55137c23733db598d7b39ec6390efafc99f31b8c8ad420fd5b1afe38da3976",
+      "size_bytes": 7421
+    },
+    "data_quality_reasons/completeness_status_by_day.csv": {
+      "sha256": "b11dc0570c12d80b1e0950aa41355278f2f2ccab83b452d01e0170ef969f956a",
+      "size_bytes": 2457
+    },
+    "data_quality_reasons/completeness_status_by_hour.csv": {
+      "sha256": "d227fa63ca6b9a09c517c705dda7ff98c182608f2f97ba99b31a803a97d0b884",
+      "size_bytes": 882
+    },
+    "data_quality_reasons/data_quality_failure_intervals.csv": {
+      "sha256": "3b23da16d474bccde1bf47b51e4ad8c9ab0009ca1ec61960722e5202b0aafa31",
+      "size_bytes": 15259
+    },
+    "data_quality_reasons/data_quality_reason_by_day.csv": {
+      "sha256": "cac8b26c774949ed2ee5b75b6cc49ec013753bb4513073b6e9f62ccb0cea6287",
+      "size_bytes": 6043
+    },
+    "data_quality_reasons/data_quality_reason_by_hour.csv": {
+      "sha256": "8472be59f5af8b033bc28fcb4ff51c0c1f0927d664b821e723af19eb09d8b761",
+      "size_bytes": 2150
+    },
+    "data_quality_reasons/data_quality_reason_by_sensor.csv": {
+      "sha256": "91df90e2cc9182ed4ff21a77ed91e432bfa54840b9b10f6cf7cc3673ddc348e1",
+      "size_bytes": 1044
+    },
+    "data_quality_reasons/data_quality_reason_channel_association.csv": {
+      "sha256": "a41077f8b10d175f594af00e2443e2f066b55748becd694ac7d63d8e3229b6b2",
+      "size_bytes": 169
+    },
+    "data_quality_reasons/data_quality_reason_combinations.csv": {
+      "sha256": "efe55742a028b0417c5dfad0e6cb89cce793ede8a3b7fef69cc14d18c1db17db",
+      "size_bytes": 142
+    },
+    "data_quality_reasons/data_quality_reason_summary.csv": {
+      "sha256": "0f80151dc72b20f448b147ca9a0863f7614c77130a14a6b953740411696411d6",
+      "size_bytes": 515
+    },
+    "data_quality_reasons/reason_code_by_channel.csv": {
+      "sha256": "bcdcdc8a7f016397978e5fcfc07de14d5f192ee072e92ecf00da1fea611336b9",
+      "size_bytes": 1037
+    },
+    "data_quality_reasons/reason_code_by_channel_day.csv": {
+      "sha256": "7be581df05804c9a09bbab2e9ea22cfcdbc1b6ffb500fb38dd94e2b9bb67eadd",
+      "size_bytes": 23560
+    },
+    "data_quality_reasons/reason_code_by_channel_hour.csv": {
+      "sha256": "897680b7f4a4f008739c12b80e5a90b947715483bccb8edf6c1663baa99d029a",
+      "size_bytes": 10959
+    },
+    "data_quality_reasons/stage2_state_by_channel.csv": {
+      "sha256": "50be697f381b12ad519cbe84ec8f8a08953bf0977e261d4df294dfd1646a442f",
+      "size_bytes": 833
+    },
+    "data_validation_report.md": {
+      "sha256": "5f158d3ec5da172687f6d02e7731a00caacb5995d57a4ee291c0a68cb999b57f",
+      "size_bytes": 1748
+    },
+    "hampel_sweep/hampel_calibration_results.csv": {
+      "sha256": "fb70979e8f11ddd2583e220d1eb96921cd7b1dc083e2020490dc598388c312bc",
+      "size_bytes": 2494
+    },
+    "hampel_sweep/hampel_metric_definitions.md": {
+      "sha256": "f49c946e62c67735ba30db10aea1c78fecf26b469dc8305fd64f3b38d3ce1458",
+      "size_bytes": 1987
+    },
+    "hampel_sweep/hampel_pr_curve.png": {
+      "sha256": "4b9c0c63b66dd5f50a2dbf9f9bc7a4bc13ff0cdd77c0249f9f23deef01b50ceb",
+      "size_bytes": 95374
+    },
+    "hampel_sweep/hampel_pr_curve.svg": {
+      "sha256": "3f295cb8e27f20aa3be93b4e21bfa0cce0f42af6becdec01b8d57f2ccf8f6df4",
+      "size_bytes": 79004
+    },
+    "hampel_sweep/hampel_selected_parameter.json": {
+      "sha256": "d17475d9ccb9e2d42bde111d58135a633dcd16758d3ad7fb065ad663cffbf125",
+      "size_bytes": 4519
+    },
+    "hampel_sweep/hampel_threshold_sweep.csv": {
+      "sha256": "8d58460cd417ad2aa5731b87fbb5b02ff30f103654764daeff3abcfb4e134753",
+      "size_bytes": 4239
+    },
+    "hampel_sweep/hampel_validation_results.csv": {
+      "sha256": "8a91135577f7a25f435f043fd48bdbba58381ebdcc6477ac6312595f9517ef21",
+      "size_bytes": 1946
+    },
+    "hampel_sweep/near_0024_value_explained.md": {
+      "sha256": "525671bef96b350eee09eb76d26f75d86193f9d0e86454ce46d7e25dbecbdb2d",
+      "size_bytes": 3008
+    },
+    "manuscript_update_notes.md": {
+      "sha256": "d6b424c992f13adffb953935d98217d60660c0b0c75365bdf9c893ce564b3d3d",
+      "size_bytes": 10911
+    },
+    "membership_audit/membership_function_audit.csv": {
+      "sha256": "78b98c2e22b5fdc5f45ebd6d178b9e118cd8e57d0bd3c6e88255cfb25625e5e5",
+      "size_bytes": 7214
+    },
+    "membership_audit/membership_function_audit.md": {
+      "sha256": "c291827743a65e106b08010ad3cec544b2ca33873ad4a7ca51cd78aec9059268",
+      "size_bytes": 14279
+    },
+    "membership_audit/pm10_degraded_shape.png": {
+      "sha256": "305284c069164cde1645a17078f9728edd4a336ad4da48b514d3dd51830b2b1b",
+      "size_bytes": 134229
+    },
+    "membership_audit/pm10_degraded_shape.svg": {
+      "sha256": "77567e81582381d62ef53c98acb253676fdbdddd3408bc8522ee153274ea93ef",
+      "size_bytes": 39232
+    },
+    "membership_audit/reachable_output_ranges.json": {
+      "sha256": "ac073893908157bfe8b0f07ba817a196362d0784623772e534c09007ea2cf446",
+      "size_bytes": 1171
+    },
+    "missing_data_strategy/missing_data_bootstrap_intervals.csv": {
+      "sha256": "88d17912a5bf3ceec5c3b10cad019c401303317f0ee4c9b2aec6e6df515791b1",
+      "size_bytes": 4191
+    },
+    "missing_data_strategy/missing_data_confusion_matrices.csv": {
+      "sha256": "b389ef5ec00b767da9b1cd7a8eda70e2ccfe1de4a3c3de639cc578b86f35bb3c",
+      "size_bytes": 78654
+    },
+    "missing_data_strategy/missing_data_strategy_bootstrap_ci.csv": {
+      "sha256": "88d17912a5bf3ceec5c3b10cad019c401303317f0ee4c9b2aec6e6df515791b1",
+      "size_bytes": 4191
+    },
+    "missing_data_strategy/missing_data_strategy_comparison.png": {
+      "sha256": "a1b089b1236748da67b416fcc9e1267c58388039bd21056a64e870facaa8c4ac",
+      "size_bytes": 385101
+    },
+    "missing_data_strategy/missing_data_strategy_comparison.svg": {
+      "sha256": "db55c02a2f28dbe9bf2c97ca3f1596a355768518b5a891c3ce4910da0a6dd6b2",
+      "size_bytes": 86578
+    },
+    "missing_data_strategy/missing_data_strategy_metadata.json": {
+      "sha256": "045473c983dbc2e94d25c13de876c2f33e2cfa94421d5c24124a332e9c7a27dd",
+      "size_bytes": 2275
+    },
+    "missing_data_strategy/missing_data_strategy_predictions.csv": {
+      "sha256": "884d1cb5fd3016e9ac92c338261e2edf80a5aeb2978f6ed66113b2a2a511c2d6",
+      "size_bytes": 6751912
+    },
+    "missing_data_strategy/missing_data_strategy_summary.csv": {
+      "sha256": "6ad2367362dfd24a05ad4d77f8961165e0122434c049cc9ae047c2e9c0618f67",
+      "size_bytes": 11965
+    },
+    "pollution_microclimate/critical_driver_by_day.csv": {
+      "sha256": "e2255e1611119ee6f2609d8b21f6f072dbcc8bf9cba20fa9dc79f6f744d05e38",
+      "size_bytes": 1404
+    },
+    "pollution_microclimate/critical_driver_by_hour.csv": {
+      "sha256": "4a94d02be2660ca39217379cafd3011caec185bdb5d86a6cccaa6db2555d3a50",
+      "size_bytes": 551
+    },
+    "pollution_microclimate/critical_driver_summary.csv": {
+      "sha256": "05397d123d51f55b7fdb07a16b93f6ae00e512806ffec61a6aea169406b0d17b",
+      "size_bytes": 242
+    },
+    "pollution_microclimate/index_class_distribution_comparison.png": {
+      "sha256": "a7ba27b1b621876e740b58d35f8fb302e9defa529a111cf7a78ea6456c741cd8",
+      "size_bytes": 126122
+    },
+    "pollution_microclimate/index_class_distribution_comparison.svg": {
+      "sha256": "f056fcb870cd2014b29b6cebd7f9367b8b5c99729b5958f8aebd07e921ba2ab8",
+      "size_bytes": 45038
+    },
+    "pollution_microclimate/microclimate_persistence_by_season.csv": {
+      "sha256": "23c1da340cd8f6d47e1c6c9cafd3de4b0cbd66e3177a92568696f00201afb895",
+      "size_bytes": 113
+    },
+    "pollution_microclimate/pollution_microclimate_summary.csv": {
+      "sha256": "0c88f4da4352b198493cef94db08213734b577e6fbebb7b3c10263d31a73d6b2",
+      "size_bytes": 1468
+    },
+    "pollution_microclimate/pollution_microclimate_summary.json": {
+      "sha256": "98cc68d369a4b24e9e5398c65b221ff41e1fa926052048b4339a43c0c505cbe9",
+      "size_bytes": 1631
+    },
+    "reproducibility_instructions.md": {
+      "sha256": "eb8f1c99db24b95658ef77c7661e9e7e944b5b44e88af5dd2db0a51f2909c386",
+      "size_bytes": 2281
+    },
+    "run_status.md": {
+      "sha256": "35f02e597dc1b13093c7cf9aaf1b8d4f7ffa9b53ad8282b707791e89a7be0e00",
+      "size_bytes": 1763
+    },
+    "runtime_profiling/runtime_profiling_report.json": {
+      "sha256": "8dd54a8e1b199e40b8e529e352bd64e1fa53c50de95ec478c0d1b86d3ca5b1f3",
+      "size_bytes": 2349
+    },
+    "second_level_equivalence/second_level_equivalence_grid.csv": {
+      "sha256": "0a200b7277fc2d9706964f03a57a2c528bcec0cab1dab339b6c6c310e4fb7aa8",
+      "size_bytes": 7504055
+    },
+    "second_level_equivalence/second_level_equivalence_real.csv": {
+      "sha256": "a780b0053ebaaaca312fa729d87118f789b8f468fe249b921fdd3a2c6d34bb63",
+      "size_bytes": 1470836
+    },
+    "second_level_equivalence/second_level_equivalence_summary.json": {
+      "sha256": "cf5793d2de1fad28cd396fe18c731ffa6e8cff28b2991ff382e3aab591c8832c",
+      "size_bytes": 1956
+    },
+    "second_level_equivalence/second_level_rule_audit.csv": {
+      "sha256": "40ca9bbf46b8b3dde7367cd771022f6097f90f5fdfbe9850975b20c32401212d",
+      "size_bytes": 5237
+    },
+    "second_level_equivalence/second_level_rule_audit.md": {
+      "sha256": "26d3d7d41a5e51b92946a230cf26989b80555b70585f30e6021db1fa7ec1c140",
+      "size_bytes": 10084
+    },
+    "snapshot/data_interval_verification.json": {
+      "sha256": "be884d38632a19fed2d7cb71e8fd7e487e68db449e92586f16650004fee6a9ef",
+      "size_bytes": 5445
+    },
+    "snapshot/dataset_sha256.txt": {
+      "sha256": "fd1b63f950a3e3e56eac0f79f00a3121db56d75f927f0a8c4c3b03a3f2d00dd0",
+      "size_bytes": 213
+    },
+    "test_report.txt": {
+      "sha256": "ce35b5cc86f2c10a3fcace5df046630bb6edb9df9f0d2eb392abda0e1dc72393",
+      "size_bytes": 847
+    }
+  },
+  "n_artifacts": 66
+}

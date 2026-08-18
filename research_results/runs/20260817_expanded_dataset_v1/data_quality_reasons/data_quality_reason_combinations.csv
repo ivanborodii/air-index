@@ -1,0 +1,7 @@
+reason_combination,n
+single_spike,59377
+out_of_range,34495
+stuck_value,23784
+data_loss,2988
+gradual_drift,1107
+gradual_drift+single_spike,168

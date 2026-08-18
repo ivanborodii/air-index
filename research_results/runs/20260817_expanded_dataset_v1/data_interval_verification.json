@@ -1,0 +1,357 @@
+{
+  "timezone_note": "raw_observations.ts/measured_at/loaded_at are TIMESTAMPTZ (see air-monitor/storage/schema.sql comments: 'UTC'). DuckDB stores TIMESTAMPTZ internally normalized to UTC regardless of session display timezone; this script explicitly runs SET TimeZone='UTC' before any query so all timestamps read here are UTC, matching the requested interval boundaries verbatim (no conversion needed).",
+  "total_rows_all_time": 212470,
+  "selected_row_count": 169331,
+  "selected_min_ts": "2026-06-18 00:00:06.791927+00:00",
+  "selected_max_ts": "2026-08-15 23:59:52.737594+00:00",
+  "selected_unique_ts_count": 169331,
+  "requested_start_inclusive": "2026-06-18T00:00:00+00:00",
+  "requested_end_exclusive": "2026-08-16T00:00:00+00:00",
+  "rows_outside_full_table": 43139,
+  "duplicate_ts_count": 0,
+  "timestamp_ordering_violations": 0,
+  "top_20_gap_intervals_seconds_and_counts": [
+    [
+      "0:00:30.000086",
+      9296
+    ],
+    [
+      "0:00:30.000079",
+      9070
+    ],
+    [
+      "0:00:30.000078",
+      9039
+    ],
+    [
+      "0:00:30.000087",
+      8992
+    ],
+    [
+      "0:00:30.000085",
+      8976
+    ],
+    [
+      "0:00:30.000080",
+      8249
+    ],
+    [
+      "0:00:30.000077",
+      7758
+    ],
+    [
+      "0:00:30.000088",
+      7719
+    ],
+    [
+      "0:00:30.000084",
+      7649
+    ],
+    [
+      "0:00:30.000081",
+      7075
+    ],
+    [
+      "0:00:30.000082",
+      6601
+    ],
+    [
+      "0:00:30.000083",
+      6569
+    ],
+    [
+      "0:00:30.000076",
+      5867
+    ],
+    [
+      "0:00:30.000089",
+      5867
+    ],
+    [
+      "0:00:30.000090",
+      4471
+    ],
+    [
+      "0:00:30.000075",
+      3842
+    ],
+    [
+      "0:00:30.000091",
+      3413
+    ],
+    [
+      "0:00:30.000092",
+      2687
+    ],
+    [
+      "0:00:30.000074",
+      2510
+    ],
+    [
+      "0:00:30.000093",
+      2285
+    ]
+  ],
+  "gaps_over_5min_count": 6,
+  "gaps_over_5min_sample": [
+    [
+      "2026-06-18 02:03:04.040453+00:00",
+      "0:24:33.668987"
+    ],
+    [
+      "2026-06-22 12:25:51.361444+00:00",
+      "0:09:14.355563"
+    ],
+    [
+      "2026-06-24 23:53:07.474318+00:00",
+      "0:12:15.531535"
+    ],
+    [
+      "2026-06-25 03:01:48.586265+00:00",
+      "3:05:23.009151"
+    ],
+    [
+      "2026-06-26 02:21:46.420901+00:00",
+      "0:18:27.607681"
+    ],
+    [
+      "2026-07-01 07:21:53.135589+00:00",
+      "0:05:59.532057"
+    ]
+  ],
+  "columns": [
+    [
+      "ts",
+      "TIMESTAMP WITH TIME ZONE"
+    ],
+    [
+      "measured_at",
+      "TIMESTAMP WITH TIME ZONE"
+    ],
+    [
+      "loaded_at",
+      "TIMESTAMP WITH TIME ZONE"
+    ],
+    [
+      "batch_id",
+      "VARCHAR"
+    ],
+    [
+      "row_in_batch",
+      "INTEGER"
+    ],
+    [
+      "co2_ppm",
+      "DOUBLE"
+    ],
+    [
+      "scd_temp_c",
+      "DOUBLE"
+    ],
+    [
+      "scd_humidity_pct",
+      "DOUBLE"
+    ],
+    [
+      "bme_temp_c",
+      "DOUBLE"
+    ],
+    [
+      "bme_humidity_pct",
+      "DOUBLE"
+    ],
+    [
+      "pressure_hpa",
+      "DOUBLE"
+    ],
+    [
+      "gas_resistance_ohm",
+      "DOUBLE"
+    ],
+    [
+      "mass_pm1_0",
+      "DOUBLE"
+    ],
+    [
+      "mass_pm2_5",
+      "DOUBLE"
+    ],
+    [
+      "mass_pm4_0",
+      "DOUBLE"
+    ],
+    [
+      "mass_pm10",
+      "DOUBLE"
+    ],
+    [
+      "number_pm0_5",
+      "DOUBLE"
+    ],
+    [
+      "number_pm1_0",
+      "DOUBLE"
+    ],
+    [
+      "number_pm2_5",
+      "DOUBLE"
+    ],
+    [
+      "number_pm4_0",
+      "DOUBLE"
+    ],
+    [
+      "number_pm10",
+      "DOUBLE"
+    ],
+    [
+      "typical_size_um",
+      "DOUBLE"
+    ],
+    [
+      "sensor_status",
+      "VARCHAR"
+    ],
+    [
+      "scd41_status",
+      "VARCHAR"
+    ],
+    [
+      "bme688_status",
+      "VARCHAR"
+    ],
+    [
+      "sps30_status",
+      "VARCHAR"
+    ]
+  ],
+  "null_counts_per_channel": {
+    "co2_ppm": 7882,
+    "scd_temp_c": 7882,
+    "scd_humidity_pct": 7882,
+    "bme_temp_c": 5941,
+    "bme_humidity_pct": 5941,
+    "pressure_hpa": 5941,
+    "gas_resistance_ohm": 169331,
+    "mass_pm1_0": 4436,
+    "mass_pm2_5": 4436,
+    "mass_pm4_0": 4436,
+    "mass_pm10": 4436,
+    "number_pm0_5": 4436,
+    "number_pm1_0": 4436,
+    "number_pm2_5": 4436,
+    "number_pm4_0": 4436,
+    "number_pm10": 4436,
+    "typical_size_um": 4436
+  },
+  "nonfinite_counts_per_channel": {
+    "co2_ppm": 0,
+    "scd_temp_c": 0,
+    "scd_humidity_pct": 0,
+    "bme_temp_c": 0,
+    "bme_humidity_pct": 0,
+    "pressure_hpa": 0,
+    "gas_resistance_ohm": 0,
+    "mass_pm1_0": 0,
+    "mass_pm2_5": 0,
+    "mass_pm4_0": 0,
+    "mass_pm10": 0,
+    "number_pm0_5": 0,
+    "number_pm1_0": 0,
+    "number_pm2_5": 0,
+    "number_pm4_0": 0,
+    "number_pm10": 0,
+    "typical_size_um": 0
+  },
+  "non_null_counts_per_channel": {
+    "co2_ppm": 161449,
+    "scd_temp_c": 161449,
+    "scd_humidity_pct": 161449,
+    "bme_temp_c": 163390,
+    "bme_humidity_pct": 163390,
+    "pressure_hpa": 163390,
+    "gas_resistance_ohm": 0,
+    "mass_pm1_0": 164895,
+    "mass_pm2_5": 164895,
+    "mass_pm4_0": 164895,
+    "mass_pm10": 164895,
+    "number_pm0_5": 164895,
+    "number_pm1_0": 164895,
+    "number_pm2_5": 164895,
+    "number_pm4_0": 164895,
+    "number_pm10": 164895,
+    "typical_size_um": 164895
+  },
+  "sensor_status_distribution": [
+    [
+      "ok",
+      160904
+    ],
+    [
+      "failed",
+      4331
+    ],
+    [
+      "partial",
+      4096
+    ]
+  ],
+  "scd41_status_distribution": [
+    [
+      "ok",
+      161449
+    ],
+    [
+      "failed",
+      6786
+    ],
+    [
+      "unavailable",
+      1096
+    ]
+  ],
+  "bme688_status_distribution": [
+    [
+      "ok",
+      163390
+    ],
+    [
+      "failed",
+      5919
+    ],
+    [
+      "unavailable",
+      22
+    ]
+  ],
+  "sps30_status_distribution": [
+    [
+      "ok",
+      164895
+    ],
+    [
+      "failed",
+      4399
+    ],
+    [
+      "unavailable",
+      28
+    ],
+    [
+      "data_not_ready",
+      9
+    ]
+  ],
+  "snapshot_source_db": "/home/ivan/python_scripts/air_ml/air-monitor/data/air_monitor.duckdb",
+  "snapshot_path": "data/iaq_hfis/snapshots/snapshot_1c2bef7586b6.duckdb",
+  "snapshot_sha256": "03507e167c61ffbccfc33f582e30b049cb6219ef91b57967e07f81c4eb5dc2ea",
+  "snapshot_wal_sha256": "a2a58ba140f6cdc50aec078ece49ae30a50288a1193a7125658aad307bfacd72",
+  "snapshot_size_bytes": 58208256,
+  "notes": [
+    "Interval verified: 169331 rows, min_ts=2026-06-18T00:00:06.79Z, max_ts=2026-08-15T23:59:52.73Z, both within [2026-06-18T00:00:00Z, 2026-08-16T00:00:00Z). Zero rows outside interval leaked into selection.",
+    "No duplicate timestamps, no ordering violations, unique_ts_count == row_count (one row per timestamp).",
+    "6 gaps > 5 minutes found (max 3h05m on 2026-06-25 ~03:01 UTC); consistent with known sensor_status=failed/partial periods, not investigated further here (data-quality reason analysis is Section 10).",
+    "gas_resistance_ohm is NULL for all 169331 selected rows (grep confirms src/iaq_hfis never reads this column) - reported explicitly per task instruction rather than silently ignored; does not affect the pipeline since this raw column is unused by iaq_hfis.",
+    "Null counts elsewhere track sensor_status=failed/partial rows (scd41 nulls=7882 close to scd41_status failed+unavailable=7882; bme688 nulls=5941 close to bme688_status failed+unavailable=5941; sps30-derived channel nulls=4436 close to sps30_status failed+unavailable+data_not_ready=4436), i.e. nulls are exactly the sensor-reported failure/unavailable rows, not silent data loss."
+  ]
+}
