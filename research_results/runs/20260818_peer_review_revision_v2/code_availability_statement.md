@@ -7,9 +7,9 @@ controlled with Git and hosted at:
 **Repository**: https://github.com/ivanborodii/air-index
 
 **Commit analysed in this revision's final, verified state**:
-`FINAL_COMMIT_SHA_PLACEHOLDER` (filled in at promotion time -- see
-`research_results/final/CURRENT_RUN.txt` and `run_manifest.json` in this run
-directory for the actual value; this placeholder must not be cited as-is).
+`0639233f4a44e9fe81dba9874661f71e4db81534` (all quality gates passed: 491
+tests, 0 failed; see `research_results/final/CURRENT_RUN.txt` and
+`run_manifest.json` in this run directory).
 
 **Relevant paths**:
 - `src/iaq_hfis/` -- production package (pipeline, fuzzy engine, membership

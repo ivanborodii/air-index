@@ -52,7 +52,7 @@ All four core fixes have new, passing unit tests (34 total) in
 - [x] Grid point count cross-checked against manifest claim (`verify_grid_point_count`, 1,030,301 == 101**3)
 - [x] Final test suite (after changes): 491 passed, 0 failed (43m26s) -- see `test_report_after.txt`
 - [x] Promotion: `research_results/final/CURRENT_RUN.txt` added, pointing to this run (production pipeline artifacts under `research_results/final/` unchanged -- see that file for why)
-- [ ] Commit and push: in progress
+- [x] Commit and push: committed as `0639233f4a44e9fe81dba9874661f71e4db81534` (bookkeeping SHA references in a small follow-up commit); push status recorded in the final Claude Code response
 
 ## Known scope limitations (see `limitations.md` for full detail)
 

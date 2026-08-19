@@ -11,6 +11,8 @@
   "git_commit_used_for_baseline_pipeline_run": "3916a5717a85e86903fc99183f0882ec913c4a36",
   "current_git_head_at_manifest_build_time": "a1232dafe14c15d7d62a25954f5589bf9406de13",
   "current_git_tree_dirty_at_manifest_build_time": true,
+  "final_verified_commit_sha": "0639233f4a44e9fe81dba9874661f71e4db81534",
+  "final_verified_commit_note": "This manifest was generated (hashing every artifact in this run directory) BEFORE the commit that included it, so current_git_head_at_manifest_build_time above correctly reflects the pre-commit HEAD, not the final one. final_verified_commit_sha is the actual commit under which this run directory (including this manifest file) was committed and all quality gates (491 tests, 0 failed) were satisfied -- this is the SHA to cite as the final, verified state.",
   "config_hash": "f878f1eed7d5342cff2ca15d2b266d67a4782e3c413eab7b218c437f2f11b086",
   "random_seeds_used": {
     "hampel_calibration_validation_split_seed": 20260815,
