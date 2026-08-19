@@ -1,0 +1,12 @@
+{
+  "iaq_hfis_version": "0.1.0",
+  "python_version": "3.13.5",
+  "duckdb_version": "1.5.2",
+  "platform": "Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41",
+  "processor": "aarch64",
+  "cpu_count": 4,
+  "git_commit": "a1232dafe14c15d7d62a25954f5589bf9406de13",
+  "git_tree_dirty": true,
+  "rule_generation_version": "worst-of-max-severity-v1",
+  "note": "Collected 2026-08-19 during the peer-review revision run 20260818_peer_review_revision_v2."
+}

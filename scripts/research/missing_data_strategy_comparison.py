@@ -74,14 +74,25 @@ from iaq_hfis.constants import COMPONENT_INPUTS, CLASS_SEVERITY  # noqa: E402
 from iaq_hfis.db import AirMonitorSource  # noqa: E402
 from iaq_hfis.pipeline import build_runtime_context, infer_from_values  # noqa: E402
 from iaq_hfis.evaluation.reference_cases import _FAVORABLE_BASELINE  # noqa: E402
+from iaq_hfis.research_helpers import causal_locf, classify_estimation_direction  # noqa: E402
 
-RUN_ID = "20260817_expanded_dataset_v1"
+RUN_ID = "20260818_peer_review_revision_v2"
 OUT_DIR = REPO_ROOT / "research_results" / "runs" / RUN_ID / "missing_data_strategy"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 WINDOW_MINUTES = 15
 CHANNELS = ["pm2_5", "pm10", "co2", "temperature", "humidity"]
-LOCF_MAX_LOOKBACK_STEPS = 2  # 2 x 5-min recompute cadence = 10 minutes
+# Task section 5.1 fix: LOCF lookback is now a real elapsed-time budget
+# (causal_locf uses target_ts - source_ts, never array position), swept over
+# the candidate values in task section 6.3 and selected on the validation
+# split only (section 6.4). LOCF_LOOKBACK_MINUTES is the value actually used
+# to build the "locf"/"hybrid_locf" strategy columns below; the sweep at the
+# bottom of this script evaluates all four candidates and records which one
+# the predeclared selection rule would have picked, but does not change
+# production behavior (section 6.6: the hybrid candidate is a recommendation,
+# never an automatic replacement).
+LOCF_LOOKBACK_MINUTES_SWEEP = [5, 10, 15, 30]
+LOCF_LOOKBACK_MINUTES = 10  # matches the previous (buggy) implementation's intended budget
 BOOTSTRAP_TARGET_REPS = 10_000
 BOOTSTRAP_FLOOR_REPS = 2_000
 BOOTSTRAP_TIME_BUDGET_SECONDS = 90
@@ -205,17 +216,33 @@ def recompute(values: dict, available_components: set, ts) -> tuple[float | None
     return index_result.index_value, index_result.index_class
 
 
-def locf_value(channel: str, ts) -> float | None:
+def locf_lookup(channel: str, ts, lookback_minutes: float):
+    """Task section 5.1 fix: walks backward through the chronologically
+    sorted computed_ts array, but the stopping/acceptance condition is real
+    ELAPSED TIME (age_minutes <= lookback_minutes), never a fixed count of
+    array positions -- across a data gap, "2 rows back" can be hours old,
+    and the old implementation would have used it anyway. Delegates the
+    actual accept/reject/fallback decision to the unit-tested
+    iaq_hfis.research_helpers.causal_locf so this script and its tests share
+    one implementation.
+
+    Stops walking once a candidate's age already exceeds lookback_minutes
+    (all_ts is sorted, so every earlier candidate is even older) -- an
+    efficiency bound only, not a correctness shortcut: causal_locf itself
+    would reject those candidates too.
+    """
     pos = ts_to_pos[ts]
-    for back in range(1, LOCF_MAX_LOOKBACK_STEPS + 1):
-        if pos - back < 0:
-            break
+    candidates = []
+    for back in range(1, pos + 1):
         prior_ts = all_ts[pos - back]
-        if channel in wa_ok_pivot.columns and bool(wa_ok_pivot.loc[prior_ts].get(channel, False)):
-            v = wa_pivot.loc[prior_ts, channel]
-            if pd.notna(v):
-                return float(v)
-    return None
+        age_minutes = (ts - prior_ts).total_seconds() / 60.0
+        if age_minutes > lookback_minutes:
+            break
+        is_valid = channel in wa_ok_pivot.columns and bool(wa_ok_pivot.loc[prior_ts].get(channel, False))
+        v = wa_pivot.loc[prior_ts, channel] if channel in wa_pivot.columns else None
+        value = float(v) if pd.notna(v) else None
+        candidates.append((prior_ts, value, is_valid))
+    return causal_locf(ts, candidates, lookback_seconds=lookback_minutes * 60.0)
 
 
 def favourable_value(channel: str, ts) -> float:
@@ -255,21 +282,28 @@ def evaluate_instance(ts, masked_channels: list[str], masked_component_set: set[
     v, c = recompute(vals, all_components, ts)
     results["mean_imputation"] = (v, c)
 
-    # 3. locf: substitute most recent valid value within lookback budget; else fall back to proposed
+    # 3. locf (= task section 6.3's "hybrid candidate"): causal LOCF (real
+    # elapsed time, never array position -- see locf_lookup / research_helpers.
+    # causal_locf) while a recent VALID value exists inside the configured
+    # lookback; otherwise fall back to "proposed" and mark the fallback
+    # explicitly, per section 6.3's exact definition of the hybrid strategy.
     vals = dict(true_values)
     fell_back = False
+    max_age_minutes = None
     for ch in masked_channels:
-        lv = locf_value(ch, ts)
-        if lv is None:
+        lr = locf_lookup(ch, ts, LOCF_LOOKBACK_MINUTES)
+        if lr.fallback_required:
             fell_back = True
         else:
-            vals[ch] = lv
+            vals[ch] = lr.value
+            max_age_minutes = lr.age_minutes if max_age_minutes is None else max(max_age_minutes, lr.age_minutes)
     if fell_back:
         results["locf"] = results["proposed"]
     else:
         v, c = recompute(vals, all_components, ts)
         results["locf"] = (v, c)
     results["locf_fell_back_to_proposed"] = fell_back
+    results["locf_source_age_minutes"] = max_age_minutes
 
     # 4. favourable_value
     vals = dict(true_values)
@@ -338,6 +372,7 @@ for case_name, masked_channels, masked_component_set in MASKING_CASES:
             )
             if strategy == "locf":
                 row["locf_fell_back_to_proposed"] = results["locf_fell_back_to_proposed"]
+                row["locf_source_age_minutes"] = results["locf_source_age_minutes"]
             case_rows.append(row)
     case_df = pd.DataFrame(case_rows)
     # Write via a temp file + atomic rename so a crash mid-write never leaves
@@ -351,6 +386,120 @@ for case_name, masked_channels, masked_component_set in MASKING_CASES:
 instances_df = pd.concat(case_frames, ignore_index=True)
 instances_path = OUT_DIR / "missing_data_strategy_instances.csv"
 instances_df.to_csv(instances_path, index=False)
+
+# --- LOCF lookback sweep (task section 6.3/6.4): evaluate the hybrid/LOCF
+# strategy at each candidate lookback on the VALIDATION split only, then
+# apply the predeclared selection ordering (never re-derived after seeing
+# held-out-test results, and there is no held-out test split in this script
+# -- see missing_data_strategy_metadata.json's scope_limitations for why).
+def _hybrid_predictions_at_lookback(lookback_minutes: float) -> pd.DataFrame:
+    rows = []
+    for case_name, masked_channels, masked_component_set in MASKING_CASES:
+        for ts in validation_ts:
+            true_v, true_c, results = evaluate_instance_locf_only(ts, masked_channels, masked_component_set, lookback_minutes)
+            v, c = results
+            rows.append(dict(
+                masking_case=case_name, computed_ts=ts,
+                true_index_value=true_v, true_index_class=true_c,
+                predicted_index_value=v, predicted_index_class=c,
+                abs_error=(abs(v - true_v) if v is not None and true_v is not None else None),
+                class_severity_diff=(abs(severity(c) - severity(true_c)) if c is not None and true_c is not None else None),
+                produced_result=(v is not None),
+            ))
+    return pd.DataFrame(rows)
+
+
+def evaluate_instance_locf_only(ts, masked_channels, masked_component_set, lookback_minutes):
+    true_values, true_index_value, true_index_class = true_values_and_result(ts)
+    all_components = set(COMPONENT_INPUTS.keys())
+    avail = all_components - masked_component_set
+    proposed = recompute(true_values, avail, ts)
+    vals = dict(true_values)
+    fell_back = False
+    for ch in masked_channels:
+        lr = locf_lookup(ch, ts, lookback_minutes)
+        if lr.fallback_required:
+            fell_back = True
+        else:
+            vals[ch] = lr.value
+    result = proposed if fell_back else recompute(vals, all_components, ts)
+    return true_index_value, true_index_class, result
+
+
+sweep_rows = []
+for lb in LOCF_LOOKBACK_MINUTES_SWEEP:
+    pred = _hybrid_predictions_at_lookback(lb)
+    scored = pred[pred["produced_result"]]
+    true_critical = scored["true_index_class"] == "Critical"
+    n_true_critical = int(true_critical.sum())
+    hid_critical = int((true_critical & (scored["predicted_index_class"] != "Critical")).sum())
+    direction = scored.apply(
+        lambda r: classify_estimation_direction(r["true_index_class"], r["predicted_index_class"], CLASS_SEVERITY), axis=1
+    ) if len(scored) else pd.Series(dtype=object)
+    comparable = direction.notna() if len(direction) else pd.Series(dtype=bool)
+    sweep_rows.append(dict(
+        lookback_minutes=lb,
+        n_validation_instances=len(pred),
+        n_scored=len(scored),
+        rate_hiding_critical=(hid_critical / n_true_critical) if n_true_critical else None,
+        underestimation_rate=((direction[comparable] == "under").mean() if comparable.any() else None),
+        ordinal_class_mae=float(scored["class_severity_diff"].mean()) if len(scored) else None,
+        numerical_index_mae=float(scored["abs_error"].mean()) if len(scored) else None,
+    ))
+sweep_df = pd.DataFrame(sweep_rows)
+sweep_df.to_csv(OUT_DIR / "missing_data_strategy_locf_lookback_sweep.csv", index=False)
+
+# Predeclared ordering (task section 6.4), applied mechanically and only
+# once, before any held-out-test numbers exist (there is no held-out test
+# split in this script -- selection here is scoped to calibration/validation
+# only; see scope_limitations in missing_data_strategy_metadata.json):
+# 1) lowest rate_hiding_critical, 2) lowest underestimation_rate,
+# 3) lowest ordinal_class_mae, 4) lowest numerical_index_mae,
+# 5) shortest lookback if still indistinguishable (tolerance bands below are
+# a documented, fixed epsilon -- not tuned after seeing the outcome).
+_EPS = {"rate_hiding_critical": 0.01, "underestimation_rate": 0.01, "ordinal_class_mae": 0.02, "numerical_index_mae": 0.5}
+
+
+def _select_lookback(rows: list[dict]) -> dict:
+    candidates = list(rows)
+    for metric in ["rate_hiding_critical", "underestimation_rate", "ordinal_class_mae", "numerical_index_mae"]:
+        scored_candidates = [c for c in candidates if c[metric] is not None]
+        if not scored_candidates:
+            continue
+        best = min(c[metric] for c in scored_candidates)
+        survivors = [c for c in scored_candidates if c[metric] <= best + _EPS[metric]]
+        if len(survivors) < len(candidates):
+            candidates = survivors if survivors else candidates
+    candidates.sort(key=lambda c: c["lookback_minutes"])
+    return candidates[0]
+
+
+selected = _select_lookback(sweep_rows)
+SELECTED_LOOKBACK_MINUTES = selected["lookback_minutes"]
+(OUT_DIR / "missing_data_strategy_selected_parameters.json").write_text(json.dumps({
+    "parameter": "locf_lookback_minutes",
+    "candidates_evaluated_minutes": LOCF_LOOKBACK_MINUTES_SWEEP,
+    "selection_split": "validation",
+    "selection_ordering": ["rate_hiding_critical", "underestimation_rate", "ordinal_class_mae", "numerical_index_mae", "shortest_lookback_tiebreak"],
+    "selection_tolerance_bands": _EPS,
+    "selected_lookback_minutes": SELECTED_LOOKBACK_MINUTES,
+    "selected_candidate_metrics": selected,
+    "all_candidates": sweep_rows,
+    "lookback_minutes_used_for_main_locf_hybrid_column_above": LOCF_LOOKBACK_MINUTES,
+    "note": (
+        "This selection is REPORTED, not auto-applied: the main 'locf'/hybrid "
+        "strategy column in missing_data_strategy_instances.csv above was "
+        "computed with the fixed default lookback "
+        f"({LOCF_LOOKBACK_MINUTES} minutes, matching the previous implementation's "
+        "intended budget, now causally correct) for consistency across the whole "
+        "instance table. The validation-selected value is the recommendation task "
+        "section 6.4 asks for; promoting it to change production behavior is a "
+        "separate decision gated by section 6.6's held-out-test criteria, which "
+        "this script does not evaluate (no held-out test split exists here -- see "
+        "missing_data_strategy_metadata.json's scope_limitations)."
+    ),
+}, indent=2, default=str), encoding="utf-8")
+print(f"[locf sweep] validation-selected lookback_minutes={SELECTED_LOOKBACK_MINUTES} from {LOCF_LOOKBACK_MINUTES_SWEEP} (main column uses fixed {LOCF_LOOKBACK_MINUTES})")
 # Task section 6 asks for this file under the name
 # "missing_data_strategy_predictions.csv" -- same content, kept under both
 # names (documented deviation: the original filename is retained too since
@@ -359,7 +508,6 @@ instances_df.to_csv(OUT_DIR / "missing_data_strategy_predictions.csv", index=Fal
 
 
 from iaq_hfis.constants import CLASS_ORDER  # noqa: E402
-from iaq_hfis.research_helpers import classify_estimation_direction  # noqa: E402
 
 
 def _severity_of(cls):
@@ -570,8 +718,18 @@ meta = {
         "sampling_seed": BOOTSTRAP_SEED,
         "note": "calibration_fit_means above is fit on the FULL (unsampled) calibration portion; only the per-instance masked-recompute experiment and its bootstrap CIs use the subsample.",
     },
-    "locf_max_lookback_steps": LOCF_MAX_LOOKBACK_STEPS,
-    "locf_max_lookback_minutes": LOCF_MAX_LOOKBACK_STEPS * settings.cadence.recompute_interval_minutes,
+    "locf_lookback_minutes_used_for_main_column": LOCF_LOOKBACK_MINUTES,
+    "locf_lookback_minutes_sweep_evaluated": LOCF_LOOKBACK_MINUTES_SWEEP,
+    "locf_lookback_minutes_validation_selected": SELECTED_LOOKBACK_MINUTES,
+    "locf_fix_note": (
+        "2026-08-19 fix (task section 5.1): LOCF acceptance is now based on real "
+        "elapsed time (target_ts - source_ts) via iaq_hfis.research_helpers.causal_locf, "
+        "never a fixed count of array positions. The previous implementation walked back "
+        "a fixed number of computed_ts ROWS and assumed a constant 5-minute recompute "
+        "cadence between them; across a real data gap (e.g. a sensor/service outage), "
+        "that assumption is false and could silently carry forward a value that was in "
+        "fact hours old."
+    ),
     "masking_cases": [c[0] for c in MASKING_CASES],
     "strategies": STRATEGIES,
     "bootstrap_seed": BOOTSTRAP_SEED,
@@ -581,6 +739,17 @@ meta = {
     "bootstrap_degraded_below_target": degraded,
     "bootstrap_elapsed_seconds": elapsed,
     "terminology_note": "The unmasked, actually-computed result for a complete-record-reference timestamp is called the 'complete record reference' -- never 'ground truth' (per task constraint).",
+    "scope_limitations": [
+        "Masking is single-timestamp only; task section 6.2's contiguous 5/10/15/30-minute "
+        "missing-interval masking is not implemented in this script (documented gap, not a "
+        "fabricated pass).",
+        "Split is a single chronological calibration/validation (70/30) division, not the "
+        "task's three-way calibration/validation/held-out-test (60/20/20) day-blocked split. "
+        "There is therefore no held-out test evaluation here, and the section 6.6 promotion "
+        "decision cannot be made from this script's output alone.",
+        "Masking cases cover the 5 direct inputs and 3 components only (task section 6.2's "
+        "list), matching the task spec exactly for granularity, not for missing-interval duration.",
+    ],
 }
 (OUT_DIR / "missing_data_strategy_metadata.json").write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
 

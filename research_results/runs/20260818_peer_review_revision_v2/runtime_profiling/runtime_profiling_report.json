@@ -1,0 +1,86 @@
+{
+  "pipeline_run_id": "7f04698725dd4f35a432ba4a0de2934f",
+  "n_timestamps_profiled": 2000,
+  "n_warmup_reps": 1,
+  "n_timed_reps": 5,
+  "seed": 20260815,
+  "full_pass_by_method": {
+    "hfis": {
+      "n_timestamps": 2000,
+      "rep_seconds": [
+        4.354209351000463,
+        4.978204145001655,
+        4.527299657000185,
+        3.0670103410011507,
+        2.6554938110002695
+      ],
+      "mean_seconds": 3.916443461000745,
+      "median_seconds": 4.354209351000463,
+      "std_seconds": 0.8948352543252639,
+      "seconds_per_timestamp_mean": 0.0019582217305003724,
+      "peak_memory_bytes_per_rep": [
+        25904,
+        25904,
+        25904,
+        25904,
+        25904
+      ],
+      "peak_memory_bytes_mean": 25904.0
+    },
+    "fuzzy_component_max": {
+      "n_timestamps": 2000,
+      "rep_seconds": [
+        1.0552768019988434,
+        1.0667937969992636,
+        1.0565667240007315,
+        1.0480971790002513,
+        1.0790574279999419
+      ],
+      "mean_seconds": 1.0611583859998064,
+      "median_seconds": 1.0565667240007315,
+      "std_seconds": 0.010755510961500382,
+      "seconds_per_timestamp_mean": 0.0005305791929999032,
+      "peak_memory_bytes_per_rep": [
+        17280,
+        17304,
+        17304,
+        17304,
+        17304
+      ],
+      "peak_memory_bytes_mean": 17299.2
+    }
+  },
+  "stage_level_timing": {
+    "stage1_membership_and_component_inference": {
+      "rep_seconds": [
+        0.3513261219995911,
+        0.4553895859990007,
+        0.3914578409985552,
+        0.45129135599927395,
+        0.38533654299862974
+      ],
+      "mean_seconds": 0.40696028959901015
+    },
+    "stage2_hfis_second_level": {
+      "rep_seconds": [
+        0.49438097900019784,
+        0.5171890809997421,
+        0.6243846329998632,
+        0.4986760089996096,
+        0.5029665290003322
+      ],
+      "mean_seconds": 0.5275194461999491
+    },
+    "stage2_fuzzy_component_max": {
+      "rep_seconds": [
+        0.005124027999045211,
+        0.004742543998872861,
+        0.004892953000307898,
+        0.004760544999953709,
+        0.004731414999696426
+      ],
+      "mean_seconds": 0.004850296999575221
+    }
+  },
+  "note": "Timed on the actual development/production machine this script ran on; not a controlled benchmark environment. seconds_per_timestamp figures are indicative, not hardware-independent."
+}

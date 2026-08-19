@@ -1,0 +1,16 @@
+{
+  "pipeline_run_id": "7f04698725dd4f35a432ba4a0de2934f",
+  "evaluation_run_id": "74deb744a581423b99e4cb7e68be33ce",
+  "window_minutes": 15,
+  "max_gap_minutes": 10.0,
+  "methods": [
+    "CRISP_CLASS_MAX",
+    "FUZZY_COMPONENT_MAX",
+    "PROPOSED_HFIS",
+    "WEIGHTED_MEAN"
+  ],
+  "primary_method": "PROPOSED_HFIS",
+  "bootstrap_seed": 20260815,
+  "bootstrap_reps": 10000,
+  "fix_note": "2026-08-19 (task section 5.4): replaces the arbitrary-perturbation-trial-order 'flapping rate' previously computed in boundary_stability_paired_analysis.py (stability_class_flapping_by_point.csv) with the REAL chronological computed_ts series for all four methods. Two updates are only 'consecutive' when their real elapsed time gap is <= max_gap_minutes; a gap-spanning pair is recorded (for transparency) but excluded from every transition/reversal/dwell-time count, so a multi-hour pipeline outage is never silently treated as continuous coverage."
+}

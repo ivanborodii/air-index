@@ -23,7 +23,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from iaq_hfis.config import load_settings  # noqa: E402
 from iaq_hfis.reproducibility import collect_environment_metadata, get_git_commit, get_git_tree_dirty  # noqa: E402
 
-RUN_ID = "20260817_expanded_dataset_v1"
+RUN_ID = "20260818_peer_review_revision_v2"
 BASELINE_PIPELINE_RUN_ID = "7f04698725dd4f35a432ba4a0de2934f"
 OUT_DIR = REPO_ROOT / "research_results" / "runs" / RUN_ID / "baseline"
 SNAPSHOT_VERIFICATION_PATH = REPO_ROOT / "research_results" / "runs" / RUN_ID / "snapshot" / "data_interval_verification.json"
@@ -131,12 +131,22 @@ manifest = {
         "python scripts/research/data_snapshot_and_interval_verification.py"
     ),
     "note_on_rerun_policy": (
-        "This manifest documents the ALREADY-COMPLETED baseline run "
-        f"({BASELINE_PIPELINE_RUN_ID}) recorded in pipeline_runs; per task "
-        "section 4 instruction, the baseline computation itself is not "
-        "rerun here since its git_commit_used_for_this_pipeline_run matches "
-        "current_git_head_commit (no code changed since it ran) and its "
-        "row/timestamp counts match the frozen section-3 snapshot exactly."
+        "This manifest documents the ALREADY-COMPLETED baseline pipeline run "
+        f"({BASELINE_PIPELINE_RUN_ID}) recorded in pipeline_runs; the baseline "
+        "computation itself (iaq_hfis run: validation, aggregation, 2-level "
+        "Mamdani inference, completeness classification) is NOT rerun for this "
+        "revision. This is valid because the 2026-08-19 peer-review revision "
+        "changed only research/evaluation scripts (scripts/research/*.py) and "
+        "added new pure helper functions (src/iaq_hfis/research_helpers.py) -- "
+        "it did not touch iaq_hfis.pipeline, iaq_hfis.fuzzy_engine, "
+        "iaq_hfis.membership, iaq_hfis.rules, or iaq_hfis.quality, i.e. nothing "
+        "that affects the persisted index_value/index_class/component_scores/ "
+        "completeness_status this baseline run already computed. Its "
+        "row/timestamp counts match the frozen section-3 snapshot exactly "
+        "(same interval, same source data). baseline_run_matches_current_git_head "
+        "above reflects the actual commit comparison honestly -- it is expected "
+        "to read False once this revision's own commit lands, since the repo's "
+        "HEAD has moved even though the pipeline-relevant code has not."
     ),
 }
 

@@ -1,0 +1,73 @@
+{
+  "parameter": "locf_lookback_minutes",
+  "candidates_evaluated_minutes": [
+    5,
+    10,
+    15,
+    30
+  ],
+  "selection_split": "validation",
+  "selection_ordering": [
+    "rate_hiding_critical",
+    "underestimation_rate",
+    "ordinal_class_mae",
+    "numerical_index_mae",
+    "shortest_lookback_tiebreak"
+  ],
+  "selection_tolerance_bands": {
+    "rate_hiding_critical": 0.01,
+    "underestimation_rate": 0.01,
+    "ordinal_class_mae": 0.02,
+    "numerical_index_mae": 0.5
+  },
+  "selected_lookback_minutes": 5,
+  "selected_candidate_metrics": {
+    "lookback_minutes": 5,
+    "n_validation_instances": 2880,
+    "n_scored": 2880,
+    "rate_hiding_critical": 0.007954545454545454,
+    "underestimation_rate": 0.006944444444444444,
+    "ordinal_class_mae": 0.016666666666666666,
+    "numerical_index_mae": 0.3826089282879929
+  },
+  "all_candidates": [
+    {
+      "lookback_minutes": 5,
+      "n_validation_instances": 2880,
+      "n_scored": 2880,
+      "rate_hiding_critical": 0.007954545454545454,
+      "underestimation_rate": 0.006944444444444444,
+      "ordinal_class_mae": 0.016666666666666666,
+      "numerical_index_mae": 0.3826089282879929
+    },
+    {
+      "lookback_minutes": 10,
+      "n_validation_instances": 2880,
+      "n_scored": 2880,
+      "rate_hiding_critical": 0.004545454545454545,
+      "underestimation_rate": 0.004861111111111111,
+      "ordinal_class_mae": 0.011111111111111112,
+      "numerical_index_mae": 0.24365078286747482
+    },
+    {
+      "lookback_minutes": 15,
+      "n_validation_instances": 2880,
+      "n_scored": 2880,
+      "rate_hiding_critical": 0.003409090909090909,
+      "underestimation_rate": 0.004166666666666667,
+      "ordinal_class_mae": 0.009722222222222222,
+      "numerical_index_mae": 0.2088914331271573
+    },
+    {
+      "lookback_minutes": 30,
+      "n_validation_instances": 2880,
+      "n_scored": 2880,
+      "rate_hiding_critical": 0.0011363636363636363,
+      "underestimation_rate": 0.002777777777777778,
+      "ordinal_class_mae": 0.00625,
+      "numerical_index_mae": 0.11679006551228
+    }
+  ],
+  "lookback_minutes_used_for_main_locf_hybrid_column_above": 10,
+  "note": "This selection is REPORTED, not auto-applied: the main 'locf'/hybrid strategy column in missing_data_strategy_instances.csv above was computed with the fixed default lookback (10 minutes, matching the previous implementation's intended budget, now causally correct) for consistency across the whole instance table. The validation-selected value is the recommendation task section 6.4 asks for; promoting it to change production behavior is a separate decision gated by section 6.6's held-out-test criteria, which this script does not evaluate (no held-out test split exists here -- see missing_data_strategy_metadata.json's scope_limitations)."
+}

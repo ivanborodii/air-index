@@ -1,0 +1,8 @@
+{
+  "empirical_min_index_value_over_full_101_cubed_grid": 12.444029850746269,
+  "empirical_max_index_value_over_full_101_cubed_grid": 87.55597014925372,
+  "n_grid_points": 1030301,
+  "zero_attained": false,
+  "hundred_attained": false,
+  "note": "Centroid defuzzification over a bounded, non-degenerate output membership partition with shoulder classes at both ends generally cannot reach the extreme universe bounds 0/100 exactly, since even the most extreme input still distributes some membership mass short of the outer edge before defuzzification integrates it -- the empirical min/max above (from an exhaustive 101^3 grid, not a sample) is the actual attainable range under this rule base and membership configuration. Class boundaries (25, 50, 75) are attainable as OUTPUT values (a component's own crisp_score reaching a midpoint or boundary is fed straight through many rules) but the exact centroid of the DEFUZZIFIED index only coincides with a class boundary value for specific input configurations, not universally -- see second_level_boundary_summary.csv for the empirical near-boundary behavior."
+}

@@ -1,0 +1,4 @@
+| Method | Mean seconds per timestamp |
+|---|---|
+| PROPOSED_HFIS | 1.958 ms |
+| FUZZY_COMPONENT_MAX | 0.531 ms |

@@ -1,0 +1,5 @@
+| Method A | Method B | Paired trials | Method A class changes | Method B class changes | McNemar p-value |
+|---|---|---|---|---|---|
+| PROPOSED_HFIS | CRISP_CLASS_MAX | 900 | 237 | 242 | 0.7663200944429479 |
+| PROPOSED_HFIS | FUZZY_COMPONENT_MAX | 900 | 237 | 237 | 1.0 |
+| PROPOSED_HFIS | WEIGHTED_MEAN | 900 | 237 | 47 | 3.440016276319106e-40 |

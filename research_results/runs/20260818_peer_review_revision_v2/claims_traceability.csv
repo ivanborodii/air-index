@@ -1,0 +1,33 @@
+claim_id,claim_text,source_artifact,source_field_or_row,value
+1,Total raw rows in the requested interval,snapshot/data_interval_verification.json,selected_row_count,169331
+2,Unique timestamps in the requested interval,snapshot/data_interval_verification.json,selected_unique_ts_count,169331
+3,Duplicate timestamps,snapshot/data_interval_verification.json,duplicate_ts_count,0
+4,Timestamp ordering violations,snapshot/data_interval_verification.json,timestamp_ordering_violations,0
+5,Rows outside requested interval,snapshot/data_interval_verification.json,rows_outside_requested_interval_found_in_selection,0
+6,Gaps longer than 5 minutes,snapshot/data_interval_verification.json,gaps_over_5min_count,6
+7,Computed index timestamps (total),pollution_microclimate/pollution_microclimate_summary.json + data_quality_reasons/data_quality_reason_summary.csv,n_total (evaluate run log),16992
+8,Completeness OK count,data_quality_reasons/data_quality_reason_summary.csv,completeness_status_count__OK,15242
+9,Completeness PARTIAL count,data_quality_reasons/data_quality_reason_summary.csv,completeness_status_count__PARTIAL,1004
+10,Completeness FAILED count,data_quality_reasons/data_quality_reason_summary.csv,completeness_status_count__FAILED,746
+11,Second-level rule audit: rules matching worst-of property,second_level_equivalence/second_level_equivalence_summary.json,rule_level_audit.n_rules_matching_worst_of_property / n_index_rules,64/64
+12,Full grid points evaluated (fixing the 41-vs-101 defect),second_level_equivalence/second_level_equivalence_summary.json,synthetic_grid.n,1030301
+13,Grid class agreement rate (full 101^3 grid),second_level_equivalence/second_level_equivalence_summary.json,synthetic_grid.class_agreement_rate,0.9834019378802894
+14,Real-timestamp HFIS vs FUZZY_COMPONENT_MAX class agreement,second_level_equivalence/second_level_equivalence_summary.json,real_timestamps.class_agreement_rate,1.0
+15,Grid disagreements occurring exactly at max-component==75,second_level_equivalence/second_level_boundary_and_random_metadata.json,reviewer_claim_check.claim_supported,true (17101/17101)
+16,Random continuous (250000 pts) class agreement excluding exact boundaries,second_level_equivalence/second_level_random_continuous_summary.csv,class_agreement_rate,0.999764
+17,Attainable index range on full grid,second_level_equivalence/attainable_index_range.json,empirical_min/empirical_max,12.44 / 87.56
+18,PM10 Degraded shape type (production effective width),membership_audit/membership_function_audit.md,PM10 Degraded shape_type,triangular
+19,PM10 class distribution sensitivity across widths 10/15/20/25,membership_audit/pm10_width_sensitivity.csv,class_share_* columns,identical across all tested widths (null finding)
+20,Current integrated index Critical share (OK-completeness),pollution_microclimate/pollution_microclimate_summary.json,current_integrated_index_critical_share,0.44882561343655686
+21,Pollution-oriented (A/V only) index Critical share,pollution_microclimate/pollution_microclimate_summary.json,pollution_oriented_index_critical_share,0.03418186589686393
+22,Share of current-Critical timestamps remaining Critical under pollution-oriented index,pollution_microclimate/pollution_microclimate_summary.json,share_current_critical_remaining_critical_under_pollution_oriented,0.07615845636602836
+23,Corrected dominance tie rate (fix for task 5.2),pollution_microclimate/pollution_microclimate_summary.json,tie_rate,0.17996325941477495
+24,Corrected direct-input attribution: temperature share of Critical drivers (fix for task 5.3),pollution_microclimate/critical_driver_summary.csv,dominant_component=M/associated_direct_input=temperature share_of_critical,0.7263557959362666
+25,Missing-data strategy (temperature masked) rate of hiding Critical -- production 'proposed',missing_data_strategy/missing_data_strategy_summary.csv,"masking_case=direct_input:temperature, split=validation, strategy=proposed, rate_hiding_critical_complete_record_reference",0.890909
+26,Missing-data strategy (temperature masked) rate of hiding Critical -- causal-LOCF-fixed hybrid,missing_data_strategy/missing_data_strategy_summary.csv,"masking_case=direct_input:temperature, split=validation, strategy=locf, rate_hiding_critical_complete_record_reference",0.018182
+27,Validation-selected LOCF lookback (predeclared ordering; not auto-promoted),missing_data_strategy/missing_data_strategy_selected_parameters.json,selected_lookback_minutes,5
+28,Real chronological transitions/day -- PROPOSED_HFIS vs WEIGHTED_MEAN (fix for task 5.4),real_time_class_flapping/real_time_class_flapping_bootstrap_ci.csv,"method_a=PROPOSED_HFIS, method_b=WEIGHTED_MEAN, point_diff_transitions_per_day",2.2 (CI 0.72 to 3.72; significant)
+29,WEIGHTED_MEAN masking rate at Critical severity (full evaluation),evaluate run log (masking section),"masking (WEIGHTED_MEAN, >= Critical)",0.976303317535545 (6798/6963)
+30,900-trial paired stability: PROPOSED_HFIS vs WEIGHTED_MEAN McNemar p-value,boundary_stability_paired/stability_paired_sign_test.csv,"method_a=PROPOSED_HFIS, method_b=WEIGHTED_MEAN, mcnemar_p_value",3.440016e-40
+31,Hampel production multiplier retained (no promotion),hampel_sweep/hampel_selected_parameter.json,production_config_mad_multiplier,3.0 (unchanged; selection sweep picked 5.0 but was not promoted per section 10.4 policy)
+32,Baseline test suite (before this revision's changes),test_report_before.txt,pytest summary line,457 passed

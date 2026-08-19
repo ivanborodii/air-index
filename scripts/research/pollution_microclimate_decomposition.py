@@ -31,13 +31,15 @@ import pandas as pd
 REPO_ROOT = Path("/home/ivan/python_scripts/air_ml")
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from iaq_hfis import membership  # noqa: E402
 from iaq_hfis.config import load_settings, load_sensor_specs, load_room_profiles  # noqa: E402
 from iaq_hfis.constants import CLASS_SEVERITY, CLASS_ORDER  # noqa: E402
 from iaq_hfis.db import AirMonitorSource  # noqa: E402
 from iaq_hfis.pipeline import build_runtime_context, infer_from_values  # noqa: E402
 from iaq_hfis.fuzzy_engine import classify_output  # noqa: E402
+from iaq_hfis.research_helpers import has_dominance_tie, most_adverse_direct_input as _rank_by_membership  # noqa: E402
 
-RUN_ID = "20260817_expanded_dataset_v1"
+RUN_ID = "20260818_peer_review_revision_v2"
 OUT_DIR = REPO_ROOT / "research_results" / "runs" / RUN_ID / "pollution_microclimate"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 WINDOW_MINUTES = 15
@@ -76,6 +78,7 @@ m_profile = cs[cs["component"] == "M"].set_index("computed_ts")[["room", "season
 
 df = idx.set_index("computed_ts").join(cs_pivot, how="inner")
 df = df.join(wa_pivot, how="left")
+df = df.join(m_profile, how="left")
 df["hour_of_day"] = pd.to_datetime(df.index).hour
 df["day"] = pd.to_datetime(df.index).date
 
@@ -116,31 +119,58 @@ def categorize(row):
 
 
 df["dominance_category"] = df.apply(categorize, axis=1)
-df["has_tie"] = df["co_dominant_components"].apply(lambda c: len(c) > 0 if isinstance(c, (list, np.ndarray)) else False)
+# Fix for task section 5.2: a tie exists only when MORE THAN ONE DISTINCT
+# component remains co-dominant. co_dominant_components always contains at
+# least the dominant component itself (fuzzy_engine.determine_dominance sets
+# dominant = co_dominant[0]), so the old `len(c) > 0` check flagged a tie on
+# essentially every row. len(set(...)) > 1 is the correct condition.
+df["has_tie"] = df["co_dominant_components"].apply(
+    lambda c: has_dominance_tie(list(c)) if isinstance(c, (list, np.ndarray)) else False
+)
 
 DIRECT_INPUTS = {"A": ["pm2_5", "pm10"], "V": ["co2"], "M": ["temperature", "humidity"]}
 
 
+def _shapes_for_channel(channel: str, row) -> dict | None:
+    if channel == "temperature":
+        room, season = row.get("room"), row.get("season")
+        if pd.isna(room) or pd.isna(season):
+            return None
+        key = (room, season)
+        return ctx.temperature_shapes_by_profile.get(key)
+    return ctx.static_shapes["relative_humidity" if channel == "humidity" else channel]
+
+
 def most_adverse_direct_input(row):
     """Among the direct inputs of the dominant component, report which one
-    has the more adverse (further-from-favourable) reading -- an associated
-    input, not a claimed cause. Ties reported explicitly."""
+    is most adverse -- an associated input, not a claimed cause. Ties
+    reported explicitly.
+
+    Fix for task section 5.3: the previous implementation ranked channels by
+    percentile rank within the dataset, which silently fails for two-sided
+    channels (temperature, humidity) since both a very low and a very high
+    value can be adverse but only one direction can hold the top percentile
+    rank. This now uses the real fuzzy membership definitions (the same
+    shapes the production pipeline evaluates) and class severity: rank by
+    each channel's most adverse ACTIVE class first, then by membership
+    degree in that class if severities tie.
+    """
     dom = row["dominant_component"]
     inputs = DIRECT_INPUTS.get(dom, [])
     if len(inputs) < 2:
         return inputs[0] if inputs else None, False
-    # Rank by z-like distance using the channel's own control-region
-    # transition width isn't available per-row cheaply here; use each
-    # channel's percentile rank within this dataset as an associated-input
-    # proxy (documented, not a membership-degree claim).
-    vals = {ch: row.get(ch) for ch in inputs}
-    if any(pd.isna(v) for v in vals.values()):
+    channel_degrees = {}
+    for ch in inputs:
+        v = row.get(ch)
+        if pd.isna(v):
+            continue
+        shapes = _shapes_for_channel(ch, row)
+        if shapes is None:
+            continue
+        channel_degrees[ch] = membership.evaluate_memberships(float(v), shapes)
+    if len(channel_degrees) < len(inputs):
         return None, False
-    ranks = {ch: df[ch].rank(pct=True).loc[row.name] for ch in inputs}
-    max_rank = max(ranks.values())
-    tied = sum(1 for r in ranks.values() if abs(r - max_rank) < 1e-9) > 1
-    top = max(ranks, key=ranks.get)
-    return top, tied
+    return _rank_by_membership(channel_degrees, CLASS_SEVERITY)
 
 
 assoc = df.apply(most_adverse_direct_input, axis=1, result_type="expand")

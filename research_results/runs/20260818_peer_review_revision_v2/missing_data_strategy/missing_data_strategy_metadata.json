@@ -1,0 +1,81 @@
+{
+  "pipeline_run_id": "7f04698725dd4f35a432ba4a0de2934f",
+  "window_minutes": 15,
+  "class_order_low_to_high_severity": [
+    "Favourable",
+    "Acceptable",
+    "Degraded",
+    "Critical"
+  ],
+  "class_order_source": "iaq_hfis.constants.CLASS_ORDER",
+  "plot_written": true,
+  "plot_error": null,
+  "n_total_computed_ts": 16454,
+  "n_complete_record_reference_full": 15242,
+  "n_calibration": 840,
+  "n_validation": 360,
+  "calibration_range": [
+    "2026-06-19 01:40:00+03:00",
+    "2026-07-29 23:25:00+03:00"
+  ],
+  "validation_range": [
+    "2026-07-29 23:55:00+03:00",
+    "2026-08-15 20:05:00+03:00"
+  ],
+  "calibration_fit_means": {
+    "pm2_5": 10.328490002888673,
+    "pm10": 10.365708609596727,
+    "co2": 674.2920564251569,
+    "temperature": 26.3597474614928,
+    "humidity": 44.1498572749711
+  },
+  "test_instance_tractability_subsample": {
+    "applied": true,
+    "reason": "An unsampled attempt (all n_complete_record_reference_full instances) exceeded a 10-minute wall-clock limit without finishing on this Raspberry Pi -- documented, not silent.",
+    "max_test_instances": 1200,
+    "n_calibration_full": 10669,
+    "n_validation_full": 4573,
+    "n_calibration_sampled": 840,
+    "n_validation_sampled": 360,
+    "sampling_seed": 20260815,
+    "note": "calibration_fit_means above is fit on the FULL (unsampled) calibration portion; only the per-instance masked-recompute experiment and its bootstrap CIs use the subsample."
+  },
+  "locf_lookback_minutes_used_for_main_column": 10,
+  "locf_lookback_minutes_sweep_evaluated": [
+    5,
+    10,
+    15,
+    30
+  ],
+  "locf_lookback_minutes_validation_selected": 5,
+  "locf_fix_note": "2026-08-19 fix (task section 5.1): LOCF acceptance is now based on real elapsed time (target_ts - source_ts) via iaq_hfis.research_helpers.causal_locf, never a fixed count of array positions. The previous implementation walked back a fixed number of computed_ts ROWS and assumed a constant 5-minute recompute cadence between them; across a real data gap (e.g. a sensor/service outage), that assumption is false and could silently carry forward a value that was in fact hours old.",
+  "masking_cases": [
+    "direct_input:pm2_5",
+    "direct_input:pm10",
+    "direct_input:co2",
+    "direct_input:temperature",
+    "direct_input:humidity",
+    "component:A",
+    "component:V",
+    "component:M"
+  ],
+  "strategies": [
+    "proposed",
+    "mean_imputation",
+    "locf",
+    "favourable_value",
+    "drop"
+  ],
+  "bootstrap_seed": 20260815,
+  "bootstrap_target_reps": 10000,
+  "bootstrap_floor_reps": 2000,
+  "bootstrap_reps_actually_run_max": 10000,
+  "bootstrap_degraded_below_target": false,
+  "bootstrap_elapsed_seconds": 0.3722096310011693,
+  "terminology_note": "The unmasked, actually-computed result for a complete-record-reference timestamp is called the 'complete record reference' -- never 'ground truth' (per task constraint).",
+  "scope_limitations": [
+    "Masking is single-timestamp only; task section 6.2's contiguous 5/10/15/30-minute missing-interval masking is not implemented in this script (documented gap, not a fabricated pass).",
+    "Split is a single chronological calibration/validation (70/30) division, not the task's three-way calibration/validation/held-out-test (60/20/20) day-blocked split. There is therefore no held-out test evaluation here, and the section 6.6 promotion decision cannot be made from this script's output alone.",
+    "Masking cases cover the 5 direct inputs and 3 components only (task section 6.2's list), matching the task spec exactly for granularity, not for missing-interval duration."
+  ]
+}

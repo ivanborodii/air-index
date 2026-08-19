@@ -1,0 +1,6 @@
+width_ug_m3,label,is_production_effective_width,plateau_exists_favourable,plateau_exists_acceptable,plateau_exists_degraded,plateau_exists_critical,any_crossed_edges,gaps_found,overlaps_found,monotonic,class_share_Favourable,class_share_Acceptable,class_share_Degraded,class_share_Critical,n_observations_classified,agreement_rate_with_production_effective_width
+25.0,production_effective_width,True,False,True,False,False,False,none,none,True,0.9492464901907275,0.007368325297916856,0.0026623002516753085,0.0407228842596804,164895,1.0
+10.0,candidate_10.0,False,False,True,True,False,False,none,none,True,0.9492464901907275,0.007368325297916856,0.0026623002516753085,0.0407228842596804,164895,1.0
+15.0,candidate_15.0,False,False,True,True,False,False,none,none,True,0.9492464901907275,0.007368325297916856,0.0026623002516753085,0.0407228842596804,164895,1.0
+20.0,candidate_20.0,False,False,True,True,False,False,none,none,True,0.9492464901907275,0.007368325297916856,0.0026623002516753085,0.0407228842596804,164895,1.0
+25.0,production_effective_width,True,False,True,False,False,False,none,none,True,0.9492464901907275,0.007368325297916856,0.0026623002516753085,0.0407228842596804,164895,1.0

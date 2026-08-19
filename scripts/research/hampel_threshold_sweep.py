@@ -58,7 +58,7 @@ from iaq_hfis.evaluation.fault_injection import (  # noqa: E402
 )
 from iaq_hfis.research_helpers import f1_of, s_new_objective, scenario_family  # noqa: E402
 
-RUN_ID = "20260817_expanded_dataset_v1"
+RUN_ID = "20260818_peer_review_revision_v2"
 OUT_DIR = REPO_ROOT / "research_results" / "runs" / RUN_ID / "hampel_sweep"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

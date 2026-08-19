@@ -1,0 +1,9 @@
+{
+  "reviewer_claim_check": {
+    "claim": "All observed HFIS vs FUZZY_COMPONENT_MAX class disagreements occur when the maximum component value is exactly 75.",
+    "n_disagreements_total_on_full_101_cubed_grid": 17101,
+    "n_disagreements_with_max_component_exactly_75": 17101,
+    "n_disagreements_with_max_component_NOT_exactly_75": 0,
+    "claim_supported": true
+  }
+}

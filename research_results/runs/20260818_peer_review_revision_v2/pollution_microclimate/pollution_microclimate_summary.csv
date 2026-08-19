@@ -1,0 +1,21 @@
+,value
+n_observations_ok_completeness,15242
+current_integrated_index_class_distribution,"{""Favourable"": 3538, ""Acceptable"": 1982, ""Degraded"": 2881, ""Critical"": 6841}"
+current_integrated_index_critical_count,6841
+current_integrated_index_critical_share,0.44882561343655686
+pollution_oriented_index_class_distribution,"{""Favourable"": 12012, ""Acceptable"": 2233, ""Degraded"": 476, ""Critical"": 521}"
+pollution_oriented_index_critical_count,521
+pollution_oriented_index_critical_share,0.03418186589686393
+microclimate_component_class_distribution,"{""Favourable"": 3965, ""Acceptable"": 1760, ""Degraded"": 2795, ""Critical"": 6722}"
+microclimate_component_critical_count,6722
+microclimate_component_critical_share,0.4410182390762367
+n_current_critical_remaining_critical_under_pollution_oriented,521
+n_current_critical_total,6841
+share_current_critical_remaining_critical_under_pollution_oriented,0.07615845636602836
+dominance_category_counts,"{""microclimate"": 9602, ""pollution"": 2901, ""tie_pollution_microclimate"": 2739}"
+n_ties_any_co_dominant_component,2743
+tie_rate,0.17996325941477495
+pearson_r_index_value_vs_pollution_score,0.29628437986488126
+pearson_r_index_value_vs_microclimate_score,0.9736008799642674
+class_order_low_to_high_severity,"[""Favourable"", ""Acceptable"", ""Degraded"", ""Critical""]"
+causality_note,"All findings above are descriptive associations over this deployment's real data, not causal claims. 'Dominant'/'associated' language only."

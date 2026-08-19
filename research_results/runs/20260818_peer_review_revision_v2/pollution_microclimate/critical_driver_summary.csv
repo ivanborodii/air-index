@@ -1,0 +1,6 @@
+dominant_component,associated_direct_input,n_timestamps,share_of_critical
+A,pm10,227,0.03318228329191639
+A,pm2_5,1214,0.17745943575500658
+M,humidity,4,0.00058470983774302
+M,temperature,4969,0.7263557959362666
+V,co2,427,0.06241777517906739

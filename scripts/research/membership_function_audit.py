@@ -44,7 +44,7 @@ from iaq_hfis.pipeline import build_runtime_context  # noqa: E402
 from iaq_hfis.db import AirMonitorSource  # noqa: E402
 from iaq_hfis.constants import CLASS_ORDER  # noqa: E402
 
-RUN_ID = "20260817_expanded_dataset_v1"
+RUN_ID = "20260818_peer_review_revision_v2"
 OUT_DIR = REPO_ROOT / "research_results" / "runs" / RUN_ID / "membership_audit"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -246,6 +246,92 @@ md_lines = [
 ]
 (OUT_DIR / "membership_function_audit.md").write_text("\n".join(md_lines), encoding="utf-8")
 
+# --- Task section 11: PM10 transition-width sensitivity analysis. Never
+# modifies the production config -- builds alternative shapes in-memory only,
+# reclassifies the REAL observed PM10 readings (raw mass_pm10 from the
+# frozen section-3 snapshot CSV, not a synthetic sample) under each
+# candidate, and reports the effect. A width is never selected here; this is
+# reporting only, per the task's explicit "do not select a width because it
+# gives a more favourable class distribution" instruction. ---
+PM10_WIDTH_CANDIDATES = [10.0, 15.0, 20.0, 25.0]
+_production_pm10_widths = [pm10_degraded["b"] - pm10_degraded["a"], pm10_degraded["d"] - pm10_degraded["c"]]
+_production_pm10_width = float(np.mean([w for w in _production_pm10_widths if np.isfinite(w)])) if any(np.isfinite(w) for w in _production_pm10_widths) else None
+
+snapshot_csv = OUT_DIR.parent / "snapshot" / "raw_observations_2026-06-18_to_2026-08-16.csv"
+pm10_values = None
+if snapshot_csv.exists():
+    raw_pm10 = pd.read_csv(snapshot_csv, usecols=["mass_pm10"])["mass_pm10"].dropna()
+    pm10_values = raw_pm10.to_numpy(dtype=float)
+
+production_classes = None
+if pm10_values is not None:
+    production_classes = np.array([
+        next(cls for cls in CLASS_ORDER if evaluate_memberships(float(v), monotonic_shapes["pm10"])[cls] == max(evaluate_memberships(float(v), monotonic_shapes["pm10"]).values()))
+        for v in pm10_values
+    ])
+
+sensitivity_rows = []
+
+
+def _classify_all(values: np.ndarray, shapes: dict) -> np.ndarray:
+    out = []
+    for v in values:
+        degrees = evaluate_memberships(float(v), shapes)
+        max_deg = max(degrees.values())
+        # worst-of tie-break on the boundary, consistent with the rest of this codebase
+        tied = [c for c in CLASS_ORDER if degrees[c] == max_deg]
+        out.append(max(tied, key=lambda c: CLASS_ORDER.index(c)))
+    return np.array(out)
+
+
+for width in [_production_pm10_width] + PM10_WIDTH_CANDIDATES if _production_pm10_width is not None else PM10_WIDTH_CANDIDATES:
+    is_production = (width == _production_pm10_width)
+    label = "production_effective_width" if is_production else f"candidate_{width}"
+    shapes = build_monotonic_classes(control_regions.pm10.breakpoints, [width, width, width])
+
+    # Plateau existence + crossed-edge / monotonicity check per class.
+    plateau_flags, crossed = {}, {}
+    for cls in CLASS_ORDER:
+        a, b, c, d = shapes[cls][0]
+        finite_bd = np.isfinite(b) and np.isfinite(c)
+        plateau_flags[cls] = bool(finite_bd and (c - b) > 1e-9)
+        crossed[cls] = bool(finite_bd and monotonic_shape_type(a, b, c, d) == "INVALID_CROSSED_EDGES")
+
+    # Adjacent-class gap/overlap check (same logic as the coverage_rows block above).
+    classes_sorted = [(cls, shapes[cls][0]) for cls in CLASS_ORDER]
+    gaps, overlaps = [], []
+    for i in range(len(classes_sorted) - 1):
+        (cls_a, (a1, b1, c1, d1)) = classes_sorted[i]
+        (cls_b, (a2, b2, c2, d2)) = classes_sorted[i + 1]
+        if np.isfinite(c1) and np.isfinite(a2):
+            if a2 > c1 + 1e-9:
+                gaps.append(f"{cls_a}->{cls_b}")
+            elif a2 < c1 - 1e-9:
+                overlaps.append(f"{cls_a}->{cls_b}")
+
+    row = dict(
+        width_ug_m3=width, label=label, is_production_effective_width=is_production,
+        plateau_exists_favourable=plateau_flags.get("Favourable"), plateau_exists_acceptable=plateau_flags["Acceptable"],
+        plateau_exists_degraded=plateau_flags["Degraded"], plateau_exists_critical=plateau_flags.get("Critical"),
+        any_crossed_edges=any(crossed.values()), gaps_found="; ".join(gaps) if gaps else "none",
+        overlaps_found="; ".join(overlaps) if overlaps else "none", monotonic=not any(crossed.values()) and not gaps,
+    )
+    if pm10_values is not None:
+        classes = _classify_all(pm10_values, shapes)
+        dist = {cls: int((classes == cls).sum()) for cls in CLASS_ORDER}
+        n = len(classes)
+        row.update({f"class_share_{cls}": dist[cls] / n for cls in CLASS_ORDER})
+        row["n_observations_classified"] = n
+        if production_classes is not None and not is_production:
+            row["agreement_rate_with_production_effective_width"] = float((classes == production_classes).mean())
+        elif is_production:
+            row["agreement_rate_with_production_effective_width"] = 1.0
+    sensitivity_rows.append(row)
+
+sensitivity_df = pd.DataFrame(sensitivity_rows)
+sensitivity_df.to_csv(OUT_DIR / "pm10_width_sensitivity.csv", index=False)
+
 print(f"Wrote artifacts to {OUT_DIR}")
 print(pd.DataFrame(coverage_rows).to_string())
 print(f"PM10 Degraded shape_type = {pm10_degraded['shape_type']}")
+print(sensitivity_df.to_string())

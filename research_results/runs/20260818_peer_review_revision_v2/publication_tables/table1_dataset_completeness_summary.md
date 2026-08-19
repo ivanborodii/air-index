@@ -1,0 +1,11 @@
+| Metric | Value |
+|---|---|
+| Raw observations | 169,331 |
+| Unique timestamps | 169,331 |
+| Duplicate timestamps | 0 |
+| Ordering violations | 0 |
+| Gaps > 5 minutes | 6 |
+| Computed index timestamps | 16,992 |
+| Complete (OK) | 15,242 (89.70%) |
+| Partial | 1,004 (5.91%) |
+| Failed | 746 (4.39%) |

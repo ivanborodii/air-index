@@ -1,0 +1,76 @@
+{
+  "run_id": "20260818_peer_review_revision_v2",
+  "pipeline_run_id": "7f04698725dd4f35a432ba4a0de2934f",
+  "description": "Unchanged baseline: current production iaq_hfis pipeline/config re-run over the expanded 2026-06-18..2026-08-16(excl) dataset, with no parameter changes.",
+  "started_at": "2026-08-17 15:12:45.999079+03:00",
+  "finished_at": "2026-08-17 23:56:16.846672+03:00",
+  "wall_clock_duration_seconds": 31410.847593,
+  "status": "success",
+  "mode": "publication",
+  "window_minutes": 15,
+  "n_timestamps_processed": 16992,
+  "n_snapshot_retries": 0,
+  "computed_ts_min": "2026-06-18 03:05:00+03:00",
+  "computed_ts_max": "2026-08-16 03:00:00+03:00",
+  "completeness_counts": {
+    "OK": 15242,
+    "PARTIAL": 1004,
+    "FAILED": 746
+  },
+  "config_hash_at_run_time": "f878f1eed7d5342cff2ca15d2b266d67a4782e3c413eab7b218c437f2f11b086",
+  "engine_version_at_run_time": "0.1.0",
+  "git_commit_used_for_this_pipeline_run": "3916a5717a85e86903fc99183f0882ec913c4a36",
+  "current_git_head_commit": "a1232dafe14c15d7d62a25954f5589bf9406de13",
+  "baseline_run_matches_current_git_head": false,
+  "current_git_tree_dirty": true,
+  "dataset": {
+    "dataset_csv_sha256": "6286fc8bc2d459533d7e552e67db477c82ebd925295f7cae5551df1e84a90061",
+    "frozen_full_db_snapshot_sha256": "1926e28789eae657f9422385f044e874c85737257f645fc5ff4ba0f35d3dc04c",
+    "selected_row_count": 169331,
+    "selected_min_ts": "2026-06-18 00:00:06.791927+00:00",
+    "selected_max_ts": "2026-08-15 23:59:52.737594+00:00"
+  },
+  "random_seeds_used_in_this_research_run": {
+    "hampel_calibration_validation_split_seed": 20260815,
+    "missing_data_strategy_subsample_and_bootstrap_seed": 20260815,
+    "evaluation_stability_seed": 42
+  },
+  "dependency_versions": {
+    "duckdb": "1.5.2",
+    "pandas": "3.0.2",
+    "numpy": "2.4.4",
+    "pydantic": "2.13.4",
+    "jsonschema": "4.26.0",
+    "matplotlib": "3.11.0",
+    "pytest": "9.1.1"
+  },
+  "python_version": "3.13.5",
+  "environment_metadata": {
+    "iaq_hfis_version": "0.1.0",
+    "python_version": "3.13.5",
+    "duckdb_version": "1.5.2",
+    "platform": "Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41",
+    "processor": "aarch64",
+    "cpu_count": 4,
+    "git_commit": "a1232dafe14c15d7d62a25954f5589bf9406de13",
+    "git_tree_dirty": true,
+    "rule_generation_version": "worst-of-max-severity-v1"
+  },
+  "os_release": {
+    "PRETTY_NAME": "Debian GNU/Linux 13 (trixie)",
+    "NAME": "Debian GNU/Linux",
+    "VERSION_ID": "13",
+    "VERSION": "13 (trixie)",
+    "VERSION_CODENAME": "trixie",
+    "DEBIAN_VERSION_FULL": "13.3",
+    "ID": "debian",
+    "HOME_URL": "https://www.debian.org/",
+    "SUPPORT_URL": "https://www.debian.org/support",
+    "BUG_REPORT_URL": "https://bugs.debian.org/"
+  },
+  "kernel_release": "6.12.62+rpt-rpi-2712",
+  "machine_architecture": "aarch64",
+  "raspberry_pi_model": "Raspberry Pi 5 Model B Rev 1.0",
+  "reproduce_command": "iaq_hfis run --from 2026-06-18T00:00:00+00:00 --to 2026-08-16T00:00:00+00:00 --window-minutes 15 --mode publication   # then: python scripts/research/data_snapshot_and_interval_verification.py",
+  "note_on_rerun_policy": "This manifest documents the ALREADY-COMPLETED baseline pipeline run (7f04698725dd4f35a432ba4a0de2934f) recorded in pipeline_runs; the baseline computation itself (iaq_hfis run: validation, aggregation, 2-level Mamdani inference, completeness classification) is NOT rerun for this revision. This is valid because the 2026-08-19 peer-review revision changed only research/evaluation scripts (scripts/research/*.py) and added new pure helper functions (src/iaq_hfis/research_helpers.py) -- it did not touch iaq_hfis.pipeline, iaq_hfis.fuzzy_engine, iaq_hfis.membership, iaq_hfis.rules, or iaq_hfis.quality, i.e. nothing that affects the persisted index_value/index_class/component_scores/ completeness_status this baseline run already computed. Its row/timestamp counts match the frozen section-3 snapshot exactly (same interval, same source data). baseline_run_matches_current_git_head above reflects the actual commit comparison honestly -- it is expected to read False once this revision's own commit lands, since the repo's HEAD has moved even though the pipeline-relevant code has not."
+}

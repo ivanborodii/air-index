@@ -1,0 +1,2 @@
+n_points,seed,boundary_exclusion_eps,n_class_agree,n_disagreements,class_agreement_rate,mean_abs_diff,median_abs_diff,min_abs_diff,p95_abs_diff,p99_abs_diff,max_abs_diff,n_disagreements_with_max_component_near_75_within_1,n_counterexamples_saved
+250000,20260815,1e-06,249941,59,0.999764,5.961146247436277,5.951888308433322,5.565948960395417e-05,11.261959720504427,12.11984453901621,12.662293049498459,55,59

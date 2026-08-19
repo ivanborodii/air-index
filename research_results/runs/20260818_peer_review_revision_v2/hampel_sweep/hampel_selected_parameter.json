@@ -1,0 +1,93 @@
+{
+  "production_config_mad_multiplier": 3.0,
+  "window_size_held_fixed_at": 11,
+  "h_grid": [
+    1.0,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0
+  ],
+  "seed": 20260815,
+  "selection_by_method_and_objective": {
+    "structural__S_old (production formula)": {
+      "selected_mad_multiplier": 5.0,
+      "calibration_objective_value": 0.9873417721518987,
+      "calibration_single_spike_recall": 1.0,
+      "calibration_single_spike_precision": 0.25,
+      "calibration_genuine_event_preservation_rate": 1.0
+    },
+    "structural__S_new = (F1_spike + P_event) / 2": {
+      "selected_mad_multiplier": 5.0,
+      "calibration_objective_value": 0.7,
+      "calibration_single_spike_recall": 1.0,
+      "calibration_single_spike_precision": 0.25,
+      "calibration_genuine_event_preservation_rate": 1.0
+    },
+    "seeded_group__S_old (production formula)": {
+      "selected_mad_multiplier": 5.0,
+      "calibration_objective_value": 0.9929378531073446,
+      "calibration_single_spike_recall": 1.0,
+      "calibration_single_spike_precision": 0.4444444444444444,
+      "calibration_genuine_event_preservation_rate": 1.0
+    },
+    "seeded_group__S_new = (F1_spike + P_event) / 2": {
+      "selected_mad_multiplier": 5.0,
+      "calibration_objective_value": 0.8076923076923077,
+      "calibration_single_spike_recall": 1.0,
+      "calibration_single_spike_precision": 0.4444444444444444,
+      "calibration_genuine_event_preservation_rate": 1.0
+    }
+  },
+  "any_disagreement_across_methods_or_objectives": false,
+  "recommendation": "No production config change recommended by this script. Per task constraint ('do not change the production fuzzy model merely to obtain better results'), this sweep is diagnostic only; any parameter change requires a separate, explicit, documented decision citing this artifact.",
+  "value_near_0_024_investigation": {
+    "searched_within": 0.01,
+    "matches_found": 5,
+    "matches": [
+      {
+        "split_method": "seeded_group",
+        "dataset_split": "calibration",
+        "mad_multiplier": 3.0,
+        "metric": "single_spike_fpr",
+        "value": 0.03389830508474576
+      },
+      {
+        "split_method": "seeded_group",
+        "dataset_split": "calibration",
+        "mad_multiplier": 3.5,
+        "metric": "single_spike_fpr",
+        "value": 0.03389830508474576
+      },
+      {
+        "split_method": "seeded_group",
+        "dataset_split": "calibration",
+        "mad_multiplier": 4.0,
+        "metric": "single_spike_fpr",
+        "value": 0.03389830508474576
+      },
+      {
+        "split_method": "seeded_group",
+        "dataset_split": "calibration",
+        "mad_multiplier": 4.5,
+        "metric": "single_spike_fpr",
+        "value": 0.03389830508474576
+      },
+      {
+        "split_method": "seeded_group",
+        "dataset_split": "calibration",
+        "mad_multiplier": 5.0,
+        "metric": "single_spike_fpr",
+        "value": 0.0211864406779661
+      }
+    ]
+  },
+  "split_method_notes": {
+    "structural": "production benchmark's built-in split: disjoint scenario_ids, different deterministic scale/phase per variant (build_channel_scenarios).",
+    "seeded_group": "robustness cross-check: 4 scenario families pooled from both variants, shuffled with random.Random(seed=20260815), first 3 families -> calibration (['co2_persistent_real_change', 'co2_single_spike', 'co2_single_spike_alt']), remaining 1 -> validation (['co2_genuine_rapid_event']). No family appears in both groups."
+  }
+}

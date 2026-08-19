@@ -23,7 +23,7 @@ REPO_ROOT = Path("/home/ivan/python_scripts/air_ml")
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from iaq_hfis.config import load_settings  # noqa: E402
 
-RUN_ID = "20260817_expanded_dataset_v1"
+RUN_ID = "20260818_peer_review_revision_v2"
 OUT_DIR = REPO_ROOT / "research_results" / "runs" / RUN_ID / "data_quality_reasons"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 WINDOW_MINUTES = 15

@@ -1,0 +1,508 @@
+{
+  "run_id": "20260818_peer_review_revision_v2",
+  "utc_data_interval": {
+    "start_inclusive": "2026-06-18T00:00:00+00:00",
+    "end_exclusive": "2026-08-16T00:00:00+00:00"
+  },
+  "selected_row_count": 169331,
+  "selected_unique_ts_count": 169331,
+  "dataset_csv_sha256": "6286fc8bc2d459533d7e552e67db477c82ebd925295f7cae5551df1e84a90061",
+  "frozen_full_db_snapshot_sha256": "1926e28789eae657f9422385f044e874c85737257f645fc5ff4ba0f35d3dc04c",
+  "git_commit_used_for_baseline_pipeline_run": "3916a5717a85e86903fc99183f0882ec913c4a36",
+  "current_git_head_at_manifest_build_time": "a1232dafe14c15d7d62a25954f5589bf9406de13",
+  "current_git_tree_dirty_at_manifest_build_time": true,
+  "config_hash": "f878f1eed7d5342cff2ca15d2b266d67a4782e3c413eab7b218c437f2f11b086",
+  "random_seeds_used": {
+    "hampel_calibration_validation_split_seed": 20260815,
+    "missing_data_strategy_subsample_and_bootstrap_seed": 20260815,
+    "evaluation_stability_seed": 42
+  },
+  "dependency_versions": {
+    "duckdb": "1.5.2",
+    "pandas": "3.0.2",
+    "numpy": "2.4.4",
+    "pydantic": "2.13.4",
+    "jsonschema": "4.26.0",
+    "matplotlib": "3.11.0",
+    "pytest": "9.1.1"
+  },
+  "python_version": "3.13.5",
+  "raspberry_pi_model": "Raspberry Pi 5 Model B Rev 1.0",
+  "os_release": {
+    "PRETTY_NAME": "Debian GNU/Linux 13 (trixie)",
+    "NAME": "Debian GNU/Linux",
+    "VERSION_ID": "13",
+    "VERSION": "13 (trixie)",
+    "VERSION_CODENAME": "trixie",
+    "DEBIAN_VERSION_FULL": "13.3",
+    "ID": "debian",
+    "HOME_URL": "https://www.debian.org/",
+    "SUPPORT_URL": "https://www.debian.org/support",
+    "BUG_REPORT_URL": "https://bugs.debian.org/"
+  },
+  "evaluation_run_id": "74deb744a581423b99e4cb7e68be33ce",
+  "multi_component_grid_points_per_axis": 101,
+  "multi_component_grid_consistency_check": {
+    "description": "task section 5.5: manifest-claimed grid_points_per_axis must equal the CUBE ROOT of the actually-persisted evaluation_multi_component_grid row count for this evaluation_run_id -- this is the exact check that caught the original 101-claimed/41-actual defect.",
+    "claimed_points_per_axis": 101,
+    "actual_persisted_row_count": 1030301,
+    "check_passes": true
+  },
+  "reproduce_commands": [
+    "# 1. Baseline pipeline (reused unchanged; already persisted as pipeline_run_id=7f04698725dd4f35a432ba4a0de2934f -- see baseline/baseline_run_manifest.json note_on_rerun_policy for why re-running it was not necessary for this revision):",
+    "# iaq_hfis run --from 2026-06-18T00:00:00+00:00 --to 2026-08-16T00:00:00+00:00 --window-minutes 15 --mode publication",
+    "# 2. Section 3 snapshot + interval verification (actually executed for this run):",
+    ".venv/bin/python3 scripts/research/data_snapshot_and_interval_verification.py",
+    "# 3. Section 4 baseline manifest (actually executed):",
+    ".venv/bin/python3 scripts/research/baseline_run_manifest.py",
+    "# 4. Evaluation run (actually executed; produced evaluation_run_id=74deb744a581423b99e4cb7e68be33ce, needed for sections 8/9 and the flapping analysis; full 101^3=1,030,301-point grid, fixing task section 5.5's defect):",
+    "iaq_hfis evaluate --from 2026-06-18T00:00:00+00:00 --to 2026-08-16T00:00:00+00:00 --window-minutes 15 --pipeline-run-id 7f04698725dd4f35a432ba4a0de2934f --multi-component-grid-points 101",
+    "# 5. Section 6 (Experiment A) missing-data strategy comparison, causal LOCF fix (task 5.1), resumable via _checkpoints/ (actually executed):",
+    ".venv/bin/python3 scripts/research/missing_data_strategy_comparison.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 6. Section 7 (Experiment B) pollution/microclimate decomposition, tie + attribution fixes (task 5.2/5.3) (actually executed):",
+    ".venv/bin/python3 scripts/research/pollution_microclimate_decomposition.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 7. Section 8 (Experiment C) second-level equivalence (actually executed with the real evaluation_run_id above):",
+    ".venv/bin/python3 scripts/research/second_level_equivalence.py 7f04698725dd4f35a432ba4a0de2934f 74deb744a581423b99e4cb7e68be33ce",
+    "# 8. Section 8.2/8.3/8.5 boundary bucket breakdown + 250,000-point random-continuous check + attainable range (new; actually executed):",
+    ".venv/bin/python3 scripts/research/second_level_boundary_and_random.py 74deb744a581423b99e4cb7e68be33ce",
+    "# 9. Section 9 (Experiment D) boundary/stability paired analysis (actually executed with the real evaluation_run_id above):",
+    ".venv/bin/python3 scripts/research/boundary_stability_paired_analysis.py 74deb744a581423b99e4cb7e68be33ce",
+    "# 10. Section 5.4/9.3 real chronological class-flapping analysis (new; actually executed):",
+    ".venv/bin/python3 scripts/research/real_time_class_flapping.py 7f04698725dd4f35a432ba4a0de2934f 74deb744a581423b99e4cb7e68be33ce",
+    "# 11. Section 10 (Experiment E) Hampel MAD-multiplier sweep, no code change, rerun only (actually executed):",
+    ".venv/bin/python3 scripts/research/hampel_threshold_sweep.py",
+    "# 12. Section 11 (Experiment F) membership-function audit + PM10 width sensitivity (new; actually executed):",
+    ".venv/bin/python3 scripts/research/membership_function_audit.py",
+    "# 13. Section 12 (Experiment G) data-quality reason analysis (actually executed):",
+    ".venv/bin/python3 scripts/research/data_quality_reason_analysis.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 14. Section 13 (Experiment H) runtime profiling (actually executed):",
+    ".venv/bin/python3 scripts/research/runtime_profiling.py 7f04698725dd4f35a432ba4a0de2934f",
+    "# 15. Full test suite, before and after (actually executed; see test_report_before.txt / test_report_after.txt):",
+    ".venv/bin/python3 -m pytest tests/ -q",
+    "# 16. This manifest (actually executed):",
+    ".venv/bin/python3 scripts/research/build_run_manifest.py"
+  ],
+  "generated_artifacts": {
+    "article_results_summary.md": {
+      "sha256": "402a154f45d8ccc608132d0776aa9f06da4c92a1a40abbb9a0abf86102c9df85",
+      "size_bytes": 6631
+    },
+    "author_contributions_template.md": {
+      "sha256": "9dbbb5befe4396fdfd158632a4485d1cfb9ba60c03b4a581aa63542a33c2be87",
+      "size_bytes": 703
+    },
+    "baseline/baseline_run_manifest.json": {
+      "sha256": "8bb2827ecffa264fe5efac9e01508594070ee39bda49435abdace2eceb1a4724",
+      "size_bytes": 4218
+    },
+    "boundary_stability_paired/boundary_stability_paired_metadata.json": {
+      "sha256": "76d221580cd699accd65523530e037042a795cce3b32c687db46901d420a072f",
+      "size_bytes": 529
+    },
+    "boundary_stability_paired/stability_activity_summary.csv": {
+      "sha256": "7a55e91c941ac3a2457a391873d9bda9e0e8297c909b5ae0526ba5f8bb1cb8e6",
+      "size_bytes": 435
+    },
+    "boundary_stability_paired/stability_class_flapping_by_point.csv": {
+      "sha256": "f8f6ae60d6dfaf52169b0b8ae6ebcdc857d410ee0ad2f9cf6b467f016ba2f6f9",
+      "size_bytes": 9040
+    },
+    "boundary_stability_paired/stability_class_flapping_summary.csv": {
+      "sha256": "9d1954d40410328c7b3fe224952fde52be469a5c6719b4773bb7d5a23a06fbee",
+      "size_bytes": 320
+    },
+    "boundary_stability_paired/stability_paired_bootstrap_ci.csv": {
+      "sha256": "3917310c9b30ec75debee757e479a89899757f4e8cf6056498e1349434852ae9",
+      "size_bytes": 295
+    },
+    "boundary_stability_paired/stability_paired_sign_test.csv": {
+      "sha256": "0014b9577c9aad90f8bf65ec30a133e4df9eb6cc7369c2c07b627daf8aed79ab",
+      "size_bytes": 299
+    },
+    "claims_traceability.csv": {
+      "sha256": "95e212ef0ff0637a902583020e3bca47166fb3e3907aae838d7fd0cb5999b672",
+      "size_bytes": 5442
+    },
+    "code_availability_statement.md": {
+      "sha256": "12378f24047f01c0e16a8c9dc9dbf7b51c68925e0654673d84d0a9d61a136f94",
+      "size_bytes": 1468
+    },
+    "conflict_of_interest_statement.md": {
+      "sha256": "deae1414fb7f99e697bd79e80a831206005b9a74ca0706f22012e57c9cdf53f7",
+      "size_bytes": 658
+    },
+    "data_availability_statement.md": {
+      "sha256": "dcd739d08ec18e6cc464ddcff0c5f724bb6a48531feae85332adca421fd51229",
+      "size_bytes": 1668
+    },
+    "data_quality_reasons/completeness_status_by_day.csv": {
+      "sha256": "b11dc0570c12d80b1e0950aa41355278f2f2ccab83b452d01e0170ef969f956a",
+      "size_bytes": 2457
+    },
+    "data_quality_reasons/completeness_status_by_hour.csv": {
+      "sha256": "d227fa63ca6b9a09c517c705dda7ff98c182608f2f97ba99b31a803a97d0b884",
+      "size_bytes": 882
+    },
+    "data_quality_reasons/data_quality_failure_intervals.csv": {
+      "sha256": "3b23da16d474bccde1bf47b51e4ad8c9ab0009ca1ec61960722e5202b0aafa31",
+      "size_bytes": 15259
+    },
+    "data_quality_reasons/data_quality_reason_by_day.csv": {
+      "sha256": "cac8b26c774949ed2ee5b75b6cc49ec013753bb4513073b6e9f62ccb0cea6287",
+      "size_bytes": 6043
+    },
+    "data_quality_reasons/data_quality_reason_by_hour.csv": {
+      "sha256": "8472be59f5af8b033bc28fcb4ff51c0c1f0927d664b821e723af19eb09d8b761",
+      "size_bytes": 2150
+    },
+    "data_quality_reasons/data_quality_reason_by_sensor.csv": {
+      "sha256": "91df90e2cc9182ed4ff21a77ed91e432bfa54840b9b10f6cf7cc3673ddc348e1",
+      "size_bytes": 1044
+    },
+    "data_quality_reasons/data_quality_reason_channel_association.csv": {
+      "sha256": "a41077f8b10d175f594af00e2443e2f066b55748becd694ac7d63d8e3229b6b2",
+      "size_bytes": 169
+    },
+    "data_quality_reasons/data_quality_reason_combinations.csv": {
+      "sha256": "efe55742a028b0417c5dfad0e6cb89cce793ede8a3b7fef69cc14d18c1db17db",
+      "size_bytes": 142
+    },
+    "data_quality_reasons/data_quality_reason_summary.csv": {
+      "sha256": "0f80151dc72b20f448b147ca9a0863f7614c77130a14a6b953740411696411d6",
+      "size_bytes": 515
+    },
+    "data_quality_reasons/reason_code_by_channel.csv": {
+      "sha256": "bcdcdc8a7f016397978e5fcfc07de14d5f192ee072e92ecf00da1fea611336b9",
+      "size_bytes": 1037
+    },
+    "data_quality_reasons/reason_code_by_channel_day.csv": {
+      "sha256": "7be581df05804c9a09bbab2e9ea22cfcdbc1b6ffb500fb38dd94e2b9bb67eadd",
+      "size_bytes": 23560
+    },
+    "data_quality_reasons/reason_code_by_channel_hour.csv": {
+      "sha256": "897680b7f4a4f008739c12b80e5a90b947715483bccb8edf6c1663baa99d029a",
+      "size_bytes": 10959
+    },
+    "data_quality_reasons/stage2_state_by_channel.csv": {
+      "sha256": "50be697f381b12ad519cbe84ec8f8a08953bf0977e261d4df294dfd1646a442f",
+      "size_bytes": 833
+    },
+    "data_validation_report.md": {
+      "sha256": "1cdd9aeb8d1601d3f45e80e2aae87074994e763a3bd345fdb584f0e8011a3aa4",
+      "size_bytes": 2956
+    },
+    "environment.json": {
+      "sha256": "b9ce587fb8809ee0e1e9735e3bb32fa5c1ebd0c9531db2926c6a7866b7a91a05",
+      "size_bytes": 450
+    },
+    "funding_statement_template.md": {
+      "sha256": "89b95b32c2bdbbc0c6f2048c132d281454821f38a4f4121bed2ef8c04d6ff582",
+      "size_bytes": 540
+    },
+    "hampel_sweep/hampel_calibration_results.csv": {
+      "sha256": "fb70979e8f11ddd2583e220d1eb96921cd7b1dc083e2020490dc598388c312bc",
+      "size_bytes": 2494
+    },
+    "hampel_sweep/hampel_metric_definitions.md": {
+      "sha256": "f49c946e62c67735ba30db10aea1c78fecf26b469dc8305fd64f3b38d3ce1458",
+      "size_bytes": 1987
+    },
+    "hampel_sweep/hampel_pr_curve.png": {
+      "sha256": "4b9c0c63b66dd5f50a2dbf9f9bc7a4bc13ff0cdd77c0249f9f23deef01b50ceb",
+      "size_bytes": 95374
+    },
+    "hampel_sweep/hampel_pr_curve.svg": {
+      "sha256": "517694b5dc7b8e4a0372dfaee5017b571f6a6480b744e98938cdb2ae6741a879",
+      "size_bytes": 79004
+    },
+    "hampel_sweep/hampel_selected_parameter.json": {
+      "sha256": "04c9bd40c737519fbbd7f8f74d99499da769a22ea93d6adf863effd5664444fe",
+      "size_bytes": 3504
+    },
+    "hampel_sweep/hampel_threshold_sweep.csv": {
+      "sha256": "8d58460cd417ad2aa5731b87fbb5b02ff30f103654764daeff3abcfb4e134753",
+      "size_bytes": 4239
+    },
+    "hampel_sweep/hampel_validation_results.csv": {
+      "sha256": "8a91135577f7a25f435f043fd48bdbba58381ebdcc6477ac6312595f9517ef21",
+      "size_bytes": 1946
+    },
+    "limitations.md": {
+      "sha256": "147953955c0f746445af2d434a2aed0c2ff9fa250dadd7907aa841c083962eeb",
+      "size_bytes": 4282
+    },
+    "manuscript_update_notes.md": {
+      "sha256": "fbdba9e2159d959ba3cf02df5fcaca43bcc12881adda9ee54ecfe63d1a9ff69e",
+      "size_bytes": 14281
+    },
+    "membership_audit/membership_function_audit.csv": {
+      "sha256": "78b98c2e22b5fdc5f45ebd6d178b9e118cd8e57d0bd3c6e88255cfb25625e5e5",
+      "size_bytes": 7214
+    },
+    "membership_audit/membership_function_audit.md": {
+      "sha256": "91e7bc70f2fe7f071128fe7bb8a65198b15a18fcf4f2e572d608da8a4ed3eaea",
+      "size_bytes": 14427
+    },
+    "membership_audit/pm10_degraded_shape.png": {
+      "sha256": "305284c069164cde1645a17078f9728edd4a336ad4da48b514d3dd51830b2b1b",
+      "size_bytes": 134229
+    },
+    "membership_audit/pm10_degraded_shape.svg": {
+      "sha256": "033eab9882fd446f6ba7f37a2918904afffe89880678d8462978024dc41cca31",
+      "size_bytes": 39232
+    },
+    "membership_audit/pm10_width_sensitivity.csv": {
+      "sha256": "772238a75743191598879209494a42743d8274bd2b668ecd452413a853adaf31",
+      "size_bytes": 1192
+    },
+    "membership_audit/reachable_output_ranges.json": {
+      "sha256": "7bc5c22231c900e2f2845ea61e4f555aee7d3d52a2c39707c442a6ec61e859cb",
+      "size_bytes": 1319
+    },
+    "missing_data_strategy/missing_data_bootstrap_intervals.csv": {
+      "sha256": "49e83231d70fd0dc568e0a6b7f8d826bc7e35b52908c7961a77ecf68fd2f51e7",
+      "size_bytes": 4195
+    },
+    "missing_data_strategy/missing_data_confusion_matrices.csv": {
+      "sha256": "ffa4181156822604921007ce90d61ee4ab49bf77f199833105d86697b75ecc5a",
+      "size_bytes": 78654
+    },
+    "missing_data_strategy/missing_data_strategy_bootstrap_ci.csv": {
+      "sha256": "49e83231d70fd0dc568e0a6b7f8d826bc7e35b52908c7961a77ecf68fd2f51e7",
+      "size_bytes": 4195
+    },
+    "missing_data_strategy/missing_data_strategy_comparison.png": {
+      "sha256": "a1b089b1236748da67b416fcc9e1267c58388039bd21056a64e870facaa8c4ac",
+      "size_bytes": 385101
+    },
+    "missing_data_strategy/missing_data_strategy_comparison.svg": {
+      "sha256": "6730ba1d004e385bbe2cced4659e7202283ad1bc9678e9c4054987929f72f875",
+      "size_bytes": 86578
+    },
+    "missing_data_strategy/missing_data_strategy_instances.csv": {
+      "sha256": "1ef4f3940fef4a54981f15fc467849007e24ed75db739eeb87dc5f2d015f2452",
+      "size_bytes": 6820208
+    },
+    "missing_data_strategy/missing_data_strategy_locf_lookback_sweep.csv": {
+      "sha256": "1bd11aa1aca30fb1828839b860c4f17541821c80909c3afda75243c42c3856fd",
+      "size_bytes": 495
+    },
+    "missing_data_strategy/missing_data_strategy_metadata.json": {
+      "sha256": "9f5d94316099973d31e07fa9f358bec3a0ad31ac0b4e9275d88bd9bcabd6e5bc",
+      "size_bytes": 3601
+    },
+    "missing_data_strategy/missing_data_strategy_predictions.csv": {
+      "sha256": "1ef4f3940fef4a54981f15fc467849007e24ed75db739eeb87dc5f2d015f2452",
+      "size_bytes": 6820208
+    },
+    "missing_data_strategy/missing_data_strategy_selected_parameters.json": {
+      "sha256": "dfd797d9576f273b089ae9706480f31a4499d5067c4b615e3019b5fce31d1e30",
+      "size_bytes": 2797
+    },
+    "missing_data_strategy/missing_data_strategy_summary.csv": {
+      "sha256": "a4eb6880882e0bae058f69d48427decdc68d58715d525a942868f94386e91e1a",
+      "size_bytes": 12049
+    },
+    "pollution_microclimate/critical_driver_by_day.csv": {
+      "sha256": "8ed5ce9d05044bfaf53490e0fe99f9b3ce3ec9995855968133921a3df5d7feac",
+      "size_bytes": 1332
+    },
+    "pollution_microclimate/critical_driver_by_hour.csv": {
+      "sha256": "35f59e2703f13a33aabbd29d7ee757adaec02561b2f12e8b118f5afeb3aee950",
+      "size_bytes": 513
+    },
+    "pollution_microclimate/critical_driver_summary.csv": {
+      "sha256": "51c9aecd2ca8ee7f671d69cec4c16329f1ddd11f0022b5bbe9248dfdcb01650a",
+      "size_bytes": 239
+    },
+    "pollution_microclimate/index_class_distribution_comparison.png": {
+      "sha256": "a7ba27b1b621876e740b58d35f8fb302e9defa529a111cf7a78ea6456c741cd8",
+      "size_bytes": 126122
+    },
+    "pollution_microclimate/index_class_distribution_comparison.svg": {
+      "sha256": "fd0103608a66248808ae29f4f323d9d4ce7828a0874aeffddb7a6bcb9053af25",
+      "size_bytes": 45038
+    },
+    "pollution_microclimate/microclimate_persistence_by_season.csv": {
+      "sha256": "23c1da340cd8f6d47e1c6c9cafd3de4b0cbd66e3177a92568696f00201afb895",
+      "size_bytes": 113
+    },
+    "pollution_microclimate/pollution_microclimate_summary.csv": {
+      "sha256": "27c5def2ddf6aec5b545768f950c16d50fc8214fd85ed1f8d9862b5c69ed4921",
+      "size_bytes": 1483
+    },
+    "pollution_microclimate/pollution_microclimate_summary.json": {
+      "sha256": "81bff4f2bc40d06dd23e86fd46f74781831f4b14036e0cd11ca1d688334a320a",
+      "size_bytes": 1646
+    },
+    "publication_tables/table1_dataset_completeness_summary.csv": {
+      "sha256": "7ec25b054565428920e7ae6c6af0b8a2980f575601df4f122fbc972d548b3623",
+      "size_bytes": 242
+    },
+    "publication_tables/table1_dataset_completeness_summary.md": {
+      "sha256": "439181de89c109d5bce928de1527907bc42cc03bf01a38520278d497a5a3bcfb",
+      "size_bytes": 302
+    },
+    "publication_tables/table2_missing_data_strategy_validation.csv": {
+      "sha256": "a789f7920859e07f7c06c7bfb142c66a17f0d4c80ce2a52189543d2386f2260c",
+      "size_bytes": 811
+    },
+    "publication_tables/table2_missing_data_strategy_validation.md": {
+      "sha256": "864a5fce452706a264e88bdd91c95c1eee7e5a31c05ab04a4546f8be9abe2420",
+      "size_bytes": 963
+    },
+    "publication_tables/table3_pollution_microclimate_decomposition.csv": {
+      "sha256": "fec5524cba0adf31543313b40bbb5f7db7affa0721ee457b976d721f50f2c484",
+      "size_bytes": 388
+    },
+    "publication_tables/table3_pollution_microclimate_decomposition.md": {
+      "sha256": "145a980f0848bde8fd4ca4d045e7e5680aad9e32b7a7feef75d8ee21a3711323",
+      "size_bytes": 444
+    },
+    "publication_tables/table4_second_level_boundary_analysis.csv": {
+      "sha256": "4d170a99054da7898730098aa927907ef6855866e3c1978b417b55fd7cf10c5f",
+      "size_bytes": 709
+    },
+    "publication_tables/table4_second_level_boundary_analysis.md": {
+      "sha256": "25172165070d82e3f439428a84df70fda6f317fdb9e9dcbe6384b7a8e754a10e",
+      "size_bytes": 835
+    },
+    "publication_tables/table5a_paired_stability_significance.csv": {
+      "sha256": "789011e457f3889ef02f98e3c08acaca99f7d50215d3a03bc860eb077ff5be57",
+      "size_bytes": 266
+    },
+    "publication_tables/table5a_paired_stability_significance.md": {
+      "sha256": "dd1f9254b820d91701e3d2e3ca780ad2c8a38c5b9f538e15e65983f3afa8f2ca",
+      "size_bytes": 348
+    },
+    "publication_tables/table5b_real_time_class_flapping.csv": {
+      "sha256": "e7d8b8c595ee98cd5d71257ebc4cba541ab3ff412e006682e26c824ff0f55ea2",
+      "size_bytes": 327
+    },
+    "publication_tables/table5b_real_time_class_flapping.md": {
+      "sha256": "8629a36ed8a3ed3935dc40db153b0f0500a08867cd650fc414d32f916ba98a2a",
+      "size_bytes": 395
+    },
+    "publication_tables/table6_hampel_summary.csv": {
+      "sha256": "3bea1cf841ae2e7a79ef18b3300ce0ddb80c6df0c6c1f399ab6404c9ec6f864e",
+      "size_bytes": 212
+    },
+    "publication_tables/table6_hampel_summary.md": {
+      "sha256": "2d83cfa94832111da11a57afa9060b177c84096afbd16c6707b2c54c2fca8a39",
+      "size_bytes": 252
+    },
+    "publication_tables/table7_runtime_comparison.csv": {
+      "sha256": "b35e1ff2576d3ceafed9dc78875cd4ed29989d33661dffe12198b55a4beb33a9",
+      "size_bytes": 86
+    },
+    "publication_tables/table7_runtime_comparison.md": {
+      "sha256": "a465a1ab5a4e92b46f3d24e1b9f288ba667c4285fe5d127f45e2f355a0d66662",
+      "size_bytes": 114
+    },
+    "real_time_class_flapping/real_time_class_flapping.csv": {
+      "sha256": "3753bfc478aedd77a0c5886042eb5a29ab3c2ef97a7a5bd69e01a57e27819014",
+      "size_bytes": 8650548
+    },
+    "real_time_class_flapping/real_time_class_flapping.png": {
+      "sha256": "306d1e59cf52f6e31c840df96edc0797730c9384e52637603c63e41178307614",
+      "size_bytes": 167693
+    },
+    "real_time_class_flapping/real_time_class_flapping.svg": {
+      "sha256": "3bafab108c06e8a1e5ba6795eea381cc64f78a145f4c6bc261b94bf0d2a5a025",
+      "size_bytes": 55507
+    },
+    "real_time_class_flapping/real_time_class_flapping_bootstrap_ci.csv": {
+      "sha256": "742bd636940014f21ab78c51cfe423c2b6df89b24e3aaeac2e457eab590a56e6",
+      "size_bytes": 393
+    },
+    "real_time_class_flapping/real_time_class_flapping_by_day.csv": {
+      "sha256": "892c7d867f2eda92f38c088915ff63ff55e2662583f5b3079a569e3f0035cfcf",
+      "size_bytes": 8099
+    },
+    "real_time_class_flapping/real_time_class_flapping_metadata.json": {
+      "sha256": "ac8d7c00910d95bf9a526a577a5a9aaaf186d58bb856e0b0b6e665e8f4749c71",
+      "size_bytes": 942
+    },
+    "real_time_class_flapping/real_time_class_flapping_summary.csv": {
+      "sha256": "d70695bebb5aad9ebd6b9414ba98c3a068eca38b14543a47368ae313302db700",
+      "size_bytes": 1488
+    },
+    "reproducibility_instructions.md": {
+      "sha256": "18bfc73c7f7cdf05cb8e959f423245312bc4fb3d3486dc529a7b3cf33da703ec",
+      "size_bytes": 3782
+    },
+    "reviewer_response_evidence_matrix.md": {
+      "sha256": "57fe1fe4828c242399f35790ebe899d31e89ba4d4fc6e31b9ab359acbb83baf0",
+      "size_bytes": 12948
+    },
+    "run_status.md": {
+      "sha256": "11f11d733716195f1487a71cc27f990d0ebd980b6440c19312d0b08f87232be1",
+      "size_bytes": 3821
+    },
+    "runtime_profiling/runtime_profiling_report.json": {
+      "sha256": "2b80995c4f8581ac7999a881ee7ff611ba7160f0505d9dc0dd14353ac9f239ce",
+      "size_bytes": 2350
+    },
+    "second_level_equivalence/attainable_index_range.json": {
+      "sha256": "d2fe135bccebbd44dd5eafaa21ae24292902aa46a576237341dc13b3dcf40d05",
+      "size_bytes": 1113
+    },
+    "second_level_equivalence/second_level_boundary_and_random_metadata.json": {
+      "sha256": "b3d323af26592e79d945d7bd9d317648dd91f1603c0199179eec96d1140c835c",
+      "size_bytes": 373
+    },
+    "second_level_equivalence/second_level_boundary_summary.csv": {
+      "sha256": "b92eb5804113b065d5efac44898edc3ec8d8cbf080efea3d03cdef76e42d39c3",
+      "size_bytes": 1287
+    },
+    "second_level_equivalence/second_level_counterexamples.csv": {
+      "sha256": "25dca46bad8ca1eac76a2c2ce705999160f2a38edbc74b515df2f78c27af4dc8",
+      "size_bytes": 8774
+    },
+    "second_level_equivalence/second_level_equivalence_grid.csv": {
+      "sha256": "c9fc5d763f61592b19bbcd757d20e145f480bd3bf1e72864de739d11dae18b59",
+      "size_bytes": 7273171
+    },
+    "second_level_equivalence/second_level_equivalence_real.csv": {
+      "sha256": "a780b0053ebaaaca312fa729d87118f789b8f468fe249b921fdd3a2c6d34bb63",
+      "size_bytes": 1470836
+    },
+    "second_level_equivalence/second_level_equivalence_summary.json": {
+      "sha256": "3affbdeb3ba5d1e9ada592c3cdbe10234fc49433acefa8c28b5c156d6bfdf5b0",
+      "size_bytes": 1950
+    },
+    "second_level_equivalence/second_level_formal_analysis.md": {
+      "sha256": "5cdaf46871491f5fa4334e436f21b00e9fbc7f84137444f141e40bf7f4ff25ca",
+      "size_bytes": 6692
+    },
+    "second_level_equivalence/second_level_random_continuous_summary.csv": {
+      "sha256": "d297b2f0ef7651bc00336db60a3557b2f748c97de4271cc0b6003fbb7878588b",
+      "size_bytes": 407
+    },
+    "second_level_equivalence/second_level_rule_audit.csv": {
+      "sha256": "40ca9bbf46b8b3dde7367cd771022f6097f90f5fdfbe9850975b20c32401212d",
+      "size_bytes": 5237
+    },
+    "second_level_equivalence/second_level_rule_audit.md": {
+      "sha256": "26d3d7d41a5e51b92946a230cf26989b80555b70585f30e6021db1fa7ec1c140",
+      "size_bytes": 10084
+    },
+    "snapshot/data_interval_verification.json": {
+      "sha256": "94eccd24ff0f489157d64af80e2171e27cdb52130062dd01d839f9a84f67b600",
+      "size_bytes": 5453
+    },
+    "snapshot/dataset_sha256.txt": {
+      "sha256": "b0221217cca2a6df3c43fde2b3e9ba70df95add9a4570be0bc33a8e05c0a69fd",
+      "size_bytes": 213
+    },
+    "test_report_after.txt": {
+      "sha256": "01b6d8a29e1aad02435d5d4d4d7d3b2da8fe2fdf325709691e87341abb0698d8",
+      "size_bytes": 593
+    },
+    "test_report_before.txt": {
+      "sha256": "ad79b05277907372268f9b7d4a8a0807ec7b4a49734c9804cb91b848d3514d29",
+      "size_bytes": 593
+    }
+  },
+  "n_artifacts": 105
+}

@@ -45,7 +45,7 @@ from iaq_hfis.config import load_settings  # noqa: E402
 from iaq_hfis.constants import CLASS_SEVERITY  # noqa: E402
 from iaq_hfis.rules import build_rule_base  # noqa: E402
 
-RUN_ID = "20260817_expanded_dataset_v1"
+RUN_ID = "20260818_peer_review_revision_v2"
 OUT_DIR = REPO_ROOT / "research_results" / "runs" / RUN_ID / "second_level_equivalence"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 WINDOW_MINUTES = 15

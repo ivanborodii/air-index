@@ -1,0 +1,48 @@
+{
+  "pipeline_run_id": "7f04698725dd4f35a432ba4a0de2934f",
+  "evaluation_run_id": "74deb744a581423b99e4cb7e68be33ce",
+  "rule_level_audit": {
+    "n_index_rules": 64,
+    "n_rules_matching_worst_of_property": 64,
+    "all_rules_are_worst_of_max_severity": true,
+    "proof_type": "exhaustive enumeration of all rules (complete, not sampled)"
+  },
+  "real_timestamps": {
+    "n": 15242,
+    "mean_signed_diff": -0.015725169901127177,
+    "median_signed_diff": 0.0,
+    "median_abs_diff": 0.0,
+    "mean_abs_diff": 0.021241178363302925,
+    "max_abs_diff": 2.001236691774551,
+    "p50_abs_diff": 0.0,
+    "p90_abs_diff": 0.04803567810920262,
+    "p95_abs_diff": 0.15027790526101775,
+    "p99_abs_diff": 0.26633689041533815,
+    "n_hfis_lower": 1967,
+    "n_hfis_higher": 242,
+    "n_exact_equal": 13033,
+    "n_class_disagreements": 0,
+    "class_agreement_rate": 1.0
+  },
+  "synthetic_grid": {
+    "n": 1030301,
+    "mean_signed_diff": -1.7012230756955888,
+    "median_signed_diff": -2.4440298507462757,
+    "mean_abs_diff": 6.074992340674607,
+    "median_abs_diff": 6.444029850746276,
+    "max_abs_diff": 12.689024390243901,
+    "p90_abs_diff": 11.444029850746276,
+    "p95_abs_diff": 11.5,
+    "p99_abs_diff": 12.444029850746276,
+    "n_hfis_lower": 621314,
+    "n_hfis_higher": 401336,
+    "n_exact_equal": 7651,
+    "n_class_agree": 1013200,
+    "n_class_disagree": 17101,
+    "class_agreement_rate": 0.9834019378802894
+  },
+  "grid_n_points_per_axis": 101,
+  "grid_csv_is_a_deterministic_sample": true,
+  "grid_csv_sample_size": 50000,
+  "interpretation_note": "Rule-level worst-of property (proven exhaustively) does NOT imply the two methods' aggregate numerical output is identical -- see real_timestamps/synthetic_grid class_agreement_rate and diff stats for the actual empirical answer. If class_agreement_rate is high but not 1.0, or if numerical diffs are nonzero even where classes agree, both are reported honestly, not smoothed over."
+}
