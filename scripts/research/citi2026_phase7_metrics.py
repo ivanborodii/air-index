@@ -182,16 +182,26 @@ def main() -> None:
     con = duckdb.connect(str(DATA_DIR / "phase6_predictions.duckdb"), read_only=True)
     preds = con.execute('SELECT * FROM predictions').df()
     con.close()
-    preds["ts"] = pd.to_datetime(preds["ts"], utc=True)
+    # Normalise to tz-naive UTC (same instants) everywhere below: a tz-aware
+    # pandas column's .to_numpy() returns an object array of Timestamps, and
+    # np.datetime64() on a single tz-aware Timestamp silently drops its tz --
+    # mixing the two raises "offset-naive vs offset-aware". Stripping tz once,
+    # up front, on every timestamp column keeps all downstream comparisons on
+    # plain vectorised datetime64[ns] arrays.
+    preds["ts"] = pd.to_datetime(preds["ts"], utc=True).dt.tz_localize(None)
 
     fault_log = pd.read_csv(
         REPO_ROOT / "research_results" / "citi2026" / "phase4" / "fault_injection_log.csv",
         parse_dates=["start_ts", "end_ts"],
     )
+    fault_log["start_ts"] = fault_log["start_ts"].dt.tz_convert("UTC").dt.tz_localize(None)
+    fault_log["end_ts"] = fault_log["end_ts"].dt.tz_convert("UTC").dt.tz_localize(None)
     events = pd.read_csv(
         REPO_ROOT / "research_results" / "citi2026" / "phase3" / "event_intervals.csv",
         parse_dates=["start_ts", "end_ts"],
     )
+    events["start_ts"] = events["start_ts"].dt.tz_convert("UTC").dt.tz_localize(None)
+    events["end_ts"] = events["end_ts"].dt.tz_convert("UTC").dt.tz_localize(None)
 
     rng = np.random.default_rng(BOOT_SEED)
     combos = preds[["pair", "window", "feature_set", "method"]].drop_duplicates()
