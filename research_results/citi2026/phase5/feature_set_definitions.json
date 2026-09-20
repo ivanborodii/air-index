@@ -1,0 +1,90 @@
+{
+  "a_single_only": {
+    "single_a": [
+      "a_roll_mean",
+      "a_roll_std",
+      "a_roll_min",
+      "a_roll_max",
+      "a_roll_mad",
+      "a_last_delta"
+    ],
+    "single_b": [
+      "b_roll_mean",
+      "b_roll_std",
+      "b_roll_min",
+      "b_roll_max",
+      "b_roll_mad",
+      "b_last_delta"
+    ]
+  },
+  "b_single_plus_cross": {
+    "single_a": [
+      "a_roll_mean",
+      "a_roll_std",
+      "a_roll_min",
+      "a_roll_max",
+      "a_roll_mad",
+      "a_last_delta"
+    ],
+    "single_b": [
+      "b_roll_mean",
+      "b_roll_std",
+      "b_roll_min",
+      "b_roll_max",
+      "b_roll_mad",
+      "b_last_delta"
+    ],
+    "cross": [
+      "cross_diff",
+      "cross_roll_diff_mean",
+      "cross_roll_diff_std",
+      "cross_roll_corr",
+      "cross_roll_corr_undefined",
+      "cross_diff_zscore"
+    ]
+  },
+  "c_plus_ah": {
+    "single_a": [
+      "a_roll_mean",
+      "a_roll_std",
+      "a_roll_min",
+      "a_roll_max",
+      "a_roll_mad",
+      "a_last_delta"
+    ],
+    "single_b": [
+      "b_roll_mean",
+      "b_roll_std",
+      "b_roll_min",
+      "b_roll_max",
+      "b_roll_mad",
+      "b_last_delta"
+    ],
+    "cross": [
+      "cross_diff",
+      "cross_roll_diff_mean",
+      "cross_roll_diff_std",
+      "cross_roll_corr",
+      "cross_roll_corr_undefined",
+      "cross_diff_zscore"
+    ],
+    "ah_cross": [
+      "ah_diff",
+      "ah_roll_diff_mean",
+      "ah_roll_diff_std",
+      "ah_roll_corr",
+      "ah_roll_corr_undefined",
+      "ah_diff_zscore"
+    ]
+  },
+  "d_cross_only": {
+    "cross": [
+      "cross_diff",
+      "cross_roll_diff_mean",
+      "cross_roll_diff_std",
+      "cross_roll_corr",
+      "cross_roll_corr_undefined",
+      "cross_diff_zscore"
+    ]
+  }
+}

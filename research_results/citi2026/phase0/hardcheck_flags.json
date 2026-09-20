@@ -1,0 +1,107 @@
+{
+  "co2_ppm": {
+    "spec_key": "co2",
+    "min": 400,
+    "max": 40000,
+    "n_fail": 181,
+    "source": "Sensirion SCD4x Datasheet v1.7 (April 2025), Table 1 p.3: CO2 output range 0-40'000 ppm (sensor's full reportable range); SCD41 accuracy specified only for 400-5'000 ppm"
+  },
+  "scd_temp_c": {
+    "spec_key": "scd_temp",
+    "min": -10,
+    "max": 60,
+    "n_fail": 7,
+    "source": "Sensirion SCD4x Datasheet v1.7 (April 2025), Table 3 p.3: temperature range -10 to 60 degC, accuracy +/-0.8 degC typ. (15-35 degC band, the relevant indoor range)"
+  },
+  "scd_humidity_pct": {
+    "spec_key": "scd_humidity",
+    "min": 0,
+    "max": 100,
+    "n_fail": 0,
+    "source": "Sensirion SCD4x Datasheet v1.7 (April 2025), Table 2 p.3: humidity range 0-100% RH, accuracy +/-6% RH typ. (15-35 degC, 20-65% RH band, the relevant indoor range)"
+  },
+  "bme_temp_c": {
+    "spec_key": "bme_temp",
+    "min": -40,
+    "max": 85,
+    "n_fail": 2,
+    "source": "Bosch BME688 Datasheet Rev.1.3 BST-BME688-DS000-03 (Feb 2024), Table 10 p.14: operating range -40 to 85 degC, absolute accuracy +/-0.5 degC (0-65 degC full-accuracy range)"
+  },
+  "bme_humidity_pct": {
+    "spec_key": "bme_humidity",
+    "min": 0,
+    "max": 100,
+    "n_fail": 0,
+    "source": "Bosch BME688 Datasheet Rev.1.3 BST-BME688-DS000-03 (Feb 2024), Table 8 p.12: range 0-100% RH, absolute accuracy +/-3% RH (20-80% RH, 25 degC, incl. hysteresis)"
+  },
+  "pressure_hpa": {
+    "spec_key": "pressure",
+    "min": 300,
+    "max": 1100,
+    "n_fail": 3,
+    "source": "Bosch BME688 Datasheet Rev.1.3 BST-BME688-DS000-03 (Feb 2024), Table 9 p.13: operating pressure range (full accuracy) 300-1'100 hPa, absolute accuracy +/-0.6 hPa (300-1'100 hPa, 0-65 degC)"
+  },
+  "mass_pm1_0": {
+    "spec_key": "pm_mass_fine",
+    "min": 0,
+    "max": 1000,
+    "n_fail": 7600,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: mass concentration range 0-1'000 ug/m3, PM1/PM2.5 precision +/-[5 ug/m3 + 5% of reading] (0-100 ug/m3 band, the relevant indoor range)"
+  },
+  "mass_pm2_5": {
+    "spec_key": "pm_mass_fine",
+    "min": 0,
+    "max": 1000,
+    "n_fail": 7663,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: mass concentration range 0-1'000 ug/m3, PM1/PM2.5 precision +/-[5 ug/m3 + 5% of reading] (0-100 ug/m3 band, the relevant indoor range)"
+  },
+  "mass_pm4_0": {
+    "spec_key": "pm_mass_coarse",
+    "min": 0,
+    "max": 1000,
+    "n_fail": 7695,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: mass concentration range 0-1'000 ug/m3, PM4/PM10 precision +/-25 ug/m3 (0-100 ug/m3 band, the relevant indoor range)"
+  },
+  "mass_pm10": {
+    "spec_key": "pm_mass_coarse",
+    "min": 0,
+    "max": 1000,
+    "n_fail": 7701,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: mass concentration range 0-1'000 ug/m3, PM4/PM10 precision +/-25 ug/m3 (0-100 ug/m3 band, the relevant indoor range)"
+  },
+  "number_pm0_5": {
+    "spec_key": "pm_number",
+    "min": 0,
+    "max": 3000,
+    "n_fail": 8339,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: number concentration range 0-3'000 #/cm3, PM0.5/PM1/PM2.5 precision +/-100 #/cm3 (0-1'000 #/cm3 band); not currently mapped to any validation logic (auxiliary channel only)"
+  },
+  "number_pm1_0": {
+    "spec_key": "pm_number",
+    "min": 0,
+    "max": 3000,
+    "n_fail": 8670,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: number concentration range 0-3'000 #/cm3, PM0.5/PM1/PM2.5 precision +/-100 #/cm3 (0-1'000 #/cm3 band); not currently mapped to any validation logic (auxiliary channel only)"
+  },
+  "number_pm2_5": {
+    "spec_key": "pm_number",
+    "min": 0,
+    "max": 3000,
+    "n_fail": 8688,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: number concentration range 0-3'000 #/cm3, PM0.5/PM1/PM2.5 precision +/-100 #/cm3 (0-1'000 #/cm3 band); not currently mapped to any validation logic (auxiliary channel only)"
+  },
+  "number_pm4_0": {
+    "spec_key": "pm_number",
+    "min": 0,
+    "max": 3000,
+    "n_fail": 8690,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: number concentration range 0-3'000 #/cm3, PM0.5/PM1/PM2.5 precision +/-100 #/cm3 (0-1'000 #/cm3 band); not currently mapped to any validation logic (auxiliary channel only)"
+  },
+  "number_pm10": {
+    "spec_key": "pm_number",
+    "min": 0,
+    "max": 3000,
+    "n_fail": 8690,
+    "source": "Sensirion SPS30 Datasheet v2.0 D1 (June 2023), Table 1 p.2: number concentration range 0-3'000 #/cm3, PM0.5/PM1/PM2.5 precision +/-100 #/cm3 (0-1'000 #/cm3 band); not currently mapped to any validation logic (auxiliary channel only)"
+  }
+}

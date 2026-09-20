@@ -1,0 +1,14 @@
+{
+  "resolved_at_utc": "2026-09-20T12:07:57.894711+00:00",
+  "source_snapshot": "data/citi2026/primary_dataset_20260920T115959Z.duckdb",
+  "analysis_dataset": "data/citi2026/analysis_dataset_20260920T120752Z.duckdb",
+  "analysis_window_start_kyiv": "2026-06-18 00:00:00",
+  "analysis_window_end_exclusive_kyiv": "2026-09-20 00:00:00",
+  "n_rows_full_history": 304110,
+  "n_rows_analysis_window": 263873,
+  "n_days_in_window": 94,
+  "n_fully_complete_days": 87,
+  "n_incomplete_days": 7,
+  "gas_resistance_ohm_excluded_from_independent_channels": true,
+  "hardcheck_total_flagged_rows": 8810
+}

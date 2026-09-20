@@ -1,0 +1,7 @@
+pair,window,n_rows_before_dropna,n_rows_after_dropna,n_dropped_warmup,positive_rate,n_features_full,table
+temperature,5,263873,244443,19430,0.11016883281583027,24,features_temperature_w5
+temperature,10,263873,241663,22210,0.1108278884231347,24,features_temperature_w10
+temperature,20,263873,237657,26216,0.11163146888162352,24,features_temperature_w20
+humidity,5,263873,244478,19395,0.11274634118407383,24,features_humidity_w5
+humidity,10,263873,241624,22249,0.11330000331092938,24,features_humidity_w10
+humidity,20,263873,237654,26219,0.11437215447667617,24,features_humidity_w20

@@ -1,0 +1,26 @@
+{
+  "n_total_samples": 263873,
+  "n_event_samples": 17217,
+  "coverage_pct": 6.5247,
+  "n_events": 1085,
+  "median_duration_minutes": 4.5,
+  "p90_duration_minutes": 19.5,
+  "max_duration_minutes": 52.0,
+  "per_channel_event_samples": {
+    "co2_ppm": 10158,
+    "mass_pm2_5": 4240,
+    "mass_pm10": 4226,
+    "pressure_hpa": 4119
+  },
+  "per_channel_event_pct_of_all_samples": {
+    "co2_ppm": 3.8496,
+    "mass_pm2_5": 1.6068,
+    "mass_pm10": 1.6015,
+    "pressure_hpa": 1.561
+  },
+  "rule_params": {
+    "roll_window_samples": 241,
+    "score_threshold_mad_units": 3.0,
+    "min_persistence_samples": 4
+  }
+}

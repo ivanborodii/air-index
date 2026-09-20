@@ -4,6 +4,11 @@
 # outside data/iaq_hfis/ specifically so this rule never accidentally ignores it.
 data/iaq_hfis/
 
+# citi2026 frozen dataset snapshots -- raw sensor data (copies of air_monitor.duckdb),
+# not source; reproducible from the live air-monitor DB + the citi2026 scripts that
+# built them. research_results/citi2026/ (CSVs, JSON, docs) IS tracked.
+data/citi2026/
+
 # Python
 __pycache__/
 *.pyc

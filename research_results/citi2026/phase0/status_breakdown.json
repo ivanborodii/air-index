@@ -1,0 +1,23 @@
+{
+  "sensor_status": {
+    "ok": 287068,
+    "partial": 12686,
+    "failed": 4356
+  },
+  "scd41_status": {
+    "ok": 291899,
+    "failed": 9782,
+    "unavailable": 2429
+  },
+  "bme688_status": {
+    "ok": 293002,
+    "failed": 11076,
+    "unavailable": 32
+  },
+  "sps30_status": {
+    "ok": 299602,
+    "failed": 4424,
+    "unavailable": 64,
+    "data_not_ready": 20
+  }
+}
