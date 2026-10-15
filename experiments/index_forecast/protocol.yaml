@@ -1,0 +1,21 @@
+# experiments/index_forecast/protocol.yaml
+# Run-budget decisions for the forecasting stage (agreed with the author on
+# 2026-10-15 after benchmarking on the Raspberry Pi 5). Deviations from the
+# task text are listed in the results README.
+#
+# The full protocol (all training rows, full-data grid search) was estimated
+# at ~16 days on the Pi 5, dominated by RandomForest regression
+# (max_features=1.0, all 78 features at every split: ~1150 s per 100 trees
+# on 226k rows). Every model keeps the specified configuration and grid;
+# only the amount of training data changes:
+
+# Fraction of training rows used to train every model (tuning and final fit).
+# Drawn at random within each home (seed 42) after the features were built on
+# the full hourly series; identical rows for all methods of one
+# (scheme, fold, h); test rows are never subsampled.
+train_fraction: 0.4
+
+# Grid search on a random 30% of the (already subsampled) CV-fold rows,
+# seed 42 -- the fallback of task section 8.6, applied to every model.
+# The final model is trained on all rows selected by train_fraction.
+tuning_subsample: 0.3
