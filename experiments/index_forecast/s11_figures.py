@@ -110,7 +110,7 @@ def main():
         cls = f1[["scheme", "h", "method", "approach", "macro_F1", "recall_CRITICAL", "recall_LOW_or_CRITICAL", "false_alarm_rate"]]
         mm = pd.concat([reg.assign(task="regression"), cls.assign(task="classification")], ignore_index=True)
         write_table(mm, fd / "fig_mae_by_method.csv")
-        fig, axes = plt.subplots(2, 3, figsize=(12, 6), sharey="row")
+        fig, axes = plt.subplots(2, 3, figsize=(13, 7))
         for j, h in enumerate(sorted(reg.h.unique())):
             for i, scheme in enumerate(("S1", "S2")):
                 ax = axes[i, j]
@@ -138,7 +138,7 @@ def main():
         ax.set_ylim(0, 100)
         ax.set_ylabel("I")
         ax.set_title(f"Example week, home {wk.home.iloc[0]} (S1 test period)", color=INK, loc="left")
-        ax.legend(frameon=False, ncol=4, fontsize=8)
+        ax.legend(frameon=False, ncol=4, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.12))
         fig.tight_layout()
         fig.savefig(fg / "fig_example_week.png")
         plt.close(fig)

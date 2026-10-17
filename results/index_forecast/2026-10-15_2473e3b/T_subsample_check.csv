@@ -1,0 +1,5 @@
+﻿method;train_fraction;n_train;n_test;best_params;MAE;RMSE;MAE_home_median;wall_s_tuning_plus_fit;peak_rss_mb;MAE_change_vs_full_pct
+linear;1,0;226846;75226;{'alpha': 10};9,952906;17,85366;9,502968;4,4;2117,6;0,0
+hgb;1,0;226846;75226;{'learning_rate': 0.05, 'max_leaf_nodes': 63};8,47841;16,177402;7,623108;54,4;2165,3;0,0
+linear;0,4;90739;75226;{'alpha': 0.1};9,956082;17,859875;9,478209;0,6;1831,6;0,031918
+hgb;0,4;90739;75226;{'learning_rate': 0.1, 'max_leaf_nodes': 31};8,489451;16,269923;7,660935;28,1;1852,0;0,130225

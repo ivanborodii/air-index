@@ -25,7 +25,7 @@ audit).
 > Raspberry Pi 5. The fuzzy method below (`iaq_hfis`) is used there only as
 > an unchanged comparison baseline. Run: `experiments/index_forecast/run_all.sh`;
 > results, deviations and resource measurements:
-> [`results/index_forecast/`](results/index_forecast/).
+> [`results/index_forecast/2026-10-15_2473e3b/`](results/index_forecast/2026-10-15_2473e3b/README.md).
 
 ## Table of contents
 

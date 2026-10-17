@@ -1,0 +1,12 @@
+{
+  "fuzzy18_profiles_used": {
+    "kitchen/warm_period": 160522,
+    "kitchen/cold_period": 159567
+  },
+  "fuzzy18_general_residential_n_defined": 160522,
+  "agreement_5class_thresholds_0_25_50_75": 0.18186191965359635,
+  "agreement_4class_native_vs_I_merged_excellent_good": 0.27968783682038434,
+  "spearman_score18_vs_I": 0.7204357302771036,
+  "fuzzy18_min_score": 12.444029850746269,
+  "note": "[18] uses config/ as is: room=kitchen, its own season months (cold Oct-Mar, warm Apr-Sep), fuzzy class boundaries 25/50/75 left-closed; EXCELLENT (score exactly 0) is unreachable for a centroid score."
+}

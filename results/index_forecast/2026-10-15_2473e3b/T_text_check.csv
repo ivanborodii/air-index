@@ -1,0 +1,14 @@
+﻿statement;value_in_article;obtained_value;match;note
+number of records / homes;322 591 / 27;322591 / 27;yes;
+median duration of episodes PM2.5 > 25;3 h;"3 h (pooled episodes); 3 h (median of per-home medians)";yes;
+median duration of episodes CO2 > 1220;3 h;"3 h (pooled episodes); 3 h (median of per-home medians)";yes;
+median Spearman x(t)-x(t+6), PM2.5 / CO2;0.68 / 0.59;0.68 / 0.59;yes;
+h=6 MAE persistence vs same hour previous day, pm25;14.3 vs 15.6 ug/m3;"pooled: 14.3 vs 15.6; median over homes: 9.8 vs 12.0 ug/m3";yes;"pooled over all hours of all homes; common hours where x(t), x(t+6) and x(t-18) are present"
+h=6 MAE persistence vs same hour previous day, co2;174 vs 172 ppm;"pooled: 175 vs 173; median over homes: 170 vs 156 ppm";no;"pooled over all hours of all homes; common hours where x(t), x(t+6) and x(t-18) are present"
+median Spearman PM2.5-PM10 over homes, both seasons;> 0.9 (about 0.998);"heating 0.9981; warm 0.9982";yes;
+share of hours with d_PM10 > d_PM2.5;<= 5%;0.0008% (max per home 0.0269%);yes;
+"scores (60,0,0) -> I = 45; (80,0,0) -> I = 80";"45; 80";"45; 80";yes;
+class of I never more than one class better than the worst component;property of (6)-(7);"max class gap: 1 on 1e5 random triples; 1 on 320089 data hours";yes;
+novelty 1: validation on homes not used in training (S2);claim;supported by T6_regression.csv, T7_classification.csv (scheme = S2), groups.json;yes;
+novelty 2: direct forecast of I vs I from forecasts of indicators;claim;supported by T8_direct_vs_indicators.csv, T_wilcoxon.csv;yes;
+novelty 3: component contribution per home and season;claim;supported by T5_contribution.csv;yes;

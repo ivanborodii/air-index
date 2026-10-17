@@ -1,0 +1,6 @@
+﻿rule;n_hours;share_EXCELLENT;share_GOOD;share_MODERATE;share_LOW;share_CRITICAL;share_more_than_one_class_better_than_worst;share_hides_LOW_CRITICAL
+mean_Qbar;320089;0,187685;0,632733;0,163945;0,015183;0,000453;0,178438;0,932654
+worst_Qmax;320089;0,187685;0,312479;0,267657;0,106558;0,125621;0,0;0,0
+model_I;320089;0,187685;0,564662;0,078294;0,043738;0,125621;0,0;0,270567
+fuzzy18_kitchen_config_as_is;320089;0,0;0,130117;0,303994;0,320686;0,245204;0,0;0,040111
+fuzzy18_general_residential_warm_only;160522;0,0;0,105543;0,230205;0,336197;0,328055;0,0;0,0
