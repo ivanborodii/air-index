@@ -1,0 +1,28 @@
+{
+  "median_spearman_by_season": {
+    "heating": 0.9980833103434517,
+    "warm": 0.9982241510427453
+  },
+  "n_homes_by_season": {
+    "heating": 27,
+    "warm": 27
+  },
+  "condition1_spearman_gt": 0.9,
+  "condition1_holds": true,
+  "share_d10_gt_d25_overall": 8.333125005208204e-06,
+  "share_d10_gt_d25_by_season": {
+    "heating": 1.1407711613050422e-05,
+    "warm": 0.0
+  },
+  "share_d10_gt_d25_per_home_quantiles": {
+    "0": 0.0,
+    "0.25": 0.0,
+    "0.5": 0.0,
+    "0.75": 0.0,
+    "1": 0.00026896180742334586
+  },
+  "n_homes_share_gt_limit": 0,
+  "condition2_share_le": 0.05,
+  "condition2_holds": true,
+  "pm10_separate": false
+}

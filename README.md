@@ -13,6 +13,20 @@ audit).
 
 ---
 
+> **New experiment (2026-10): integral IAQ index and its ML forecasting.**
+> A separate package `src/iaq_index/` implements the integral index I
+> (formulas (1)–(9) of the article "A model of an integral indoor air quality
+> index and its forecasting with machine learning methods"; limits in
+> `config/iaq_index.yaml`). `experiments/index_forecast/` computes it on the
+> Kępa & Rogulski dataset (27 Polish homes, 2024–2025, Zenodo DOI
+> [10.5281/zenodo.22045167](https://doi.org/10.5281/zenodo.22045167); download
+> `data_HOM_Pl_Zenodo.csv` into `data/zenodo/`, it is not committed) and
+> forecasts I 1, 3 and 6 h ahead with 7 scikit-learn methods on a
+> Raspberry Pi 5. The fuzzy method below (`iaq_hfis`) is used there only as
+> an unchanged comparison baseline. Run: `experiments/index_forecast/run_all.sh`;
+> results, deviations and resource measurements:
+> [`results/index_forecast/2026-10-15_2473e3b/`](results/index_forecast/2026-10-15_2473e3b/README.md).
+
 ## Table of contents
 
 1. [Purpose and scope](#1-purpose-and-scope)

@@ -47,3 +47,13 @@ research_results/runs/*/snapshot/*.csv
 # experiment (task section 1/6) -- intermediate working state, not a result;
 # the finished CSVs/plots under missing_data_strategy/ are the real artifacts.
 research_results/runs/*/missing_data_strategy/_checkpoints/
+
+# index-forecast experiment (2026-10): raw Zenodo dataset (obtain it from
+# DOI 10.5281/zenodo.22045167, see README), intermediate stage outputs,
+# trained models, logs, the experiment venv. hourly_index.parquet holds the
+# raw measurements too, so it is not committed either.
+data/zenodo/
+data/index_forecast/
+logs/
+.venv-index/
+results/index_forecast/*/hourly_index.parquet

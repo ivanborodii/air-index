@@ -1,0 +1,7 @@
+﻿rule;indicator;n_values_removed;n_values_present_before
+co2_below_min;co2;768;322451
+co2_error_code;co2;7;322451
+pm25_above_max;pm25;21;320893
+pm10_above_max;pm10;29;320893
+t_out_of_range;t;0;322451
+rh_out_of_range;rh;0;322451

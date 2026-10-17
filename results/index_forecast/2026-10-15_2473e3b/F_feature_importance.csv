@@ -1,0 +1,21 @@
+﻿rank;feature;importance_mean_MAE_increase;importance_std;model
+1;I;12,552435;0,191111;S1 h=3 hgb direct regression
+2;t_mean_24h;0,912002;0,029379;S1 h=3 hgb direct regression
+3;Q_M;0,753398;0,01918;S1 h=3 hgb direct regression
+4;pm25_mean_24h;0,341156;0,03465;S1 h=3 hgb direct regression
+5;hour_sin;0,314765;0,038244;S1 h=3 hgb direct regression
+6;hour_cos;0,283653;0,028956;S1 h=3 hgb direct regression
+7;cur_pm25;0,262726;0,006983;S1 h=3 hgb direct regression
+8;diff1_t;0,24172;0,020042;S1 h=3 hgb direct regression
+9;t_max_24h;0,223269;0,018759;S1 h=3 hgb direct regression
+10;diff1_pm25;0,204815;0,015898;S1 h=3 hgb direct regression
+11;pm10_mean_24h;0,174532;0,015999;S1 h=3 hgb direct regression
+12;pm10_std_3h;0,12948;0,010165;S1 h=3 hgb direct regression
+13;diff1_co2;0,121086;0,015452;S1 h=3 hgb direct regression
+14;diff1_pm10;0,109234;0,008891;S1 h=3 hgb direct regression
+15;t_min_24h;0,098617;0,007046;S1 h=3 hgb direct regression
+16;co2_mean_24h;0,081448;0,006276;S1 h=3 hgb direct regression
+17;cur_co2;0,080227;0,009162;S1 h=3 hgb direct regression
+18;cur_t;0,077202;0,016926;S1 h=3 hgb direct regression
+19;rh_mean_24h;0,07656;0,009428;S1 h=3 hgb direct regression
+20;pm10_mean_6h;0,074902;0,015047;S1 h=3 hgb direct regression

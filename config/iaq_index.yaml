@@ -1,0 +1,111 @@
+# config/iaq_index.yaml
+# Integral indoor air quality index model (package src/iaq_index/).
+# Article: "A model of an integral indoor air quality index and its
+# forecasting with machine learning methods" -- formulas (1)-(11),
+# Table 1 (class limits of the indicators), Table 2 (classes of scores and I).
+#
+# Every number used by the model lives here; the code holds none.
+# Breakpoints b0..b4 per indicator (Table 1 of the article):
+#   b0      -- limit of the normative (EXCELLENT) range
+#   b1..b3  -- outer limits of GOOD, MODERATE, LOW
+#   b4      -- b3 + (b3 - b2): one LOW-class width beyond the CRITICAL limit
+#              (score d = 100 at and beyond b4)
+# Two-sided indicators (T, RH) have separate sets below ("low") and above
+# ("high") the normative range.
+
+classes:
+  # Table 2: class by score, identical for d_i, Q_c and I.
+  # EXCELLENT = 0; GOOD (0;25]; MODERATE (25;50]; LOW (50;75]; CRITICAL (75;100]
+  names: [EXCELLENT, GOOD, MODERATE, LOW, CRITICAL]
+  score_upper_limits: [0, 25, 50, 75, 100]
+
+score:
+  # Formula (1): d_i = 25 * (k + |x - b_k| / |b_{k+1} - b_k|)
+  points_per_class: 25
+  max_score: 100
+
+indicators:
+  pm25:
+    # WHO 2021 Global Air Quality Guidelines, PM2.5 24-h: AQG level 15,
+    # interim targets IT-4 25, IT-3 37.5, IT-2 50 ug/m3.
+    # b4 = 50 + (50 - 37.5) = 62.5
+    unit: "ug/m3"
+    kind: monotonic
+    breakpoints: [15, 25, 37.5, 50, 62.5]
+  pm10:
+    # WHO 2021, PM10 24-h: AQG level 45, IT-4 50, IT-3 75, IT-2 100 ug/m3.
+    # b4 = 100 + (100 - 75) = 125
+    unit: "ug/m3"
+    kind: monotonic
+    breakpoints: [45, 50, 75, 100, 125]
+  co2:
+    # EN 16798-1:2019 Annex B (residential, default CO2 above outdoor):
+    # category I 550, II 800, III 1350 ppm above outdoor; outdoor CO2 = 420 ppm
+    # -> 970 / 1220 / 1770 ppm. Category IV has no upper limit in the
+    # standard, so the CRITICAL limit 2000 ppm is taken from UBA 2008
+    # (Umweltbundesamt, Gesundheitliche Bewertung von Kohlendioxid in der
+    # Innenraumluft). b4 = 2000 + (2000 - 1770) = 2230.
+    # Breakpoints are derived from outdoor_ppm + delta_ppm in code so the
+    # sensitivity variant (outdoor 400 ppm) changes only one number.
+    unit: "ppm"
+    kind: monotonic
+    outdoor_ppm: 420
+    delta_above_outdoor_ppm: [550, 800, 1350]
+    critical_limit_ppm: 2000
+  t:
+    # EN 16798-1:2019 (DSTU EN 16798-1), residential living rooms,
+    # categories I-III: I [21; 25.5], II [20; 26], III [18; 27] degC.
+    # LOW limits (16 and 28) are a MODEL PARAMETER, not a normative value:
+    # obtained by continuing the step b3 = b2 + (b2 - b1) on each side
+    # (18 - 2 = 16; 27 + 1 = 28). b4 = b3 + (b3 - b2): 14 and 29.
+    unit: "degC"
+    kind: two_sided
+    low: [21, 20, 18, 16, 14]
+    high: [25.5, 26, 27, 28, 29]
+  rh:
+    # EN 16798-1:2019, categories I-III: I [30; 50], II [25; 60], III [20; 70] %.
+    # LOW limits (15 and 80) are a MODEL PARAMETER obtained by continuing the
+    # step (20 - 5 = 15; 70 + 10 = 80). b4: 10 and 90.
+    unit: "%"
+    kind: two_sided
+    low: [30, 25, 20, 15, 10]
+    high: [50, 60, 70, 80, 90]
+
+components:
+  # Formulas (2)-(4); with pm10_separate: true, PM10 forms a fourth
+  # component P (section 3.4 of the task / merging rule) and Q-bar is
+  # divided by 4.
+  pm10_separate: false
+  A: [pm25, pm10]
+  V: [co2]
+  M: [t, rh]
+
+aggregation:
+  # Formula (6): Delta = max(0, threshold - Q_max); (7): I = max(Q-bar, Q_max - Delta)
+  critical_threshold: 75
+  # Formulas (8)-(9): dominance S_c = N_c / N, N = hours with I > dominance_min_index,
+  # N_c = those with Q_c >= Q_max - dominance_tolerance
+  dominance_min_index: 25
+  dominance_tolerance: 1
+
+pm_merge_rule:
+  # Section 3.4: PM10 stays inside component A only if BOTH hold
+  min_median_spearman: 0.9          # in both seasons, median over homes, strictly greater
+  max_share_pm10_dominant: 0.05     # share of hours (max(d_PM2.5, d_PM10) > 0) with d_PM10 > d_PM2.5, <=
+  min_common_hours: 200
+
+preprocessing:
+  # Physically invalid values are set to missing (no imputation).
+  co2_min_ppm: 350          # CO2 < 350 ppm -> missing
+  co2_error_code: 9999      # CO2 == 9999 -> missing (sensor error code)
+  pm_max_ugm3: 1000         # PM2.5 or PM10 > 1000 -> missing
+  t_range_c: [5, 40]        # T outside [5; 40] -> missing
+  rh_range_pct: [5, 95]     # RH outside [5; 95] -> missing
+  heating_months: [10, 11, 12, 1, 2, 3, 4]   # heating season October-April
+  warm_months: [5, 6, 7, 8, 9]               # warm season May-September
+
+sensitivity:
+  t_low_alt: [21, 20, 18, 17, 16]   # LOW lower limit 17 degC instead of 16 (b4 = 16)
+  co2_outdoor_alt_ppm: 400          # -> 950 / 1200 / 1750 ppm
+  pm_trailing_window_hours: 24
+  pm_trailing_min_hours: 18
